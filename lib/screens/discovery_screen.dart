@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/dcp_models.dart';
 import '../services/device_manager.dart';
+import '../services/pairing_manager.dart';
 import '../theme/app_theme.dart';
 import '../widgets/device_icons.dart';
 import '../widgets/machine_make_logo.dart';
 import 'main_layout.dart';
+import 'qr_scanner_screen.dart';
 
 class DiscoveryScreen extends StatefulWidget {
   const DiscoveryScreen({super.key});
@@ -324,13 +326,23 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                         color: AppTheme.primaryOrange,
                         size: 28,
                       ),
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Opening QR Scanner...'),
-                            backgroundColor: AppTheme.primaryOrange,
+                      onPressed: () async {
+                        final messenger = ScaffoldMessenger.of(context);
+                        final result = await Navigator.of(context).push<PairingRequest>(
+                          MaterialPageRoute(
+                            builder: (_) => const QrScannerScreen(),
                           ),
                         );
+                        if (result != null && mounted) {
+                          messenger.showSnackBar(
+                            SnackBar(
+                              content: Text('Pairing initiated with ${result.deviceName}'),
+                              backgroundColor: AppTheme.primaryOrange,
+                            ),
+                          );
+                          // Trigger scan refresh
+                          _deviceManager.startScan();
+                        }
                       },
                     ),
                   ),

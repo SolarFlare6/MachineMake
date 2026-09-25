@@ -42,6 +42,24 @@ class AppTheme {
       textTheme: exo2TextTheme.apply(
         bodyColor: textWhite,
         displayColor: textWhite,
+        fontFamily: GoogleFonts.exo2().fontFamily,
+      ),
+      primaryTextTheme: exo2TextTheme.apply(
+        bodyColor: textWhite,
+        displayColor: textWhite,
+        fontFamily: GoogleFonts.exo2().fontFamily,
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: modalBackground,
+        titleTextStyle: GoogleFonts.exo2(
+          color: textWhite,
+          fontSize: 22,
+          fontWeight: FontWeight.bold,
+        ),
+        contentTextStyle: GoogleFonts.exo2(
+          color: textWhite,
+          fontSize: 16,
+        ),
       ),
       appBarTheme: AppBarTheme(
         backgroundColor: darkBackground,
