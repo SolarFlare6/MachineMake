@@ -27,7 +27,7 @@ class DeviceProfileIcon extends StatelessWidget {
           'assets/Rpi icon.svg',
           width: size,
           height: size,
-          colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+          fit: BoxFit.contain,
         );
         break;
 
@@ -38,7 +38,7 @@ class DeviceProfileIcon extends StatelessWidget {
           'assets/microchip.svg',
           width: size,
           height: size,
-          colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+          fit: BoxFit.contain,
         );
         break;
 
@@ -62,7 +62,7 @@ class DeviceProfileIcon extends StatelessWidget {
     return Container(
       width: size * 1.6,
       height: size * 1.6,
-      padding: EdgeInsets.all(size * 0.25),
+      padding: EdgeInsets.all(size * 0.2),
       decoration: BoxDecoration(
         color: backgroundColor,
         borderRadius: BorderRadius.circular(12),
@@ -80,51 +80,62 @@ class QuadrupedIconPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
+    final w = size.width;
+    final h = size.height;
+
+    // Dark body fill inside quadruped
+    final bgPaint = Paint()
+      ..color = const Color(0xFF181818)
+      ..style = PaintingStyle.fill;
+
+    final outlinePaint = Paint()
       ..color = color
       ..style = PaintingStyle.stroke
-      ..strokeWidth = size.width * 0.08
+      ..strokeWidth = w * 0.08
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
 
-    final w = size.width;
-    final h = size.height;
+    final bodyRect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(w * 0.15, h * 0.2, w * 0.7, h * 0.6),
+      Radius.circular(w * 0.15),
+    );
+    canvas.drawRRect(bodyRect, bgPaint);
 
     // Body curve
     final bodyPath = Path();
     bodyPath.moveTo(w * 0.25, h * 0.45);
     bodyPath.quadraticBezierTo(w * 0.5, h * 0.35, w * 0.75, h * 0.45);
-    canvas.drawPath(bodyPath, paint);
+    canvas.drawPath(bodyPath, outlinePaint);
 
     // Head
     final headPath = Path();
     headPath.moveTo(w * 0.25, h * 0.45);
     headPath.cubicTo(w * 0.2, h * 0.3, w * 0.35, h * 0.2, w * 0.4, h * 0.3);
-    canvas.drawPath(headPath, paint);
+    canvas.drawPath(headPath, outlinePaint);
 
     // Front Left Leg
     final legFL = Path();
     legFL.moveTo(w * 0.3, h * 0.45);
     legFL.quadraticBezierTo(w * 0.2, h * 0.65, w * 0.25, h * 0.85);
-    canvas.drawPath(legFL, paint);
+    canvas.drawPath(legFL, outlinePaint);
 
     // Front Right Leg
     final legFR = Path();
     legFR.moveTo(w * 0.4, h * 0.45);
     legFR.quadraticBezierTo(w * 0.35, h * 0.65, w * 0.4, h * 0.85);
-    canvas.drawPath(legFR, paint);
+    canvas.drawPath(legFR, outlinePaint);
 
     // Back Left Leg
     final legBL = Path();
     legBL.moveTo(w * 0.65, h * 0.45);
     legBL.quadraticBezierTo(w * 0.6, h * 0.65, w * 0.65, h * 0.85);
-    canvas.drawPath(legBL, paint);
+    canvas.drawPath(legBL, outlinePaint);
 
     // Back Right Leg
     final legBR = Path();
     legBR.moveTo(w * 0.75, h * 0.45);
     legBR.quadraticBezierTo(w * 0.8, h * 0.65, w * 0.75, h * 0.85);
-    canvas.drawPath(legBR, paint);
+    canvas.drawPath(legBR, outlinePaint);
   }
 
   @override
