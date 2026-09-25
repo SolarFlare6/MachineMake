@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 
 class MachineMakeLogo extends StatelessWidget {
@@ -30,11 +31,10 @@ class MachineMakeLogo extends StatelessWidget {
 
     final textWidget = RichText(
       text: TextSpan(
-        style: TextStyle(
+        style: GoogleFonts.exo2(
           fontSize: fontSize,
           fontWeight: FontWeight.bold,
           letterSpacing: 0.5,
-          fontFamily: 'Roboto',
         ),
         children: const [
           TextSpan(

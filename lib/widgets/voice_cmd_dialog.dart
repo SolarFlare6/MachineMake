@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../models/dcp_models.dart';
 import '../theme/app_theme.dart';
 import 'voice_sphere.dart';
@@ -76,19 +77,19 @@ class _VoiceCmdDialogState extends State<VoiceCmdDialog> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text(
+        Text(
           'Voice command',
           textAlign: TextAlign.center,
-          style: TextStyle(
+          style: GoogleFonts.exo2(
             fontSize: 26,
             fontWeight: FontWeight.bold,
             color: Colors.white,
           ),
         ),
         const SizedBox(height: 24),
-        const Text(
+        Text(
           'Device',
-          style: TextStyle(
+          style: GoogleFonts.exo2(
             fontSize: 18,
             fontWeight: FontWeight.bold,
             color: AppTheme.primaryOrange,
@@ -117,7 +118,7 @@ class _VoiceCmdDialogState extends State<VoiceCmdDialog> {
                   value: device.id,
                   child: Text(
                     device.name,
-                    style: const TextStyle(
+                    style: GoogleFonts.exo2(
                       color: Colors.white,
                       fontSize: 18,
                       fontWeight: FontWeight.w600,
@@ -140,18 +141,19 @@ class _VoiceCmdDialogState extends State<VoiceCmdDialog> {
           },
           style: ElevatedButton.styleFrom(
             backgroundColor: AppTheme.primaryOrange,
-            foregroundColor: Colors.white,
+            foregroundColor: AppTheme.textDarkButton,
             padding: const EdgeInsets.symmetric(vertical: 14),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
             elevation: 0,
           ),
-          child: const Text(
+          child: Text(
             'Select',
-            style: TextStyle(
+            style: GoogleFonts.exo2(
               fontSize: 18,
               fontWeight: FontWeight.bold,
+              color: AppTheme.textDarkButton,
             ),
           ),
         ),
@@ -162,18 +164,19 @@ class _VoiceCmdDialogState extends State<VoiceCmdDialog> {
             foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(vertical: 14),
             side: const BorderSide(
-              color: Color(0xFFD4CBE5),
+              color: AppTheme.borderLavender,
               width: 1.8,
             ),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
           ),
-          child: const Text(
+          child: Text(
             'Close',
-            style: TextStyle(
+            style: GoogleFonts.exo2(
               fontSize: 18,
               fontWeight: FontWeight.bold,
+              color: Colors.white,
             ),
           ),
         ),
@@ -186,10 +189,10 @@ class _VoiceCmdDialogState extends State<VoiceCmdDialog> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        const Text(
+        Text(
           'Listening',
           textAlign: TextAlign.center,
-          style: TextStyle(
+          style: GoogleFonts.exo2(
             fontSize: 26,
             fontWeight: FontWeight.bold,
             color: Colors.white,
@@ -205,18 +208,19 @@ class _VoiceCmdDialogState extends State<VoiceCmdDialog> {
             padding: const EdgeInsets.symmetric(vertical: 14),
             minimumSize: const Size(double.infinity, 50),
             side: const BorderSide(
-              color: Color(0xFFD4CBE5),
+              color: AppTheme.borderLavender,
               width: 1.8,
             ),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
           ),
-          child: const Text(
+          child: Text(
             'Close',
-            style: TextStyle(
+            style: GoogleFonts.exo2(
               fontSize: 18,
               fontWeight: FontWeight.bold,
+              color: Colors.white,
             ),
           ),
         ),

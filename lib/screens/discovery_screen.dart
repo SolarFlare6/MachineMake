@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../models/dcp_models.dart';
 import '../services/device_manager.dart';
 import '../theme/app_theme.dart';
@@ -20,7 +21,6 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
   void initState() {
     super.initState();
     _deviceManager.addListener(_onDeviceManagerChange);
-    // Trigger initial scan
     _deviceManager.startScan();
   }
 
@@ -55,16 +55,19 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                   children: [
                     Text(
                       'Pair with ${device.name}',
-                      style: const TextStyle(
+                      style: GoogleFonts.exo2(
                         fontSize: 22,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
                       ),
                     ),
                     const SizedBox(height: 12),
-                    const Text(
+                    Text(
                       'Select communication transport protocol:',
-                      style: TextStyle(color: AppTheme.textMuted, fontSize: 14),
+                      style: GoogleFonts.exo2(
+                        color: AppTheme.textMuted,
+                        fontSize: 14,
+                      ),
                     ),
                     const SizedBox(height: 16),
                     ...device.availableTransports.map((t) {
@@ -88,7 +91,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                           activeColor: AppTheme.primaryOrange,
                           title: Text(
                             t.toUpperCase(),
-                            style: const TextStyle(
+                            style: GoogleFonts.exo2(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
                             ),
@@ -117,7 +120,17 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                           ),
                         );
                       },
-                      child: const Text('Pair & Connect'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primaryOrange,
+                        foregroundColor: AppTheme.textDarkButton,
+                      ),
+                      child: Text(
+                        'Pair & Connect',
+                        style: GoogleFonts.exo2(
+                          color: AppTheme.textDarkButton,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -173,9 +186,9 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 12),
-              const Text(
+              Text(
                 'Nearby Devices',
-                style: TextStyle(
+                style: GoogleFonts.exo2(
                   fontSize: 26,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
@@ -210,7 +223,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                         ),
                         title: Text(
                           item.name,
-                          style: const TextStyle(
+                          style: GoogleFonts.exo2(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
@@ -230,13 +243,13 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                                   color: AppTheme.darkCard,
                                   borderRadius: BorderRadius.circular(6),
                                   border: Border.all(
-                                    color: AppTheme.primaryOrange.withOpacity(0.5),
+                                    color: AppTheme.primaryOrange.withAlpha(128),
                                     width: 1,
                                   ),
                                 ),
                                 child: Text(
                                   t,
-                                  style: const TextStyle(
+                                  style: GoogleFonts.exo2(
                                     color: AppTheme.primaryOrange,
                                     fontSize: 12,
                                     fontWeight: FontWeight.w600,
@@ -268,7 +281,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppTheme.primaryOrange,
-                        foregroundColor: Colors.white,
+                        foregroundColor: AppTheme.textDarkButton,
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),
@@ -279,15 +292,16 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                               height: 24,
                               width: 24,
                               child: CircularProgressIndicator(
-                                color: Colors.white,
+                                color: AppTheme.textDarkButton,
                                 strokeWidth: 2.5,
                               ),
                             )
-                          : const Text(
+                          : Text(
                               'Scan',
-                              style: TextStyle(
+                              style: GoogleFonts.exo2(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
+                                color: AppTheme.textDarkButton,
                               ),
                             ),
                     ),
@@ -333,9 +347,9 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                       ),
                     );
                   },
-                  child: const Text(
+                  child: Text(
                     'skip scan',
-                    style: TextStyle(
+                    style: GoogleFonts.exo2(
                       color: AppTheme.primaryOrange,
                       fontSize: 16,
                       fontWeight: FontWeight.bold,

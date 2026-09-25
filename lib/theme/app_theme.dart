@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
   // Brand Color Palette
@@ -11,9 +12,11 @@ class AppTheme {
   // Vibrant Accents
   static const Color primaryOrange = Color(0xFFF37032);
   static const Color accentOrange = Color(0xFFFF6B35);
+  static const Color textDarkButton = Color(0xFF1E1F23); // Button text on filled orange
   static const Color textWhite = Color(0xFFFFFFFF);
   static const Color textMuted = Color(0xFF9E9EA3);
   static const Color borderOrange = Color(0xFFF37032);
+  static const Color borderLavender = Color(0xFFD4CBE5);
 
   // Telemetry Colors
   static const Color cpuOrange = Color(0xFFF37032);
@@ -22,6 +25,9 @@ class AppTheme {
   static const Color tempBlue = Color(0xFF00A8FF);
 
   static ThemeData get darkTheme {
+    final baseTheme = ThemeData.dark();
+    final exo2TextTheme = GoogleFonts.exo2TextTheme(baseTheme.textTheme);
+
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
@@ -32,12 +38,16 @@ class AppTheme {
         surface: darkSurface,
         onSurface: textWhite,
       ),
-      fontFamily: 'Roboto',
-      appBarTheme: const AppBarTheme(
+      fontFamily: GoogleFonts.exo2().fontFamily,
+      textTheme: exo2TextTheme.apply(
+        bodyColor: textWhite,
+        displayColor: textWhite,
+      ),
+      appBarTheme: AppBarTheme(
         backgroundColor: darkBackground,
         elevation: 0,
         centerTitle: false,
-        titleTextStyle: TextStyle(
+        titleTextStyle: GoogleFonts.exo2(
           color: textWhite,
           fontSize: 22,
           fontWeight: FontWeight.bold,
@@ -54,13 +64,14 @@ class AppTheme {
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: primaryOrange,
-          foregroundColor: textWhite,
+          foregroundColor: textDarkButton,
           minimumSize: const Size(double.infinity, 50),
+          elevation: 0,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(14),
           ),
-          textStyle: const TextStyle(
-            fontSize: 16,
+          textStyle: GoogleFonts.exo2(
+            fontSize: 18,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -68,13 +79,13 @@ class AppTheme {
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: primaryOrange,
-          side: const BorderSide(color: borderOrange, width: 2),
+          side: const BorderSide(color: borderOrange, width: 1.8),
           minimumSize: const Size(double.infinity, 50),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(14),
           ),
-          textStyle: const TextStyle(
-            fontSize: 16,
+          textStyle: GoogleFonts.exo2(
+            fontSize: 18,
             fontWeight: FontWeight.bold,
           ),
         ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../widgets/machine_make_logo.dart';
 import 'discovery_screen.dart';
@@ -51,14 +52,13 @@ class WelcomeScreen extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         RichText(
-                          text: const TextSpan(
-                            style: TextStyle(
+                          text: TextSpan(
+                            style: GoogleFonts.exo2(
                               fontSize: 26,
                               fontWeight: FontWeight.bold,
-                              fontFamily: 'Roboto',
                               height: 1.2,
                             ),
-                            children: [
+                            children: const [
                               TextSpan(
                                 text: 'Welcome to the\n',
                                 style: TextStyle(color: Colors.white),
@@ -71,9 +71,9 @@ class WelcomeScreen extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 12),
-                        const Text(
+                        Text(
                           'connect, control & create through\none app',
-                          style: TextStyle(
+                          style: GoogleFonts.exo2(
                             fontSize: 16,
                             color: AppTheme.textMuted,
                             height: 1.3,
@@ -90,18 +90,19 @@ class WelcomeScreen extends StatelessWidget {
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppTheme.primaryOrange,
-                            foregroundColor: Colors.white,
+                            foregroundColor: AppTheme.textDarkButton,
                             padding: const EdgeInsets.symmetric(vertical: 16),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(16),
                             ),
                             elevation: 0,
                           ),
-                          child: const Text(
+                          child: Text(
                             'Scan for devices',
-                            style: TextStyle(
+                            style: GoogleFonts.exo2(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
+                              color: AppTheme.textDarkButton,
                             ),
                           ),
                         ),
