@@ -1,31 +1,38 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- ─── Internet & Network ─────────────────────────────────────────────── -->
-    <uses-permission android:name="android.permission.INTERNET"/>
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
-    <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE"/>
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.example.machmake2">
 
-    <!-- ─── Bluetooth (legacy — Android ≤ 11) ───────────────────────────────── -->
-    <uses-permission android:name="android.permission.BLUETOOTH"
-        android:maxSdkVersion="30"/>
-    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"
-        android:maxSdkVersion="30"/>
+    <!-- Internet & Network -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
 
-    <!-- ─── Bluetooth (Android 12 +) ─────────────────────────────────────── -->
-    <uses-permission android:name="android.permission.BLUETOOTH_SCAN"
-        android:usesPermissionFlags="neverForLocation"/>
-    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
-    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE"/>
+    <!-- Bluetooth (legacy — Android 11 and lower) -->
+    <uses-permission android:name="android.permission.BLUETOOTH" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
 
-    <!-- ─── Location (required for BLE on Android ≤ 11) ─────────────────── -->
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+    <!-- Bluetooth (Android 12+) -->
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
 
-    <!-- ─── Camera (QR scanner) ──────────────────────────────────────────── -->
-    <uses-permission android:name="android.permission.CAMERA"/>
+    <!-- Location (required for Bluetooth scanning on Android) -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
-    <!-- BLE optional so the app installs on non-BLE devices too -->
-    <uses-feature android:name="android.hardware.bluetooth_le" android:required="false"/>
-    <uses-feature android:name="android.hardware.camera" android:required="false"/>
+    <!-- Camera (QR scanner) -->
+    <uses-permission android:name="android.permission.CAMERA" />
+
+    <!-- Microphone (Voice command) -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <!-- Features -->
+    <uses-feature
+        android:name="android.hardware.bluetooth_le"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="false" />
 
     <application
         android:label="MachineMake"
@@ -65,6 +72,9 @@
 
          In particular, this is used by the Flutter engine in io.flutter.plugin.text.ProcessTextPlugin. -->
     <queries>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>

@@ -168,50 +168,76 @@ class _OperationsScreenState extends State<OperationsScreen> {
             ),
             const SizedBox(height: 8),
 
-            // Device Selector Dropdown
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              decoration: BoxDecoration(
-                color: AppTheme.darkCard,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: AppTheme.primaryOrange,
-                  width: 2,
-                ),
-              ),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<String>(
-                  value: devices.any((d) => d.id == selectedId)
-                      ? selectedId
-                      : (devices.isNotEmpty ? devices.first.id : null),
-                  isExpanded: true,
-                  dropdownColor: AppTheme.darkCard,
-                  icon: const Icon(
-                    Icons.arrow_drop_down,
-                    color: AppTheme.primaryOrange,
-                    size: 32,
-                  ),
-                  items: devices.map((device) {
-                    return DropdownMenuItem<String>(
-                      value: device.id,
-                      child: Text(
-                        device.name,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
+            // Device Selector Dropdown or Empty Placeholder
+            devices.isEmpty
+                ? Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    decoration: BoxDecoration(
+                      color: AppTheme.darkCard,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: AppTheme.darkBorder,
+                        width: 1.5,
                       ),
-                    );
-                  }).toList(),
-                  onChanged: (val) {
-                    if (val != null) {
-                      _deviceManager.setSelectedDevice(val);
-                    }
-                  },
-                ),
-              ),
-            ),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.device_unknown, color: AppTheme.textMuted, size: 22),
+                        SizedBox(width: 12),
+                        Text(
+                          'No device connected',
+                          style: TextStyle(
+                            color: AppTheme.textMuted,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppTheme.darkCard,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: AppTheme.primaryOrange,
+                        width: 2,
+                      ),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: devices.any((d) => d.id == selectedId)
+                            ? selectedId
+                            : devices.first.id,
+                        isExpanded: true,
+                        dropdownColor: AppTheme.darkCard,
+                        icon: const Icon(
+                          Icons.arrow_drop_down,
+                          color: AppTheme.primaryOrange,
+                          size: 32,
+                        ),
+                        items: devices.map((device) {
+                          return DropdownMenuItem<String>(
+                            value: device.id,
+                            child: Text(
+                              device.name,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (val) {
+                          if (val != null) {
+                            _deviceManager.setSelectedDevice(val);
+                          }
+                        },
+                      ),
+                    ),
+                  ),
 
             const SizedBox(height: 24),
             const Text(
@@ -226,7 +252,53 @@ class _OperationsScreenState extends State<OperationsScreen> {
 
             // Available Operations List
             Expanded(
-              child: ListView(
+              child: devices.isEmpty
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              width: 72,
+                              height: 72,
+                              decoration: BoxDecoration(
+                                color: AppTheme.darkSurface,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: AppTheme.darkBorder,
+                                  width: 1.5,
+                                ),
+                              ),
+                              child: const Icon(
+                                Icons.settings_remote,
+                                color: AppTheme.textMuted,
+                                size: 36,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            const Text(
+                              'No active device',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              'Connect a device from the Devices tab to access controls and operations.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: AppTheme.textMuted,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  : ListView(
                 children: [
                   _buildOpCard(
                     icon: Icons.gamepad,

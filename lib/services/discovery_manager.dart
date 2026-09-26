@@ -64,11 +64,6 @@ class DiscoveryManager extends ChangeNotifier {
       _ble.startScan(timeout: timeout);
     }
 
-    // ── Mock devices in debug mode (so UI works without hardware) ─────────
-    if (kDebugMode) {
-      _injectMockDevices();
-    }
-
     // ── Expiry pruning every 10 s ─────────────────────────────────────────
     _expiryTimer?.cancel();
     _expiryTimer =
@@ -107,59 +102,6 @@ class DiscoveryManager extends ChangeNotifier {
     final before = _byId.length;
     _byId.removeWhere((_, d) => !d.isFresh);
     if (_byId.length != before) notifyListeners();
-  }
-
-  // ── Mock data (debug only) ─────────────────────────────────────────────
-
-  void _injectMockDevices() {
-    Timer(const Duration(milliseconds: 600), () {
-      if (!_isScanning) return;
-      _addDevice(DiscoveredDevice(
-        deviceId: 'rpi-4b-01',
-        name: 'Raspberry Pi 4B',
-        type: 'raspberry_pi',
-        transports: const {'wifi'},
-        ipAddress: '192.168.1.104',
-        port: 8765,
-      ));
-    });
-
-    Timer(const Duration(milliseconds: 1400), () {
-      if (!_isScanning) return;
-      _addDevice(DiscoveredDevice(
-        deviceId: 'quad-bot-01',
-        name: 'Quadruped Bot',
-        type: 'robot',
-        transports: const {'wifi'},
-        ipAddress: '192.168.1.120',
-        port: 8765,
-      ));
-    });
-
-    Timer(const Duration(milliseconds: 2200), () {
-      if (!_isScanning) return;
-      _addDevice(DiscoveredDevice(
-        deviceId: 'pico-w-01',
-        name: 'RPi Pico W',
-        type: 'pico',
-        transports: const {'bluetooth'},
-        bleAddress: 'D8:3A:DD:4A:21:05',
-        rssi: -58,
-      ));
-    });
-
-    // Simulate the Pico W also appearing over Wi-Fi to show merge behaviour
-    Timer(const Duration(milliseconds: 3500), () {
-      if (!_isScanning) return;
-      _addDevice(DiscoveredDevice(
-        deviceId: 'pico-w-01',
-        name: 'RPi Pico W',
-        type: 'pico',
-        transports: const {'wifi'},
-        ipAddress: '192.168.1.131',
-        port: 8765,
-      ));
-    });
   }
 
   // ── Dispose ────────────────────────────────────────────────────────────

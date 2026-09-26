@@ -1,0 +1,225 @@
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import '../../core/connection/device_connection.dart';
+import '../../core/models/device_manifest.dart';
+import '../../models/dcp_models.dart';
+import '../../services/device_manager.dart';
+import '../../theme/app_theme.dart';
+import '../../widgets/ssh_dialog.dart';
+import '../../widgets/telemetry_gauge.dart';
+
+/// Specialized dashboard for computer / SBC profiles (Raspberry Pi, PC, Laptop).
+class ComputerDashboardScreen extends StatefulWidget {
+  final DeviceItem device;
+  final DeviceConnection? conn;
+  final DeviceManifest? manifest;
+
+  const ComputerDashboardScreen({
+    super.key,
+    required this.device,
+    this.conn,
+    this.manifest,
+  });
+
+  @override
+  State<ComputerDashboardScreen> createState() => _ComputerDashboardScreenState();
+}
+
+class _ComputerDashboardScreenState extends State<ComputerDashboardScreen> {
+  final DeviceManager _deviceManager = DeviceManager();
+
+  void _openSsh() {
+    final cfg = _deviceManager.getSSHConfig(widget.device.id);
+    showDialog(
+      context: context,
+      builder: (_) => SSHDialog(
+        initialHostname: cfg.hostname,
+        initialPassword: cfg.password,
+        onConnect: (hostname, password) {
+          _deviceManager.saveSSHConfig(widget.device.id, hostname, password);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Connected to $hostname via SSH', style: GoogleFonts.exo2()),
+              backgroundColor: AppTheme.primaryOrange,
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _confirmSystemAction(String actionTitle, String command) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.modalBackground,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: AppTheme.darkBorder),
+        ),
+        title: Text(actionTitle, style: GoogleFonts.exo2(color: Colors.white, fontWeight: FontWeight.bold)),
+        content: Text('Are you sure you want to $actionTitle on ${widget.device.name}?', style: GoogleFonts.exo2(color: AppTheme.textMuted)),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text('Cancel', style: GoogleFonts.exo2(color: Colors.white70))),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryOrange, foregroundColor: AppTheme.textDarkButton),
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              widget.conn?.session?.executeTool(command, {});
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Command sent: $command', style: GoogleFonts.exo2()), backgroundColor: AppTheme.primaryOrange),
+              );
+            },
+            child: Text('Confirm', style: GoogleFonts.exo2(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final telemetry = _deviceManager.getTelemetry(widget.device.id);
+
+    return Scaffold(
+      backgroundColor: AppTheme.darkBackground,
+      appBar: AppBar(
+        backgroundColor: AppTheme.darkSurface,
+        title: Text(
+          widget.device.name,
+          style: GoogleFonts.exo2(fontWeight: FontWeight.bold, color: Colors.white),
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.terminal, color: AppTheme.primaryOrange),
+            tooltip: 'Open SSH Shell',
+            onPressed: _openSsh,
+          ),
+        ],
+      ),
+      body: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Device Info Header Card
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppTheme.darkCard,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: AppTheme.darkBorder),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryOrange.withAlpha(35),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Icon(Icons.computer, color: AppTheme.primaryOrange, size: 28),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.device.deviceType,
+                          style: GoogleFonts.exo2(color: AppTheme.textMuted, fontSize: 13),
+                        ),
+                        Text(
+                          widget.device.ipAddress != null
+                              ? 'IP: ${widget.device.ipAddress}'
+                              : 'Connected over ${widget.device.selectedTransport.toUpperCase()}',
+                          style: GoogleFonts.exo2(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF00E676).withAlpha(30),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFF00E676).withAlpha(120)),
+                    ),
+                    child: Text('Online', style: GoogleFonts.exo2(color: const Color(0xFF00E676), fontWeight: FontWeight.bold, fontSize: 12)),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 20),
+            Text('System Telemetry', style: GoogleFonts.exo2(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+            const SizedBox(height: 14),
+
+            // Gauges (CPU, RAM, GPU, Temp)
+            Row(
+              children: [
+                Expanded(child: TelemetryGauge(value: telemetry.cpuUsage, label: 'CPU', displayValue: '${telemetry.cpuUsage.toStringAsFixed(0)}%', color: AppTheme.cpuOrange)),
+                const SizedBox(width: 14),
+                Expanded(child: TelemetryGauge(value: telemetry.ramUsage, label: 'RAM', displayValue: '${telemetry.ramUsage.toStringAsFixed(0)}%', color: AppTheme.ramPink)),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(child: TelemetryGauge(value: telemetry.gpuUsage, label: 'GPU', displayValue: '${telemetry.gpuUsage.toStringAsFixed(0)}%', color: AppTheme.gpuCyan)),
+                const SizedBox(width: 14),
+                Expanded(child: TelemetryGauge(value: telemetry.temperature, label: 'Temp', displayValue: '${telemetry.temperature.toStringAsFixed(0)}°C', color: AppTheme.tempBlue)),
+              ],
+            ),
+
+            const SizedBox(height: 24),
+            Text('System Operations', style: GoogleFonts.exo2(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+            const SizedBox(height: 14),
+
+            // Quick Operations
+            _buildActionTile(icon: Icons.terminal, title: 'Open SSH Terminal', subtitle: 'Launch remote command line interface', color: AppTheme.primaryOrange, onTap: _openSsh),
+            const SizedBox(height: 10),
+            _buildActionTile(icon: Icons.restart_alt, title: 'Reboot System', subtitle: 'Soft reboot the operating system', color: Colors.amberAccent, onTap: () => _confirmSystemAction('Reboot System', 'system_reboot')),
+            const SizedBox(height: 10),
+            _buildActionTile(icon: Icons.power_settings_new, title: 'Shutdown Host', subtitle: 'Safely halt and power down the device', color: Colors.redAccent, onTap: () => _confirmSystemAction('Shutdown Host', 'system_shutdown')),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActionTile({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.darkCard,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.darkBorder),
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        leading: Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(color: color.withAlpha(30), borderRadius: BorderRadius.circular(12)),
+          child: Icon(icon, color: color, size: 24),
+        ),
+        title: Text(title, style: GoogleFonts.exo2(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+        subtitle: Text(subtitle, style: GoogleFonts.exo2(color: AppTheme.textMuted, fontSize: 12)),
+        trailing: const Icon(Icons.chevron_right, color: AppTheme.textMuted),
+        onTap: onTap,
+      ),
+    );
+  }
+}

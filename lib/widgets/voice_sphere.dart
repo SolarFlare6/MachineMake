@@ -4,8 +4,20 @@ import 'package:flutter/scheduler.dart';
 import '../theme/app_theme.dart';
 
 class VoiceSphere extends StatefulWidget {
-  const VoiceSphere({super.key, this.size = 220});
+  const VoiceSphere({
+    super.key,
+    this.size = 220,
+    this.audioLevel = 0.0,
+    this.isListening = false,
+  });
+
   final double size;
+
+  /// Normalized audio input level from microphone (0.0 to 1.0).
+  final double audioLevel;
+
+  /// Whether voice recognition / listening is currently active.
+  final bool isListening;
 
   @override
   State<VoiceSphere> createState() => _VoiceSphereState();
@@ -38,15 +50,26 @@ class _VoiceSphereState extends State<VoiceSphere>
       width: widget.size,
       height: widget.size,
       child: CustomPaint(
-        painter: _SpherePainter(_elapsed),
+        painter: _SpherePainter(
+          _elapsed,
+          audioLevel: widget.audioLevel,
+          isListening: widget.isListening,
+        ),
       ),
     );
   }
 }
 
 class _SpherePainter extends CustomPainter {
-  _SpherePainter(this.t);
+  _SpherePainter(
+    this.t, {
+    this.audioLevel = 0.0,
+    this.isListening = false,
+  });
+
   final double t;
+  final double audioLevel;
+  final bool isListening;
 
   static final List<List<double>> _pts = _buildSphere(500);
 
@@ -59,18 +82,36 @@ class _SpherePainter extends CustomPainter {
     });
   }
 
-  // Simulated voice reactivity bands
+  // Voice reactivity bands based on microphone audio level + ambient breathing
   Map<String, double> _voice() {
     final s = t / 1000;
-    final breath = 0.3 + 0.25 * sin(s * 0.5);
-    final syllable = pow(max(0.0, sin(s * 3.8 * pi * 2)), 2).toDouble();
-    final phrase = pow(max(0.0, sin(s * 0.36) * sin(s * 0.19)), 0.6).toDouble();
-    final pop = pow(max(0.0, sin(s * 7.3)), 14).toDouble();
+    final breath = 0.25 + 0.15 * sin(s * 0.5);
+
+    final mic = audioLevel.clamp(0.0, 1.0);
+    final hasVoice = isListening && mic > 0.03;
+
+    // React strongly to real voice volume, fall back to organic idle pulse
+    final overall = hasVoice
+        ? (mic * 1.35 + 0.08).clamp(0.0, 1.0)
+        : (isListening ? (breath * 0.45).clamp(0.0, 1.0) : 0.15);
+
+    final bass = hasVoice
+        ? (mic * 1.5).clamp(0.0, 1.0)
+        : (isListening ? breath * 0.35 : 0.1);
+
+    final mid = hasVoice
+        ? (mic * 1.15).clamp(0.0, 1.0)
+        : (isListening ? breath * 0.3 : 0.1);
+
+    final treble = hasVoice
+        ? (mic * 0.95).clamp(0.0, 1.0)
+        : (isListening ? breath * 0.25 : 0.08);
+
     return {
-      'bass': (breath * phrase * 0.8 + pop * 0.2).clamp(0, 1),
-      'mid': (phrase * syllable * 0.8 + pop * 0.5).clamp(0, 1),
-      'treble': (syllable * 0.6 * phrase + pop * 0.9).clamp(0, 1),
-      'overall': (breath * phrase * syllable + pop * 0.35).clamp(0, 1),
+      'bass': bass,
+      'mid': mid,
+      'treble': treble,
+      'overall': overall,
     };
   }
 
@@ -84,19 +125,21 @@ class _SpherePainter extends CustomPainter {
     final treble = v['treble']!;
     final overall = v['overall']!;
 
-    final baseR = size.width * 0.32;
-    final breathe = sin(t * 0.0015) * 6;
-    final radius = baseR + breathe + bass * baseR * 0.35;
-    final ry = t * 0.0003 + mid * t * 0.0001;
+    final baseR = size.width * 0.30;
+    final breathe = sin(t * 0.0015) * 5;
+    // Sphere expands when the user speaks!
+    final radius = baseR + breathe + bass * baseR * 0.45;
+    final ry = t * 0.0003 + (mid + overall) * t * 0.00015;
     final rx = 0.28 + sin(t * 0.0003) * 0.1;
 
     // Background glow radial
     final bgPaint = Paint()
       ..shader = RadialGradient(colors: [
-        Color.fromRGBO(243, 112, 50, 0.15 + overall * 0.25),
+        Color.fromRGBO(243, 112, 50, (0.12 + overall * 0.38).clamp(0.0, 1.0)),
         const Color(0x00000000),
-      ]).createShader(Rect.fromCircle(center: Offset(cx, cy), radius: radius * 1.6));
-    canvas.drawCircle(Offset(cx, cy), radius * 1.6, bgPaint);
+      ]).createShader(
+          Rect.fromCircle(center: Offset(cx, cy), radius: radius * 1.65));
+    canvas.drawCircle(Offset(cx, cy), radius * 1.65, bgPaint);
 
     // Project 3D particles onto 2D viewport
     final projected = <Map<String, double>>[];
@@ -126,15 +169,15 @@ class _SpherePainter extends CustomPainter {
     for (final p in projected) {
       final depth = p['depth']!;
       final dt = (depth + 1) / 2;
-      final dot = (0.7 + p['persp']! * 0.9) + overall * 2.0;
+      final dot = (0.7 + p['persp']! * 0.9) + overall * 2.8;
 
-      final r = (200 + dt * 55 + bass * 20).clamp(0, 255).toInt();
-      final g = (70 + dt * 80 + treble * 40).clamp(0, 255).toInt();
+      final r = (200 + dt * 55 + bass * 25).clamp(0, 255).toInt();
+      final g = (70 + dt * 80 + treble * 50).clamp(0, 255).toInt();
       final b = (20 + dt * 30).clamp(0, 255).toInt();
-      final a = (0.2 + dt * 0.7 + (bass + treble) * 0.1).clamp(0.0, 1.0);
+      final a = (0.2 + dt * 0.7 + (bass + treble) * 0.15).clamp(0.0, 1.0);
 
       if (depth > 0.5 && overall > 0.02) {
-        final ha = (depth - 0.5) * overall * 0.35;
+        final ha = (depth - 0.5) * overall * 0.4;
         canvas.drawCircle(
           Offset(p['sx']!, p['sy']!),
           dot * 2.5,
@@ -152,19 +195,21 @@ class _SpherePainter extends CustomPainter {
     // Core glow center
     final corePaint = Paint()
       ..shader = RadialGradient(colors: [
-        Color.fromRGBO(255, 200, 150, (0.12 + overall * 0.35).clamp(0, 1)),
+        Color.fromRGBO(255, 200, 150, (0.12 + overall * 0.45).clamp(0.0, 1.0)),
         const Color(0x00000000),
       ]).createShader(Rect.fromCircle(
-          center: Offset(cx, cy), radius: radius * 0.45 + overall * 20));
-    canvas.drawCircle(Offset(cx, cy), radius * 0.45 + overall * 20, corePaint);
+          center: Offset(cx, cy), radius: radius * 0.45 + overall * 24));
+    canvas.drawCircle(
+        Offset(cx, cy), radius * 0.45 + overall * 24, corePaint);
 
-    // Outer contour line (smooth pulsating organic border matching image)
+    // Outer contour line (smooth pulsating organic border reacting to audio)
     final borderPath = Path();
     const steps = 60;
     for (int i = 0; i <= steps; i++) {
       final angle = (i / steps) * 2 * pi;
-      final n = sin(angle * 7 + t * 0.003) * 3 + cos(angle * 5 - t * 0.002) * 2;
-      final r = radius * 1.12 + n + bass * 5;
+      final n = sin(angle * 7 + t * 0.003) * (3 + bass * 8) +
+          cos(angle * 5 - t * 0.002) * (2 + bass * 6);
+      final r = radius * 1.12 + n + bass * 12;
       final px = cx + cos(angle) * r;
       final py = cy + sin(angle) * r;
       if (i == 0) {
@@ -176,9 +221,10 @@ class _SpherePainter extends CustomPainter {
     borderPath.close();
 
     final borderPaint = Paint()
-      ..color = AppTheme.primaryOrange.withOpacity(0.7)
+      ..color = AppTheme.primaryOrange
+          .withValues(alpha: (0.7 + overall * 0.3).clamp(0.0, 1.0))
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.8;
+      ..strokeWidth = 1.8 + overall * 1.2;
 
     canvas.drawPath(borderPath, borderPaint);
   }

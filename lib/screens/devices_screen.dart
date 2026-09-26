@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/routing/profile_router.dart';
 import '../services/device_manager.dart';
 import '../theme/app_theme.dart';
 import '../widgets/device_icons.dart';
@@ -123,91 +124,171 @@ class _DevicesScreenState extends State<DevicesScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Devices Grid (2 columns)
+            // Devices Grid or Empty State
             Expanded(
-              child: GridView.builder(
-                itemCount: devices.length,
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 14,
-                  mainAxisSpacing: 14,
-                  childAspectRatio: 1.15,
-                ),
-                itemBuilder: (context, index) {
-                  final device = devices[index];
-                  final isSelected = device.id == _deviceManager.selectedDeviceId;
-
-                  return GestureDetector(
-                    onTap: () {
-                      _deviceManager.setSelectedDevice(device.id);
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: AppTheme.darkCard,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: isSelected
-                              ? AppTheme.primaryOrange
-                              : AppTheme.darkBorder,
-                          width: isSelected ? 2.0 : 1.2,
-                        ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Top Row: Icon + Toggle
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              DeviceProfileIcon(
-                                iconKey: device.iconKey,
-                                size: 24,
-                              ),
-                              Transform.scale(
-                                scale: 0.85,
-                                child: Switch(
-                                  value: device.isConnected,
-                                  activeColor: AppTheme.primaryOrange,
-                                  activeTrackColor: AppTheme.primaryOrange.withOpacity(0.3),
-                                  inactiveThumbColor: Colors.white,
-                                  inactiveTrackColor: AppTheme.darkBorder,
-                                  onChanged: (val) {
-                                    _deviceManager.toggleDeviceConnection(
-                                      device.id,
-                                      val,
-                                    );
-                                  },
+              child: devices.isEmpty
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              width: 72,
+                              height: 72,
+                              decoration: BoxDecoration(
+                                color: AppTheme.darkSurface,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: AppTheme.darkBorder,
+                                  width: 1.5,
                                 ),
                               ),
-                            ],
-                          ),
-                          const Spacer(),
-                          Text(
-                            device.deviceType,
-                            style: const TextStyle(
-                              fontSize: 13,
-                              color: AppTheme.textMuted,
-                              fontWeight: FontWeight.w500,
+                              child: const Icon(
+                                Icons.link_off,
+                                color: AppTheme.textMuted,
+                                size: 36,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            device.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
+                            const SizedBox(height: 16),
+                            const Text(
+                              'No connected devices',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
                             ),
-                          ),
-                        ],
+                            const SizedBox(height: 8),
+                            const Text(
+                              'Devices only appear here once an active connection is established. Tap + to scan and connect.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: AppTheme.textMuted,
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                            ElevatedButton.icon(
+                              onPressed: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => const DiscoveryScreen(),
+                                  ),
+                                );
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppTheme.primaryOrange,
+                                foregroundColor: AppTheme.textDarkButton,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 20,
+                                  vertical: 12,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                              icon: const Icon(Icons.radar, size: 20),
+                              label: const Text(
+                                'Scan Devices',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
+                    )
+                  : GridView.builder(
+                      itemCount: devices.length,
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        crossAxisSpacing: 14,
+                        mainAxisSpacing: 14,
+                        childAspectRatio: 1.15,
+                      ),
+                      itemBuilder: (context, index) {
+                        final device = devices[index];
+                        final isSelected = device.id == _deviceManager.selectedDeviceId;
+
+                        return GestureDetector(
+                          onTap: () {
+                            _deviceManager.setSelectedDevice(device.id);
+                            ProfileRouter.openDeviceDashboard(
+                              context,
+                              device,
+                              conn: _deviceManager.getConnection(device.id),
+                            );
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: AppTheme.darkCard,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: isSelected
+                                    ? AppTheme.primaryOrange
+                                    : AppTheme.darkBorder,
+                                width: isSelected ? 2.0 : 1.2,
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Top Row: Icon + Toggle
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    DeviceProfileIcon(
+                                      iconKey: device.iconKey,
+                                      size: 24,
+                                    ),
+                                    Transform.scale(
+                                      scale: 0.85,
+                                      child: Switch(
+                                        value: device.isConnected,
+                                        activeColor: AppTheme.primaryOrange,
+                                        activeTrackColor: AppTheme.primaryOrange.withOpacity(0.3),
+                                        inactiveThumbColor: Colors.white,
+                                        inactiveTrackColor: AppTheme.darkBorder,
+                                        onChanged: (val) {
+                                          _deviceManager.toggleDeviceConnection(
+                                            device.id,
+                                            val,
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const Spacer(),
+                                Text(
+                                  device.deviceType,
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    color: AppTheme.textMuted,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  device.name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
                     ),
-                  );
-                },
-              ),
             ),
 
             const SizedBox(height: 12),

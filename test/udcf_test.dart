@@ -4,9 +4,14 @@ import 'package:machmake2/core/dcp/dcp_message.dart';
 import 'package:machmake2/core/discovery/discovered_device.dart';
 import 'package:machmake2/core/models/device_capability.dart';
 import 'package:machmake2/core/models/device_manifest.dart';
+import 'package:machmake2/core/models/device_profile.dart';
 import 'package:machmake2/core/models/task_model.dart';
 import 'package:machmake2/core/models/tool_definition.dart';
+import 'package:flutter/material.dart';
 import 'package:machmake2/main.dart';
+import 'package:machmake2/models/dcp_models.dart';
+import 'package:machmake2/widgets/voice_cmd_dialog.dart';
+import 'package:machmake2/widgets/voice_sphere.dart';
 
 void main() {
   testWidgets('MachineMakeApp launches to WelcomeScreen', (WidgetTester tester) async {
@@ -113,4 +118,115 @@ void main() {
       expect(merged.bleAddress, equals('AA:BB:CC:DD:EE:FF'));
     });
   });
+
+  group('Phase 4 — Device Profiles & Routing', () {
+    test('DeviceProfile.fromString maps known types', () {
+      expect(DeviceProfile.fromString('quadruped'), equals(DeviceProfile.quadruped));
+      expect(DeviceProfile.fromString('robot'), equals(DeviceProfile.robot));
+      expect(DeviceProfile.fromString('raspberry_pi'), equals(DeviceProfile.computer));
+      expect(DeviceProfile.fromString('pc'), equals(DeviceProfile.computer));
+      expect(DeviceProfile.fromString('laptop'), equals(DeviceProfile.computer));
+      expect(DeviceProfile.fromString('pico'), equals(DeviceProfile.microcontroller));
+      expect(DeviceProfile.fromString('esp32'), equals(DeviceProfile.microcontroller));
+      expect(DeviceProfile.fromString('arduino'), equals(DeviceProfile.microcontroller));
+      expect(DeviceProfile.fromString(null), equals(DeviceProfile.generic));
+      expect(DeviceProfile.fromString('unknown_type'), equals(DeviceProfile.generic));
+    });
+
+    test('DeviceProfile.isRobot flags', () {
+      expect(DeviceProfile.quadruped.isRobot, isTrue);
+      expect(DeviceProfile.robot.isRobot, isTrue);
+      expect(DeviceProfile.computer.isRobot, isFalse);
+      expect(DeviceProfile.microcontroller.isRobot, isFalse);
+      expect(DeviceProfile.generic.isRobot, isFalse);
+    });
+
+    test('DeviceProfile labels', () {
+      expect(DeviceProfile.quadruped.label, equals('Quadruped Robot'));
+      expect(DeviceProfile.computer.label, equals('Computer / SBC'));
+      expect(DeviceProfile.microcontroller.label, equals('Microcontroller'));
+      expect(DeviceProfile.generic.label, equals('Generic Device'));
+    });
+
+    test('DeviceItem model basics', () {
+      final device = DeviceItem(
+        id: 'test-01',
+        name: 'Test Device',
+        profile: 'quadruped',
+        deviceType: 'Robot',
+        availableTransports: ['wifi', 'bluetooth'],
+        iconKey: 'quadruped',
+      );
+      expect(device.id, equals('test-01'));
+      expect(device.profile, equals('quadruped'));
+      expect(device.selectedTransport, equals('wifi'));
+    });
+  });
+
+  group('Voice Command & VoiceSphere UI', () {
+    testWidgets('VoiceCmdDialog handles empty devices list cleanly without crash', (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: VoiceCmdDialog(
+              devices: const [],
+              selectedDeviceId: '',
+              onCommandExecuted: (_, __) {},
+            ),
+          ),
+        ),
+      );
+
+      // Verify no red screen / assertion crash occurs
+      expect(find.text('No Connected Devices'), findsOneWidget);
+      expect(find.text('Scan for Devices'), findsOneWidget);
+      expect(find.text('Close'), findsWidgets);
+    });
+
+    testWidgets('VoiceCmdDialog displays connected device list', (WidgetTester tester) async {
+      final testDevice = DeviceItem(
+        id: 'rpi-01',
+        name: 'Raspberry Pi 4',
+        profile: 'raspberry_pi',
+        deviceType: 'Raspberry Pi',
+        availableTransports: ['wifi'],
+        iconKey: 'rpi',
+        isConnected: true,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: VoiceCmdDialog(
+              devices: [testDevice],
+              selectedDeviceId: 'rpi-01',
+              onCommandExecuted: (_, __) {},
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('Voice Command'), findsOneWidget);
+      expect(find.text('Raspberry Pi 4'), findsWidgets);
+      expect(find.text('Start Listening'), findsOneWidget);
+    });
+
+    testWidgets('VoiceSphere renders with audioLevel and isListening', (WidgetTester tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: VoiceSphere(
+              size: 200,
+              audioLevel: 0.75,
+              isListening: true,
+            ),
+          ),
+        ),
+      );
+
+      expect(find.byType(VoiceSphere), findsOneWidget);
+      await tester.pump(const Duration(milliseconds: 50));
+    });
+  });
 }
+

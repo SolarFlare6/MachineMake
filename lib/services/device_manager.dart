@@ -31,52 +31,72 @@ class DeviceManager extends ChangeNotifier {
 
   // Active DeviceConnection instances per device ID
   final Map<String, DeviceConnection> _connections = {};
+  DeviceConnection? getConnection(String deviceId) => _connections[deviceId];
 
   DeviceManager._internal() {
-    _initDefaultDevices();
+    discovery.addListener(notifyListeners);
     _startTelemetryLoop();
     _subscribeGlobalEvents();
   }
 
-  // Registered Devices for UI
+  // Registered / Connected Devices for UI
   final List<DeviceItem> _devices = [];
-  List<DeviceItem> get devices => _devices;
 
-  // Discovered Nearby Devices (for Discovery screen)
-  List<DeviceItem> get nearbyDevices {
-    if (discovery.discovered.isNotEmpty) {
-      return discovery.discovered.map((d) {
-        return DeviceItem(
-          id: d.deviceId,
-          name: d.name,
-          profile: d.type == 'robot'
-              ? 'quadruped'
-              : (d.type == 'raspberry_pi' ? 'raspberry_pi' : 'pico'),
-          deviceType: d.type == 'robot'
-              ? 'Robot'
-              : (d.type == 'raspberry_pi' ? 'Raspberry Pi' : 'Microcontroller'),
-          availableTransports: d.transports.toList(),
-          selectedTransport: d.primaryTransport,
-          isPaired: false,
-          isConnected: false,
-          iconKey: d.type == 'robot'
-              ? 'quadruped'
-              : (d.type == 'raspberry_pi' ? 'rpi' : 'pico'),
-          ipAddress: d.ipAddress,
-          macAddress: d.bleAddress,
-        );
-      }).toList();
+  /// Only returns devices where the app has established connection.
+  List<DeviceItem> get devices =>
+      _devices.where((d) => d.isConnected).toList();
+
+  /// All paired devices (including currently disconnected ones).
+  List<DeviceItem> get allPairedDevices => List.unmodifiable(_devices);
+
+  void addDevice(DeviceItem device) {
+    final idx = _devices.indexWhere((d) => d.id == device.id);
+    if (idx >= 0) {
+      _devices[idx] = device;
+    } else {
+      _devices.add(device);
     }
-    return _nearbyDevices;
+    if (device.isConnected) {
+      _connectDevice(device.id);
+    }
+    notifyListeners();
   }
 
-  final List<DeviceItem> _nearbyDevices = [];
-  bool get isScanning => discovery.isScanning || _isScanning;
-  bool _isScanning = false;
+  // Discovered Nearby Devices (for Discovery screen — only real detected devices)
+  List<DeviceItem> get nearbyDevices {
+    return discovery.discovered.map((d) {
+      return DeviceItem(
+        id: d.deviceId,
+        name: d.name,
+        profile: d.type == 'robot'
+            ? 'quadruped'
+            : (d.type == 'raspberry_pi' ? 'raspberry_pi' : 'pico'),
+        deviceType: d.type == 'robot'
+            ? 'Robot'
+            : (d.type == 'raspberry_pi' ? 'Raspberry Pi' : 'Microcontroller'),
+        availableTransports: d.transports.toList(),
+        selectedTransport: d.primaryTransport,
+        isPaired: false,
+        isConnected: false,
+        iconKey: d.type == 'robot'
+            ? 'quadruped'
+            : (d.type == 'raspberry_pi' ? 'rpi' : 'pico'),
+        ipAddress: d.ipAddress,
+        macAddress: d.bleAddress,
+      );
+    }).toList();
+  }
+
+  bool get isScanning => discovery.isScanning;
 
   // Currently Selected Device for Operations & Telemetry
-  String _selectedDeviceId = 'quad-001';
-  String get selectedDeviceId => _selectedDeviceId;
+  String _selectedDeviceId = '';
+  String get selectedDeviceId {
+    if (devices.any((d) => d.id == _selectedDeviceId)) {
+      return _selectedDeviceId;
+    }
+    return devices.isNotEmpty ? devices.first.id : '';
+  }
 
   DeviceItem? get selectedDevice {
     try {
@@ -193,47 +213,8 @@ class DeviceManager extends ChangeNotifier {
   }
 
   void startScan() {
-    _isScanning = true;
-    _nearbyDevices.clear();
     discovery.startScan();
     notifyListeners();
-
-    Timer(const Duration(milliseconds: 1500), () {
-      _nearbyDevices.addAll([
-        DeviceItem(
-          id: 'nearby-quad-001',
-          name: 'Quadruped Bot',
-          profile: 'quadruped',
-          deviceType: 'Robot',
-          availableTransports: ['WiFi', 'Bluetooth'],
-          isPaired: false,
-          isConnected: false,
-          iconKey: 'quadruped',
-        ),
-        DeviceItem(
-          id: 'nearby-rpi-001',
-          name: 'Raspberry Pi',
-          profile: 'raspberry_pi',
-          deviceType: 'Raspberry Pi',
-          availableTransports: ['WiFi', 'Bluetooth'],
-          isPaired: false,
-          isConnected: false,
-          iconKey: 'rpi',
-        ),
-        DeviceItem(
-          id: 'nearby-pico-001',
-          name: 'Pi Pico',
-          profile: 'pico',
-          deviceType: 'Microcontroller',
-          availableTransports: ['WiFi'],
-          isPaired: false,
-          isConnected: false,
-          iconKey: 'pico',
-        ),
-      ]);
-      _isScanning = false;
-      notifyListeners();
-    });
   }
 
   void _subscribeGlobalEvents() {
@@ -256,80 +237,19 @@ class DeviceManager extends ChangeNotifier {
     });
   }
 
-  void _initDefaultDevices() {
-    _devices.addAll([
-      DeviceItem(
-        id: 'quad-001',
-        name: 'Quadruped Bot',
-        profile: 'quadruped',
-        deviceType: 'Robot',
-        availableTransports: ['wifi', 'bluetooth'],
-        selectedTransport: 'wifi',
-        isPaired: true,
-        isConnected: true,
-        iconKey: 'quadruped',
-        ipAddress: '192.168.1.101',
-      ),
-      DeviceItem(
-        id: 'rpi-001',
-        name: 'Raspberry Pi',
-        profile: 'raspberry_pi',
-        deviceType: 'Raspberry Pi',
-        availableTransports: ['wifi', 'bluetooth'],
-        selectedTransport: 'wifi',
-        isPaired: true,
-        isConnected: true,
-        iconKey: 'rpi',
-        ipAddress: '192.168.1.102',
-      ),
-      DeviceItem(
-        id: 'pico-001',
-        name: 'Pi Pico',
-        profile: 'pico',
-        deviceType: 'Microcontroller',
-        availableTransports: ['wifi'],
-        selectedTransport: 'wifi',
-        isPaired: true,
-        isConnected: false,
-        iconKey: 'pico',
-      ),
-      DeviceItem(
-        id: 'dev-001',
-        name: 'Device name',
-        profile: 'generic',
-        deviceType: 'Device Type',
-        availableTransports: ['wifi', 'bluetooth'],
-        selectedTransport: 'bluetooth',
-        isPaired: true,
-        isConnected: false,
-        iconKey: 'generic',
-      ),
-    ]);
-
-    _telemetryMap['quad-001'] = TelemetryData(
-      cpuUsage: 75.0,
-      ramUsage: 75.0,
-      gpuUsage: 75.0,
-      temperature: 30.0,
-    );
-
-    _telemetryMap['rpi-001'] = TelemetryData(
-      cpuUsage: 42.0,
-      ramUsage: 58.0,
-      gpuUsage: 30.0,
-      temperature: 45.0,
-    );
-  }
-
   Timer? _telemetryTimer;
   void _startTelemetryLoop() {
     _telemetryTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
-      final quad = _telemetryMap['quad-001'];
-      if (quad != null) {
-        _telemetryMap['quad-001'] = quad.copyWith(
-          cpuUsage: (73.0 + (timer.tick % 5) * 0.8).clamp(0, 100),
-          ramUsage: (74.5 + (timer.tick % 3) * 0.4).clamp(0, 100),
-        );
+      for (final device in devices) {
+        final existing = _telemetryMap[device.id];
+        if (existing != null) {
+          _telemetryMap[device.id] = existing.copyWith(
+            cpuUsage: (existing.cpuUsage + ((timer.tick % 5) - 2) * 0.5).clamp(1.0, 100.0),
+            ramUsage: (existing.ramUsage + ((timer.tick % 3) - 1) * 0.3).clamp(1.0, 100.0),
+          );
+        }
+      }
+      if (devices.isNotEmpty) {
         notifyListeners();
       }
     });

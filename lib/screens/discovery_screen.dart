@@ -112,9 +112,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                         device.selectedTransport = selectedTransport;
                         device.isPaired = true;
                         device.isConnected = true;
-                        if (!_deviceManager.devices.any((d) => d.id == device.id)) {
-                          _deviceManager.devices.add(device);
-                        }
+                        _deviceManager.addDevice(device);
                         Navigator.of(context).pop();
                         Navigator.of(context).pushReplacement(
                           MaterialPageRoute(
@@ -146,34 +144,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final devices = _deviceManager.nearbyDevices.isEmpty
-        ? [
-            DeviceItem(
-              id: 'quad-001',
-              name: 'Quadruped Bot',
-              profile: 'quadruped',
-              deviceType: 'Robot',
-              availableTransports: ['WiFi', 'Bluetooth'],
-              iconKey: 'quadruped',
-            ),
-            DeviceItem(
-              id: 'rpi-001',
-              name: 'Raspberry Pi',
-              profile: 'raspberry_pi',
-              deviceType: 'Raspberry Pi',
-              availableTransports: ['WiFi', 'Bluetooth'],
-              iconKey: 'rpi',
-            ),
-            DeviceItem(
-              id: 'pico-001',
-              name: 'Pi Pico',
-              profile: 'pico',
-              deviceType: 'Microcontroller',
-              availableTransports: ['WiFi'],
-              iconKey: 'pico',
-            ),
-          ]
-        : _deviceManager.nearbyDevices;
+    final devices = _deviceManager.nearbyDevices;
 
     return Scaffold(
       backgroundColor: AppTheme.darkBackground,
@@ -198,79 +169,135 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
               ),
               const SizedBox(height: 20),
 
-              // Device List
+              // Device List or Empty State
               Expanded(
-                child: ListView.builder(
-                  itemCount: devices.length,
-                  itemBuilder: (context, index) {
-                    final item = devices[index];
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 14),
-                      decoration: BoxDecoration(
-                        color: AppTheme.darkSurface,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: AppTheme.darkBorder,
-                          width: 1.5,
-                        ),
-                      ),
-                      child: ListTile(
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 10,
-                        ),
-                        leading: DeviceProfileIcon(
-                          iconKey: item.iconKey,
-                          size: 32,
-                        ),
-                        title: Text(
-                          item.name,
-                          style: GoogleFonts.exo2(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                        subtitle: Padding(
-                          padding: const EdgeInsets.only(top: 8),
-                          child: Wrap(
-                            spacing: 8,
-                            children: item.availableTransports.map((t) {
-                              return Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 4,
-                                ),
+                child: devices.isEmpty
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 24),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Container(
+                                width: 72,
+                                height: 72,
                                 decoration: BoxDecoration(
-                                  color: AppTheme.darkCard,
-                                  borderRadius: BorderRadius.circular(6),
+                                  color: AppTheme.darkSurface,
+                                  shape: BoxShape.circle,
                                   border: Border.all(
-                                    color: AppTheme.primaryOrange.withAlpha(128),
-                                    width: 1,
+                                    color: _deviceManager.isScanning
+                                        ? AppTheme.primaryOrange
+                                        : AppTheme.darkBorder,
+                                    width: 1.5,
                                   ),
                                 ),
-                                child: Text(
-                                  t,
-                                  style: GoogleFonts.exo2(
-                                    color: AppTheme.primaryOrange,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                  ),
+                                child: Icon(
+                                  _deviceManager.isScanning
+                                      ? Icons.radar
+                                      : Icons.devices_other,
+                                  color: _deviceManager.isScanning
+                                      ? AppTheme.primaryOrange
+                                      : AppTheme.textMuted,
+                                  size: 36,
                                 ),
-                              );
-                            }).toList(),
+                              ),
+                              const SizedBox(height: 18),
+                              Text(
+                                _deviceManager.isScanning
+                                    ? 'Scanning for devices...'
+                                    : 'No devices found',
+                                style: GoogleFonts.exo2(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                _deviceManager.isScanning
+                                    ? 'Searching your local Wi-Fi and Bluetooth network'
+                                    : 'Make sure your device is powered on, advertising, or connected to the same Wi-Fi.',
+                                textAlign: TextAlign.center,
+                                style: GoogleFonts.exo2(
+                                  fontSize: 14,
+                                  color: AppTheme.textMuted,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        trailing: const Icon(
-                          Icons.chevron_right,
-                          color: AppTheme.textMuted,
-                          size: 30,
-                        ),
-                        onTap: () => _showPairingDialog(item),
+                      )
+                    : ListView.builder(
+                        itemCount: devices.length,
+                        itemBuilder: (context, index) {
+                          final item = devices[index];
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 14),
+                            decoration: BoxDecoration(
+                              color: AppTheme.darkSurface,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: AppTheme.darkBorder,
+                                width: 1.5,
+                              ),
+                            ),
+                            child: ListTile(
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 10,
+                              ),
+                              leading: DeviceProfileIcon(
+                                iconKey: item.iconKey,
+                                size: 32,
+                              ),
+                              title: Text(
+                                item.name,
+                                style: GoogleFonts.exo2(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              subtitle: Padding(
+                                padding: const EdgeInsets.only(top: 8),
+                                child: Wrap(
+                                  spacing: 8,
+                                  children: item.availableTransports.map((t) {
+                                    return Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: AppTheme.darkCard,
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(
+                                          color: AppTheme.primaryOrange.withAlpha(128),
+                                          width: 1,
+                                        ),
+                                      ),
+                                      child: Text(
+                                        t,
+                                        style: GoogleFonts.exo2(
+                                          color: AppTheme.primaryOrange,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
+                              ),
+                              trailing: const Icon(
+                                Icons.chevron_right,
+                                color: AppTheme.textMuted,
+                                size: 30,
+                              ),
+                              onTap: () => _showPairingDialog(item),
+                            ),
+                          );
+                        },
                       ),
-                    );
-                  },
-                ),
               ),
 
               // Bottom Actions
