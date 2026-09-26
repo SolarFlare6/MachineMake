@@ -48,6 +48,8 @@ dependencies:
   # Phase 3 — QR pairing
   mobile_scanner: ^5.2.3
   speech_to_text: ^7.4.0
+  dartssh2: ^4.1.0
+  xterm: ^4.0.0
 
 dev_dependencies:
   flutter_test:

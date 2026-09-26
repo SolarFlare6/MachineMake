@@ -7,6 +7,7 @@ import '../widgets/machine_make_logo.dart';
 import '../widgets/ssh_dialog.dart';
 import '../widgets/voice_cmd_dialog.dart';
 import 'discovery_screen.dart';
+import 'ssh_terminal_screen.dart';
 
 class DevicesScreen extends StatefulWidget {
   final Function(int tabIndex) onNavigateTab;
@@ -41,24 +42,40 @@ class _DevicesScreenState extends State<DevicesScreen> {
 
   void _openShell() {
     final selectedDev = _deviceManager.selectedDevice;
-    final cfg = _deviceManager.getSSHConfig(selectedDev?.id ?? 'quad-001');
+    final deviceId = selectedDev?.id ??
+        (_deviceManager.devices.isNotEmpty
+            ? _deviceManager.devices.first.id
+            : 'device-01');
+    final cfg = _deviceManager.getSSHConfig(deviceId);
+    final defaultHost = cfg.hostname.isNotEmpty
+        ? cfg.hostname
+        : (selectedDev?.ipAddress ?? '');
 
     showDialog(
       context: context,
       builder: (_) => SSHDialog(
-        initialHostname: cfg.hostname,
+        initialHostname: defaultHost,
+        initialUsername: cfg.username.isNotEmpty ? cfg.username : 'pi',
         initialPassword: cfg.password,
-        onConnect: (hostname, password) {
+        initialPort: cfg.port,
+        onConnectDetailed: (hostname, username, password, port) {
           _deviceManager.saveSSHConfig(
-            selectedDev?.id ?? 'quad-001',
+            deviceId,
             hostname,
             password,
+            username: username,
+            port: port,
           );
-          widget.onNavigateTab(2); // Go to Operations tab
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Connected to $hostname via SSH'),
-              backgroundColor: AppTheme.primaryOrange,
+
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => SshTerminalScreen(
+                host: hostname,
+                port: port,
+                username: username,
+                password: password,
+                deviceName: selectedDev?.name,
+              ),
             ),
           );
         },

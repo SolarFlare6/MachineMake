@@ -10,6 +10,8 @@ import 'package:machmake2/core/models/tool_definition.dart';
 import 'package:flutter/material.dart';
 import 'package:machmake2/main.dart';
 import 'package:machmake2/models/dcp_models.dart';
+import 'package:machmake2/widgets/ssh_dialog.dart';
+import 'package:machmake2/screens/ssh_terminal_screen.dart';
 import 'package:machmake2/widgets/voice_cmd_dialog.dart';
 import 'package:machmake2/widgets/voice_sphere.dart';
 
@@ -226,6 +228,83 @@ void main() {
 
       expect(find.byType(VoiceSphere), findsOneWidget);
       await tester.pump(const Duration(milliseconds: 50));
+    });
+  });
+
+  group('SSH Shell & Terminal Window UI', () {
+    test('SSHConfig stores hostname, username, password and port', () {
+      final config = SSHConfig(
+        hostname: '192.168.1.50',
+        password: 'secret_password',
+        port: 2222,
+        username: 'admin',
+      );
+      expect(config.hostname, equals('192.168.1.50'));
+      expect(config.password, equals('secret_password'));
+      expect(config.port, equals(2222));
+      expect(config.username, equals('admin'));
+    });
+
+    testWidgets('SSHDialog renders hostname, port, username, password fields and calls onConnectDetailed', (WidgetTester tester) async {
+      String? connectedHost;
+      String? connectedUser;
+      String? connectedPass;
+      int? connectedPort;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SSHDialog(
+              initialHostname: '192.168.1.100',
+              initialUsername: 'pi',
+              initialPassword: 'raspberry',
+              initialPort: 22,
+              onConnectDetailed: (h, u, p, port) {
+                connectedHost = h;
+                connectedUser = u;
+                connectedPass = p;
+                connectedPort = port;
+              },
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('SSH Shell'), findsOneWidget);
+      expect(find.text('Hostname / IP'), findsOneWidget);
+      expect(find.text('Username'), findsOneWidget);
+      expect(find.text('Password'), findsOneWidget);
+      expect(find.text('Connect Shell'), findsOneWidget);
+
+      await tester.tap(find.text('Connect Shell'));
+      await tester.pumpAndSettle();
+
+      expect(connectedHost, equals('192.168.1.100'));
+      expect(connectedUser, equals('pi'));
+      expect(connectedPass, equals('raspberry'));
+      expect(connectedPort, equals(22));
+    });
+
+    testWidgets('SshTerminalScreen renders terminal and quick keys bar', (WidgetTester tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: SshTerminalScreen(
+            host: '127.0.0.1',
+            port: 22,
+            username: 'pi',
+            password: 'pwd',
+            deviceName: 'Test Raspberry Pi',
+            autoConnect: false,
+          ),
+        ),
+      );
+
+      expect(find.text('Test Raspberry Pi'), findsOneWidget);
+      expect(find.text('ESC'), findsOneWidget);
+      expect(find.text('TAB'), findsOneWidget);
+      expect(find.text('Ctrl+C'), findsOneWidget);
+      expect(find.text('▲'), findsOneWidget);
+      expect(find.text('▼'), findsOneWidget);
     });
   });
 }

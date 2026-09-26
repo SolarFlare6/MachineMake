@@ -121,10 +121,18 @@ class DeviceManager extends ChangeNotifier {
         deviceId, () => SSHConfig(hostname: '192.168.1.102'));
   }
 
-  void saveSSHConfig(String deviceId, String hostname, String password) {
+  void saveSSHConfig(
+    String deviceId,
+    String hostname,
+    String password, {
+    String? username,
+    int? port,
+  }) {
     final cfg = getSSHConfig(deviceId);
     cfg.hostname = hostname;
     cfg.password = password;
+    if (username != null) cfg.username = username;
+    if (port != null) cfg.port = port;
     notifyListeners();
   }
 

@@ -7,6 +7,7 @@ import '../../services/device_manager.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/ssh_dialog.dart';
 import '../../widgets/telemetry_gauge.dart';
+import '../ssh_terminal_screen.dart';
 
 /// Specialized dashboard for computer / SBC profiles (Raspberry Pi, PC, Laptop).
 class ComputerDashboardScreen extends StatefulWidget {
@@ -30,17 +31,35 @@ class _ComputerDashboardScreenState extends State<ComputerDashboardScreen> {
 
   void _openSsh() {
     final cfg = _deviceManager.getSSHConfig(widget.device.id);
+    final defaultHost = cfg.hostname.isNotEmpty
+        ? cfg.hostname
+        : (widget.device.ipAddress ?? '');
+
     showDialog(
       context: context,
       builder: (_) => SSHDialog(
-        initialHostname: cfg.hostname,
+        initialHostname: defaultHost,
+        initialUsername: cfg.username.isNotEmpty ? cfg.username : 'pi',
         initialPassword: cfg.password,
-        onConnect: (hostname, password) {
-          _deviceManager.saveSSHConfig(widget.device.id, hostname, password);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Connected to $hostname via SSH', style: GoogleFonts.exo2()),
-              backgroundColor: AppTheme.primaryOrange,
+        initialPort: cfg.port,
+        onConnectDetailed: (hostname, username, password, port) {
+          _deviceManager.saveSSHConfig(
+            widget.device.id,
+            hostname,
+            password,
+            username: username,
+            port: port,
+          );
+
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => SshTerminalScreen(
+                host: hostname,
+                port: port,
+                username: username,
+                password: password,
+                deviceName: widget.device.name,
+              ),
             ),
           );
         },
