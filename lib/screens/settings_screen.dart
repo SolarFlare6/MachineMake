@@ -123,6 +123,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
             _buildSettingCard(
               title: 'Auto enable BT on start',
+              subtitle: 'Automatically turns on Bluetooth when the app launches',
               trailing: Transform.scale(
                 scale: 0.85,
                 child: Switch(
@@ -141,6 +142,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
             _buildSettingCard(
               title: 'Auto enable Wifi on start',
+              subtitle: 'Opens Wi-Fi settings on launch so you can enable it quickly',
               trailing: Transform.scale(
                 scale: 0.85,
                 child: Switch(
@@ -321,6 +323,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Widget _buildSettingCard({
     required String title,
+    String? subtitle,
     required Widget trailing,
     VoidCallback? onTap,
   }) {
@@ -346,6 +349,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
             color: Colors.white,
           ),
         ),
+        subtitle: subtitle != null
+            ? Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  subtitle,
+                  style: GoogleFonts.exo2(
+                    fontSize: 13,
+                    color: AppTheme.textMuted,
+                    height: 1.3,
+                  ),
+                ),
+              )
+            : null,
         trailing: trailing,
         onTap: onTap,
       ),

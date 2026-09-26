@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 
 import '../core/connection/device_connection.dart';
 import '../models/dcp_models.dart';
+import 'app_startup_service.dart';
 import 'capability_manager.dart';
 import 'device_registry.dart';
 import 'discovery_manager.dart';
@@ -143,17 +144,28 @@ class DeviceManager extends ChangeNotifier {
 
   void toggleAlertOnDisconnect(bool val) {
     alertOnDisconnect = val;
+    _persistSettings();
     notifyListeners();
   }
 
   void toggleAutoEnableBT(bool val) {
     autoEnableBTOnStart = val;
+    _persistSettings();
     notifyListeners();
   }
 
   void toggleAutoEnableWifi(bool val) {
     autoEnableWifiOnStart = val;
+    _persistSettings();
     notifyListeners();
+  }
+
+  void _persistSettings() {
+    AppStartupService.saveSettings(
+      alertOnDisconnect: alertOnDisconnect,
+      autoEnableBT: autoEnableBTOnStart,
+      autoEnableWifi: autoEnableWifiOnStart,
+    );
   }
 
   void setSelectedDevice(String deviceId) {

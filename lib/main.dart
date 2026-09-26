@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'screens/welcome_screen.dart';
+import 'services/app_startup_service.dart';
 import 'theme/app_theme.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await AppStartupService.run();
   runApp(const MachineMakeApp());
 }
 
