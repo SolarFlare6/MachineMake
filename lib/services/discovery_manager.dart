@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 
 import '../core/discovery/discovered_device.dart';
@@ -64,6 +65,9 @@ class DiscoveryManager extends ChangeNotifier {
       _ble.startScan(timeout: timeout);
     }
 
+    // ── Direct LAN probe for DCP server on port 8765 ───────────────────────
+    _probeKnownHosts(port: 8765);
+
     // ── Expiry pruning every 10 s ─────────────────────────────────────────
     _expiryTimer?.cancel();
     _expiryTimer =
@@ -72,6 +76,36 @@ class DiscoveryManager extends ChangeNotifier {
     // ── Auto-stop after timeout ───────────────────────────────────────────
     _scanTimer?.cancel();
     _scanTimer = Timer(timeout + const Duration(seconds: 2), stopScan);
+  }
+
+  Future<void> _probeKnownHosts({int port = 8765}) async {
+    final candidates = [
+      '10.80.166.248',
+      '10.0.2.2',
+      '127.0.0.1',
+      '192.168.1.100',
+      '192.168.1.102',
+    ];
+
+    for (final host in candidates) {
+      if (!_isScanning) break;
+      probeHost(host, port: port);
+    }
+  }
+
+  Future<void> probeHost(String host, {int port = 8765}) async {
+    try {
+      final socket = await Socket.connect(host, port, timeout: const Duration(seconds: 1));
+      socket.destroy();
+      _addDevice(DiscoveredDevice(
+        deviceId: 'quadruped-9d3271',
+        name: 'Quadruped Robot ($host)',
+        type: 'quadruped',
+        transports: const {'wifi'},
+        ipAddress: host,
+        port: port,
+      ));
+    } catch (_) {}
   }
 
   Future<void> stopScan() async {

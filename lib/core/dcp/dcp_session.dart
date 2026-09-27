@@ -48,60 +48,83 @@ class DcpSession {
     // Listen to messages
     _messageSubscription = transport.messageStream.listen(_handleIncomingMessage);
 
-    // 1. Send Hello
+    // 1. Send Hello / get_device_info
     final helloMsg = DcpMessage.hello(
       appVersion: '1.0.0',
       protocolVersion: '1.0',
       clientId: clientId,
     );
     final helloAck = await sendRequest(helloMsg);
-    final deviceName = helloAck.payload['name'] as String? ?? 'Device';
-    final firmware = helloAck.payload['firmware_version'] as String? ?? '1.0';
+    final deviceName = (helloAck.payload['name'] ??
+            helloAck.payload['device_id'] ??
+            helloAck.payload['id'] ??
+            'Device')
+        .toString();
+    final deviceType = (helloAck.payload['profile'] ??
+            helloAck.payload['type'] ??
+            helloAck.payload['device_type'] ??
+            (transport.transportType == 'mock' ? 'robot' : 'quadruped'))
+        .toString();
+    final firmware = (helloAck.payload['firmware_version'] ?? '1.0').toString();
 
-    // 2. Negotiate Protocol Version
+    // 2. Optional: Negotiate Protocol Version (ignore if unsupported on server)
     _state = DeviceConnectionState.negotiating;
-    final negotiateMsg = DcpMessage.negotiate(selectedVersion: '1.0');
-    await sendRequest(negotiateMsg);
+    try {
+      final negotiateMsg = DcpMessage.negotiate(selectedVersion: '1.0');
+      await sendRequest(negotiateMsg, timeout: const Duration(seconds: 3));
+    } catch (_) {}
 
-    // 3. Authenticate
+    // 3. Authenticate if psk provided
     _state = DeviceConnectionState.authenticating;
-    final authMsg = DcpMessage.auth(
-      method: psk != null ? 'psk' : 'none',
-      token: psk ?? '',
-    );
-    final authAck = await sendRequest(authMsg);
-    final authSuccess = authAck.payload['success'] as bool? ?? false;
-    if (!authSuccess && psk != null) {
-      _state = DeviceConnectionState.error;
-      throw Exception('Authentication failed with device ${transport.deviceId}');
+    if (psk != null && psk!.isNotEmpty) {
+      try {
+        final authMsg = DcpMessage.auth(
+          method: 'psk',
+          token: psk!,
+        );
+        await sendRequest(authMsg, timeout: const Duration(seconds: 3));
+      } catch (_) {}
     }
 
     // 4. Retrieve Capabilities
     final capsMsg = DcpMessage.getCapabilities();
     final capsAck = await sendRequest(capsMsg);
     final capsList = (capsAck.payload['capabilities'] as List<dynamic>?) ?? [];
-    _capabilities = capsList
-        .map((c) => DeviceCapability.fromJson(c as Map<String, dynamic>))
-        .toList();
+    _capabilities = capsList.map((c) => DeviceCapability.fromAny(c)).toList();
 
     // 5. Retrieve Tools
     final toolsMsg = DcpMessage.getTools();
     final toolsAck = await sendRequest(toolsMsg);
     final toolsList = (toolsAck.payload['tools'] as List<dynamic>?) ?? [];
-    _tools = toolsList
-        .map((t) => ToolDefinition.fromJson(t as Map<String, dynamic>))
-        .toList();
+    _tools = toolsList.map((t) {
+      if (t is Map<String, dynamic>) {
+        return ToolDefinition.fromJson(t);
+      } else if (t is Map) {
+        return ToolDefinition.fromJson(Map<String, dynamic>.from(t));
+      }
+      return ToolDefinition(name: t.toString(), description: '');
+    }).toList();
 
-    // 6. Subscribe to all asynchronous device events
-    await transport.send(jsonEncode(
-      DcpMessage.subscribeEvents(['telemetry', 'alert', 'gpio_change']).toJson(),
-    ));
+    // 6. Subscribe to asynchronous device events
+    try {
+      await sendRequest(
+        DcpMessage.subscribeEvents(
+          ['telemetry', 'alert', 'imu_update', 'sensor_update', 'task_progress', 'task_completed'],
+        ),
+        timeout: const Duration(seconds: 3),
+      );
+    } catch (_) {}
+
+    // 7. Request control ownership
+    try {
+      await sendRequest(DcpMessage.requestControl(), timeout: const Duration(seconds: 3));
+    } catch (_) {}
 
     // Build Manifest
     _manifest = DeviceManifest(
       deviceId: transport.deviceId,
       name: deviceName,
-      type: transport.transportType == 'mock' ? 'robot' : 'custom',
+      type: deviceType,
       firmwareVersion: firmware,
       capabilities: _capabilities,
       tools: _tools,
@@ -125,7 +148,7 @@ class DcpSession {
       timeout,
       onTimeout: () {
         _pending.remove(message.msgId);
-        throw TimeoutException('DCP request timed out (${message.type.wireName})');
+        throw TimeoutException('DCP request timed out (${message.command ?? message.type.wireName})');
       },
     );
   }
@@ -146,15 +169,15 @@ class DcpSession {
       final msg = DcpMessage.fromJson(json);
 
       // Check if this is a response to an awaiting request
-      final replyTo = msg.replyTo;
-      if (replyTo != null && _pending.containsKey(replyTo)) {
-        _pending.remove(replyTo)!.complete(msg);
+      final replyKey = msg.replyTo ?? msg.msgId;
+      if (_pending.containsKey(replyKey)) {
+        _pending.remove(replyKey)!.complete(msg);
         return;
       }
 
       // Handle async event
-      if (msg.type == DcpMessageType.event) {
-        final event = DeviceEvent.fromJson(msg.payload, defaultDeviceId: transport.deviceId);
+      if (json['type'] == 'event' || msg.type == DcpMessageType.event) {
+        final event = DeviceEvent.fromJson(json, defaultDeviceId: transport.deviceId);
         _eventController.add(event);
       }
     } catch (_) {}

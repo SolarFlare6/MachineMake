@@ -66,23 +66,23 @@ class DeviceManager extends ChangeNotifier {
   // Discovered Nearby Devices (for Discovery screen — only real detected devices)
   List<DeviceItem> get nearbyDevices {
     return discovery.discovered.map((d) {
+      final t = d.type.toLowerCase();
+      final isQuad = t.contains('quad');
+      final isRobot = t.contains('robot') || isQuad;
+      final isRpi = t.contains('raspberry') || t == 'computer' || t == 'sbc';
+
       return DeviceItem(
         id: d.deviceId,
         name: d.name,
-        profile: d.type == 'robot'
-            ? 'quadruped'
-            : (d.type == 'raspberry_pi' ? 'raspberry_pi' : 'pico'),
-        deviceType: d.type == 'robot'
-            ? 'Robot'
-            : (d.type == 'raspberry_pi' ? 'Raspberry Pi' : 'Microcontroller'),
+        profile: isQuad ? 'quadruped' : (isRobot ? 'quadruped' : (isRpi ? 'raspberry_pi' : 'pico')),
+        deviceType: isQuad ? 'Quadruped Robot' : (isRobot ? 'Robot' : (isRpi ? 'Raspberry Pi' : 'Microcontroller')),
         availableTransports: d.transports.toList(),
         selectedTransport: d.primaryTransport,
         isPaired: false,
         isConnected: false,
-        iconKey: d.type == 'robot'
-            ? 'quadruped'
-            : (d.type == 'raspberry_pi' ? 'rpi' : 'pico'),
+        iconKey: (isQuad || isRobot) ? 'quadruped' : (isRpi ? 'rpi' : 'pico'),
         ipAddress: d.ipAddress,
+        port: d.port ?? 8765,
         macAddress: d.bleAddress,
       );
     }).toList();
@@ -205,7 +205,7 @@ class DeviceManager extends ChangeNotifier {
     } else if (transportType == 'wifi' && dev.ipAddress != null && dev.ipAddress!.isNotEmpty) {
       await conn.connectWifi(
         host: dev.ipAddress!,
-        port: 8765,
+        port: dev.port,
         clientId: _clientId,
       );
     } else {

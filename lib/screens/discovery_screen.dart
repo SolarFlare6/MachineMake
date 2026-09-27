@@ -36,6 +36,118 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
     if (mounted) setState(() {});
   }
 
+  void _showDirectConnectDialog() {
+    final hostCtrl = TextEditingController(text: '10.80.166.248');
+    final portCtrl = TextEditingController(text: '8765');
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.modalBackground,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: AppTheme.darkBorder, width: 1.5),
+        ),
+        title: Row(
+          children: [
+            const Icon(Icons.settings_ethernet, color: AppTheme.primaryOrange, size: 26),
+            const SizedBox(width: 10),
+            Text(
+              'Direct IP Connect',
+              style: GoogleFonts.exo2(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 20,
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Connect directly to a DCP server via Wi-Fi/LAN (when mDNS is blocked by firewall):',
+              style: GoogleFonts.exo2(color: AppTheme.textMuted, fontSize: 13),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: hostCtrl,
+              style: GoogleFonts.exo2(color: Colors.white),
+              decoration: InputDecoration(
+                labelText: 'Host / IP Address',
+                labelStyle: GoogleFonts.exo2(color: AppTheme.primaryOrange),
+                hintText: 'e.g. 10.80.166.248',
+                hintStyle: GoogleFonts.exo2(color: AppTheme.textMuted),
+                filled: true,
+                fillColor: AppTheme.darkSurface,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: portCtrl,
+              keyboardType: TextInputType.number,
+              style: GoogleFonts.exo2(color: Colors.white),
+              decoration: InputDecoration(
+                labelText: 'Port',
+                labelStyle: GoogleFonts.exo2(color: AppTheme.primaryOrange),
+                hintText: '8765',
+                hintStyle: GoogleFonts.exo2(color: AppTheme.textMuted),
+                filled: true,
+                fillColor: AppTheme.darkSurface,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text('Cancel', style: GoogleFonts.exo2(color: AppTheme.textMuted)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryOrange,
+              foregroundColor: AppTheme.textDarkButton,
+            ),
+            onPressed: () {
+              final host = hostCtrl.text.trim();
+              final port = int.tryParse(portCtrl.text.trim()) ?? 8765;
+              if (host.isEmpty) return;
+
+              final dev = DeviceItem(
+                id: 'quadruped-9d3271',
+                name: 'Quadruped Robot',
+                profile: 'quadruped',
+                deviceType: 'Quadruped Robot',
+                availableTransports: const ['wifi'],
+                selectedTransport: 'wifi',
+                isPaired: true,
+                isConnected: true,
+                iconKey: 'quadruped',
+                ipAddress: host,
+                port: port,
+              );
+
+              _deviceManager.addDevice(dev);
+              _deviceManager.setSelectedDevice(dev.id);
+
+              Navigator.of(ctx).pop();
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(builder: (_) => const MainLayout()),
+              );
+            },
+            child: Text(
+              'Connect',
+              style: GoogleFonts.exo2(fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showPairingDialog(DeviceItem device) {
     showDialog(
       context: context,
@@ -223,6 +335,25 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                                   color: AppTheme.textMuted,
                                 ),
                               ),
+                              if (!_deviceManager.isScanning) ...[
+                                const SizedBox(height: 18),
+                                OutlinedButton.icon(
+                                  onPressed: _showDirectConnectDialog,
+                                  icon: const Icon(Icons.settings_ethernet, color: AppTheme.primaryOrange, size: 20),
+                                  label: Text(
+                                    'Direct IP Connect',
+                                    style: GoogleFonts.exo2(
+                                      color: AppTheme.primaryOrange,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  style: OutlinedButton.styleFrom(
+                                    side: const BorderSide(color: AppTheme.primaryOrange, width: 1.5),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
                         ),

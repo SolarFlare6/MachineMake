@@ -36,12 +36,20 @@ void main() {
         clientId: 'client-123',
       );
       final json = msg.toJson();
-      expect(json['type'], equals('hello'));
-      expect(json['payload']['client_id'], equals('client-123'));
+      // Standard DCP 1.0 format: type='request', command field carries the name
+      expect(json['type'], equals('request'));
+      expect(json['command'], equals('get_device_info'));
+      final args = json['arguments'] as Map<String, dynamic>;
+      expect(args['client_id'], equals('client-123'));
+      expect(args['app_version'], equals('1.0.0'));
 
-      final restored = DcpMessage.fromJson(json);
-      expect(restored.type, equals(DcpMessageType.hello));
-      expect(restored.payload['app_version'], equals('1.0.0'));
+      // Verify execute command format
+      final execMsg = DcpMessage.execute(toolName: 'stand', params: {});
+      final execJson = execMsg.toJson();
+      expect(execJson['type'], equals('request'));
+      expect(execJson['command'], equals('execute_tool'));
+      final execArgs = execJson['arguments'] as Map<String, dynamic>;
+      expect(execArgs['tool'], equals('stand'));
     });
 
     test('DeviceCapability json round-trip', () {

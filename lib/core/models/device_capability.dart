@@ -108,6 +108,27 @@ class DeviceCapability {
     this.enabled = true,
   });
 
+  factory DeviceCapability.fromAny(dynamic item) {
+    if (item is String) {
+      return DeviceCapability(
+        id: item,
+        type: CapabilityTypeExtension.fromString(item),
+        name: item,
+        description: '',
+      );
+    } else if (item is Map<String, dynamic>) {
+      return DeviceCapability.fromJson(item);
+    } else if (item is Map) {
+      return DeviceCapability.fromJson(Map<String, dynamic>.from(item));
+    }
+    return DeviceCapability(
+      id: item?.toString() ?? '',
+      type: CapabilityType.custom,
+      name: item?.toString() ?? '',
+      description: '',
+    );
+  }
+
   factory DeviceCapability.fromJson(Map<String, dynamic> json) {
     return DeviceCapability(
       id: json['id'] as String? ?? '',

@@ -9,6 +9,7 @@ class DeviceItem {
   bool isConnected;
   final String iconKey; // 'quadruped', 'rpi', 'pico', 'generic'
   String? ipAddress;
+  int port;
   String? macAddress;
 
   DeviceItem({
@@ -22,6 +23,7 @@ class DeviceItem {
     this.isConnected = true,
     required this.iconKey,
     this.ipAddress,
+    this.port = 8765,
     this.macAddress,
   });
 }

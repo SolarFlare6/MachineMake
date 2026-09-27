@@ -65,9 +65,9 @@ class DeviceEvent {
 
   factory DeviceEvent.fromJson(Map<String, dynamic> json, {String? defaultDeviceId}) {
     return DeviceEvent(
-      eventType: json['event_type'] as String? ?? 'custom',
+      eventType: json['event'] as String? ?? json['event_type'] as String? ?? 'custom',
       deviceId: json['device_id'] as String? ?? defaultDeviceId ?? '',
-      data: (json['data'] as Map<String, dynamic>?) ?? {},
+      data: (json['data'] as Map<String, dynamic>?) ?? (json['payload'] as Map<String, dynamic>?) ?? {},
       receivedAt: json['timestamp'] != null
           ? DateTime.tryParse(json['timestamp'].toString()) ?? DateTime.now()
           : DateTime.now(),

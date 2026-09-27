@@ -129,10 +129,11 @@ extension DcpMessageTypeExtension on DcpMessageType {
 
 /// Base DCP frame containing metadata and JSON payload.
 class DcpMessage {
-  static const _uuid = Uuid();
+  static int _idCounter = 1;
 
   final String msgId;
   final DcpMessageType type;
+  final String? command;
   final Map<String, dynamic> payload;
   final int timestampMs;
   final String? replyTo;
@@ -140,29 +141,66 @@ class DcpMessage {
   DcpMessage({
     String? msgId,
     required this.type,
+    this.command,
     required this.payload,
     int? timestampMs,
     this.replyTo,
-  })  : msgId = msgId ?? _uuid.v4(),
+  })  : msgId = msgId ?? '${_idCounter++}',
         timestampMs = timestampMs ?? DateTime.now().millisecondsSinceEpoch;
 
   factory DcpMessage.fromJson(Map<String, dynamic> json) {
+    final dcpType = json['type'] as String? ?? 'error';
+    final idStr = (json['id'] ?? json['msg_id'] ?? const Uuid().v4()).toString();
+    final replyStr = (json['reply_to'] ?? json['id'] ?? json['msg_id'])?.toString();
+    final cmd = json['command'] as String?;
+
+    DcpMessageType messageType;
+    if (dcpType == 'response') {
+      messageType = DcpMessageType.helloAck; // generic response / ack
+    } else if (dcpType == 'event') {
+      messageType = DcpMessageType.event;
+    } else {
+      messageType = DcpMessageTypeExtension.fromWireName(dcpType);
+    }
+
+    Map<String, dynamic> payloadData = {};
+    if (json['data'] is Map<String, dynamic>) {
+      payloadData = json['data'] as Map<String, dynamic>;
+    } else if (json['payload'] is Map<String, dynamic>) {
+      payloadData = json['payload'] as Map<String, dynamic>;
+    } else if (json['data'] != null) {
+      payloadData = {'data': json['data']};
+    } else {
+      payloadData = json;
+    }
+
     return DcpMessage(
-      msgId: json['msg_id'] as String? ?? const Uuid().v4(),
-      type: DcpMessageTypeExtension.fromWireName(json['type'] as String? ?? 'error'),
-      payload: (json['payload'] as Map<String, dynamic>?) ?? {},
+      msgId: idStr,
+      type: messageType,
+      command: cmd,
+      payload: payloadData,
       timestampMs: json['timestamp_ms'] as int? ?? DateTime.now().millisecondsSinceEpoch,
-      replyTo: json['reply_to'] as String?,
+      replyTo: replyStr,
     );
   }
 
-  Map<String, dynamic> toJson() => {
-        'msg_id': msgId,
-        'type': type.wireName,
-        'payload': payload,
-        'timestamp_ms': timestampMs,
-        if (replyTo != null) 'reply_to': replyTo,
-      };
+  Map<String, dynamic> toJson() {
+    final intId = int.tryParse(msgId);
+    final isEvent = type == DcpMessageType.event;
+    final isAckOrResponse = type.wireName.contains('ack') || type.wireName.contains('response');
+
+    return {
+      'dcp': '1.0',
+      'type': isEvent ? 'event' : (isAckOrResponse ? 'response' : 'request'),
+      if (intId != null) 'id': intId else 'id': msgId,
+      'msg_id': msgId,
+      if (command != null) 'command': command,
+      'arguments': payload,
+      'payload': payload,
+      'timestamp_ms': timestampMs,
+      if (replyTo != null) 'reply_to': replyTo,
+    };
+  }
 
   // Factory helpers for common messages
   static DcpMessage hello({
@@ -172,6 +210,7 @@ class DcpMessage {
   }) =>
       DcpMessage(
         type: DcpMessageType.hello,
+        command: 'get_device_info',
         payload: {
           'app_version': appVersion,
           'protocol_version': protocolVersion,
@@ -179,24 +218,34 @@ class DcpMessage {
         },
       );
 
+  static DcpMessage getDeviceInfo() => DcpMessage(
+        type: DcpMessageType.hello,
+        command: 'get_device_info',
+        payload: {},
+      );
+
   static DcpMessage negotiate({required String selectedVersion}) => DcpMessage(
         type: DcpMessageType.negotiate,
+        command: 'negotiate',
         payload: {'selected_version': selectedVersion},
       );
 
   static DcpMessage auth({required String method, required String token}) =>
       DcpMessage(
         type: DcpMessageType.auth,
+        command: 'authenticate',
         payload: {'method': method, 'token': token},
       );
 
   static DcpMessage getCapabilities() => DcpMessage(
         type: DcpMessageType.capabilities,
+        command: 'get_capabilities',
         payload: {},
       );
 
   static DcpMessage getTools() => DcpMessage(
         type: DcpMessageType.tools,
+        command: 'get_tools',
         payload: {},
       );
 
@@ -207,8 +256,11 @@ class DcpMessage {
   }) =>
       DcpMessage(
         type: DcpMessageType.execute,
+        command: 'execute_tool',
         payload: {
+          'tool': toolName,
           'tool_name': toolName,
+          'parameters': params,
           'params': params,
           if (taskId != null) 'task_id': taskId,
         },
@@ -216,11 +268,22 @@ class DcpMessage {
 
   static DcpMessage subscribeEvents(List<String> eventTypes) => DcpMessage(
         type: DcpMessageType.subscribeEvents,
-        payload: {'event_types': eventTypes},
+        command: 'subscribe',
+        payload: {
+          'events': eventTypes,
+          'event_types': eventTypes,
+        },
+      );
+
+  static DcpMessage requestControl() => DcpMessage(
+        type: DcpMessageType.execute,
+        command: 'request_control',
+        payload: {},
       );
 
   static DcpMessage ping() => DcpMessage(
         type: DcpMessageType.ping,
+        command: 'ping',
         payload: {},
       );
 }
@@ -241,9 +304,11 @@ class DcpExecuteResponse {
 
   factory DcpExecuteResponse.fromPayload(Map<String, dynamic> payload) {
     return DcpExecuteResponse(
-      success: payload['success'] as bool? ?? false,
-      result: payload['result'],
-      error: payload['error'] as String?,
+      success: payload['success'] as bool? ?? (payload['error'] == null),
+      result: payload['result'] ?? payload['data'],
+      error: payload['error'] is Map
+          ? (payload['error'] as Map)['message']?.toString()
+          : payload['error'] as String?,
       taskId: payload['task_id'] as String?,
     );
   }

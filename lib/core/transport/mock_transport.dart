@@ -77,9 +77,12 @@ class MockTransport implements DeviceTransport {
 
     try {
       final msg = jsonDecode(jsonMessage) as Map<String, dynamic>;
+      final command = msg['command'] as String?;
       final type = msg['type'] as String? ?? '';
-      final msgId = msg['msg_id'] as String? ?? const Uuid().v4();
-      final payload = (msg['payload'] as Map<String, dynamic>?) ?? {};
+      final msgId = (msg['id'] ?? msg['msg_id'] ?? const Uuid().v4()).toString();
+      final payload = (msg['arguments'] as Map<String, dynamic>?) ??
+          (msg['payload'] as Map<String, dynamic>?) ??
+          {};
 
       // Simulate network latency
       await Future.delayed(const Duration(milliseconds: 60));
@@ -87,12 +90,17 @@ class MockTransport implements DeviceTransport {
       Map<String, dynamic> responsePayload = {};
       String responseType = '${type}_ack';
 
-      switch (type) {
+      final effectiveCommand = command ?? type;
+
+      switch (effectiveCommand) {
+        case 'get_device_info':
         case 'hello':
           responseType = 'hello_ack';
           responsePayload = {
             'device_id': deviceId,
             'name': _deviceNameForType(mockDeviceType),
+            'type': mockDeviceType == 'robot' ? 'robot' : (mockDeviceType == 'raspberry_pi' ? 'raspberry_pi' : 'pico'),
+            'profile': mockDeviceType == 'robot' ? 'quadruped' : (mockDeviceType == 'raspberry_pi' ? 'computer' : 'microcontroller'),
             'firmware_version': '2.1.0',
             'supported_versions': ['1.0', '1.1'],
           };
@@ -103,31 +111,48 @@ class MockTransport implements DeviceTransport {
           responsePayload = {'selected_version': '1.0'};
           break;
 
+        case 'authenticate':
         case 'auth':
           responseType = 'auth_ack';
           responsePayload = {
             'success': true,
+            'authenticated': true,
             'session_token': 'mock_token_${const Uuid().v4().substring(0, 8)}',
           };
           break;
 
+        case 'get_capabilities':
         case 'capabilities':
           responseType = 'capabilities_response';
           responsePayload = {'capabilities': _capabilitiesForType(mockDeviceType)};
           break;
 
+        case 'get_tools':
         case 'tools':
           responseType = 'tools_response';
           responsePayload = {'tools': _toolsForType(mockDeviceType)};
           break;
 
+        case 'subscribe':
+        case 'subscribe_events':
+          responseType = 'subscribe_ack';
+          responsePayload = {'subscribed': ['telemetry', 'imu_update', 'sensor_update']};
+          break;
+
+        case 'request_control':
+          responseType = 'control_ack';
+          responsePayload = {'granted': true};
+          break;
+
+        case 'execute_tool':
         case 'execute':
           responseType = 'execute_response';
-          final tool = payload['tool_name'] as String? ?? '';
+          final tool = (payload['tool'] ?? payload['tool_name'] ?? '').toString();
+          final params = (payload['parameters'] ?? payload['params'] ?? {}) as Map<String, dynamic>;
           responsePayload = {
             'success': true,
             'tool_name': tool,
-            'result': {'status': 'executed', 'output': 'Tool $tool executed successfully on $deviceId'},
+            'result': {'status': 'executed', 'output': 'Tool $tool executed successfully on $deviceId', 'params': params},
           };
           break;
 
@@ -138,14 +163,20 @@ class MockTransport implements DeviceTransport {
 
         default:
           responseType = 'ack';
-          responsePayload = {'received': type};
+          responsePayload = {'received': effectiveCommand};
       }
 
+      final intId = int.tryParse(msgId);
       final responseMsg = jsonEncode({
+        'dcp': '1.0',
+        'type': 'response',
+        if (intId != null) 'id': intId else 'id': msgId,
         'msg_id': const Uuid().v4(),
         'reply_to': msgId,
-        'type': responseType,
+        'success': true,
+        'response_type': responseType,
         'timestamp_ms': DateTime.now().millisecondsSinceEpoch,
+        'data': responsePayload,
         'payload': responsePayload,
       });
 

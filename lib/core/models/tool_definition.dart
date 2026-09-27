@@ -58,13 +58,36 @@ class ToolDefinition {
   });
 
   factory ToolDefinition.fromJson(Map<String, dynamic> json) {
+    List<ToolParameter> params = [];
+    if (json['parameters'] is List) {
+      params = (json['parameters'] as List<dynamic>)
+          .map((p) => ToolParameter.fromJson(p as Map<String, dynamic>))
+          .toList();
+    } else if (json['arguments'] is Map) {
+      final args = json['arguments'] as Map<String, dynamic>;
+      params = args.entries.map((e) {
+        final val = e.value;
+        if (val is Map<String, dynamic>) {
+          return ToolParameter(
+            name: e.key,
+            type: val['type'] as String? ?? 'string',
+            description: val['description'] as String? ?? '',
+            required: val['required'] as bool? ?? false,
+          );
+        } else {
+          return ToolParameter(
+            name: e.key,
+            type: 'string',
+            description: val?.toString() ?? '',
+          );
+        }
+      }).toList();
+    }
+
     return ToolDefinition(
       name: json['name'] as String? ?? '',
       description: json['description'] as String? ?? '',
-      parameters: (json['parameters'] as List<dynamic>?)
-              ?.map((p) => ToolParameter.fromJson(p as Map<String, dynamic>))
-              .toList() ??
-          [],
+      parameters: params,
       requiredCapability: json['required_capability'] as String?,
       isAsync: json['is_async'] as bool? ?? false,
       timeoutSeconds: json['timeout_seconds'] as int?,
