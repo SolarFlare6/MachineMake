@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:crypto/crypto.dart';
 
 import '../connection/connection_state_enum.dart';
 import '../models/device_capability.dart';
@@ -74,15 +75,36 @@ class DcpSession {
       await sendRequest(negotiateMsg, timeout: const Duration(seconds: 3));
     } catch (_) {}
 
-    // 3. Authenticate if psk provided
+    // 3. Authenticate if psk provided (two-step HMAC-SHA256 challenge-response)
     _state = DeviceConnectionState.authenticating;
     if (psk != null && psk!.isNotEmpty) {
       try {
-        final authMsg = DcpMessage.auth(
-          method: 'psk',
-          token: psk!,
-        );
-        await sendRequest(authMsg, timeout: const Duration(seconds: 3));
+        // Step 1: Send client_id to obtain a fresh nonce from the server
+        final challengeMsg = DcpMessage.authenticateChallenge(clientId: clientId);
+        final challengeAck = await sendRequest(challengeMsg, timeout: const Duration(seconds: 4));
+        final nonce = (challengeAck.payload['nonce'] ??
+                challengeAck.payload['data']?['nonce'])
+            ?.toString();
+
+        if (nonce != null && nonce.isNotEmpty) {
+          // Step 2: Compute HMAC-SHA256(hex_secret, nonce_utf8)
+          final secretBytes = _hexToBytes(psk!);
+          final hmac = Hmac(sha256, secretBytes);
+          final responseHex = hmac.convert(utf8.encode(nonce)).toString();
+
+          final verifyMsg = DcpMessage.authenticateResponse(
+            clientId: clientId,
+            responseHex: responseHex,
+          );
+          await sendRequest(verifyMsg, timeout: const Duration(seconds: 4));
+        } else {
+          // Fallback for mock or legacy servers
+          final authMsg = DcpMessage.auth(
+            method: 'psk',
+            token: psk!,
+          );
+          await sendRequest(authMsg, timeout: const Duration(seconds: 3));
+        }
       } catch (_) {}
     }
 
@@ -200,5 +222,16 @@ class DcpSession {
   void dispose() {
     disconnect();
     _eventController.close();
+  }
+
+  static List<int> _hexToBytes(String hex) {
+    final clean = hex.replaceAll(RegExp(r'[^0-9a-fA-F]'), '');
+    final bytes = <int>[];
+    for (int i = 0; i < clean.length; i += 2) {
+      if (i + 2 <= clean.length) {
+        bytes.add(int.parse(clean.substring(i, i + 2), radix: 16));
+      }
+    }
+    return bytes;
   }
 }

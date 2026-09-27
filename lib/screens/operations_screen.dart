@@ -310,6 +310,7 @@ class _OperationsScreenState extends State<OperationsScreen> {
                           builder: (_) => ControlsScreen(
                             deviceName:
                                 _deviceManager.selectedDevice?.name ?? 'Robot',
+                            deviceId: _deviceManager.selectedDeviceId,
                           ),
                         ),
                       );

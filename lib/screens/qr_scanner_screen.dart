@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
+import '../services/app_startup_service.dart';
 import '../services/pairing_manager.dart';
 import '../services/permission_service.dart';
 import '../theme/app_theme.dart';
@@ -27,6 +28,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
 
   bool _permissionGranted = false;
   bool _scanned = false;
+  bool _isPairing = false;
   String? _error;
 
   @override
@@ -99,8 +101,45 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
         // Corner decorations
         _buildCornerDecor(),
 
-        // Success overlay
-        if (_scanned)
+        // Success or pairing overlay
+        if (_isPairing)
+          Container(
+            color: Colors.black.withAlpha(200),
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(
+                    width: 48,
+                    height: 48,
+                    child: CircularProgressIndicator(
+                      color: AppTheme.primaryOrange,
+                      strokeWidth: 4,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    'Pairing in progress...',
+                    style: GoogleFonts.exo2(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Exchanging credentials with device',
+                    style: GoogleFonts.exo2(
+                      fontSize: 14,
+                      color: AppTheme.textMuted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          )
+        else if (_scanned)
           Container(
             color: Colors.black.withAlpha(160),
             child: Center(
@@ -255,8 +294,8 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
     );
   }
 
-  void _onDetect(BarcodeCapture capture) {
-    if (_scanned) return;
+  Future<void> _onDetect(BarcodeCapture capture) async {
+    if (_scanned || _isPairing) return;
 
     for (final barcode in capture.barcodes) {
       final raw = barcode.rawValue;
@@ -271,25 +310,71 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
         return;
       }
 
-      setState(() => _scanned = true);
+      final deviceId = (payload['device_id'] as String?) ?? '';
+      final deviceName = (payload['name'] as String?) ?? 'Unknown Device';
+      final transport = (payload['transport'] as String?) ?? 'wifi';
+      final host = (payload['host'] ?? payload['address']) as String?;
+      final port = payload['port'] is int
+          ? payload['port'] as int
+          : int.tryParse('${payload['port']}') ?? 8765;
+      final pairingCode = (payload['pairing_code'] as String?) ?? '';
+      final profile = (payload['profile'] as String?) ?? 'quadruped';
+
+      setState(() {
+        _scanned = true;
+        _isPairing = true;
+        _error = null;
+      });
       _controller.stop();
 
-      // Initiate pairing then return result to caller
-      final deviceId   = payload['device_id'] as String? ?? '';
-      final deviceName = (payload['name'] as String?) ?? 'Unknown Device';
-      final transport  = (payload['transport'] as String?) ?? 'wifi';
-      final address    = payload['address'] as String?;
+      // If we have a direct host and pairing code, perform automated pairing handshake!
+      if (host != null && host.isNotEmpty && pairingCode.isNotEmpty) {
+        try {
+          final pairResult = await PairingManager().pairViaQr(
+            host: host,
+            port: port,
+            deviceId: deviceId,
+            deviceName: deviceName,
+            pairingCode: pairingCode,
+            clientId: AppStartupService.clientId,
+          );
 
+          if (mounted) {
+            Navigator.of(context).pop({
+              'success': true,
+              'device_id': deviceId,
+              'name': deviceName,
+              'profile': profile,
+              'host': host,
+              'port': port,
+              'secret': pairResult['secret'],
+            });
+          }
+          return;
+        } catch (e) {
+          if (mounted) {
+            setState(() {
+              _scanned = false;
+              _isPairing = false;
+              _error = 'Pairing failed: ${e.toString().replaceAll('Exception: ', '')}';
+            });
+            _controller.start();
+          }
+          return;
+        }
+      }
+
+      // Fallback for requests without direct network details
       PairingManager()
           .initiatePairing(
             deviceId: deviceId,
             deviceName: deviceName,
             transport: transport,
-            address: address,
+            address: host,
           )
           .then((req) {
         if (mounted) {
-          Navigator.of(context).pop(req); // Pop with PairingRequest result
+          Navigator.of(context).pop(req);
         }
       });
       break;

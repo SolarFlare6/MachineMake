@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
 import '../core/connection/device_connection.dart';
+import '../core/dcp/dcp_message.dart';
 import '../models/dcp_models.dart';
 import 'app_startup_service.dart';
 import 'capability_manager.dart';
@@ -12,6 +13,7 @@ import 'event_manager.dart';
 import 'pairing_manager.dart';
 import 'task_manager.dart';
 import 'tool_manager.dart';
+import 'voice_command_service.dart';
 
 /// Central facade orchestrating discovery, pairing, transports, DCP sessions,
 /// and telemetry for the MachineMake application.
@@ -19,7 +21,33 @@ class DeviceManager extends ChangeNotifier {
   static final DeviceManager _instance = DeviceManager._internal();
   factory DeviceManager() => _instance;
 
-  final String _clientId = const Uuid().v4();
+  String _clientId = const Uuid().v4();
+
+  void initFromStartup({required String clientId}) {
+    _clientId = clientId;
+    for (final known in registry.devices) {
+      if (!_devices.any((d) => d.id == known.deviceId)) {
+        final t = known.type.toLowerCase();
+        final isQuad = t.contains('quad') || t.contains('robot');
+        final isRpi = t.contains('raspberry');
+        _devices.add(DeviceItem(
+          id: known.deviceId,
+          name: known.name,
+          profile: isQuad ? 'quadruped' : (isRpi ? 'raspberry_pi' : 'pico'),
+          deviceType: isQuad ? 'Quadruped Robot' : (isRpi ? 'Raspberry Pi' : 'Microcontroller'),
+          availableTransports: [known.lastBleAddress != null ? 'bluetooth' : 'wifi'],
+          selectedTransport: known.lastBleAddress != null ? 'bluetooth' : 'wifi',
+          isPaired: known.isTrusted,
+          isConnected: false,
+          iconKey: isQuad ? 'quadruped' : (isRpi ? 'rpi' : 'pico'),
+          ipAddress: known.lastIp,
+          port: known.lastPort ?? 8765,
+          macAddress: known.lastBleAddress,
+        ));
+      }
+    }
+    notifyListeners();
+  }
 
   // Framework Subsystem Managers
   final DeviceRegistry registry = DeviceRegistry();
@@ -60,6 +88,22 @@ class DeviceManager extends ChangeNotifier {
     if (device.isConnected) {
       _connectDevice(device.id);
     }
+    notifyListeners();
+  }
+
+  void removeDevice(String deviceId) {
+    final conn = _connections.remove(deviceId);
+    if (conn != null) {
+      try {
+        conn.disconnect();
+        conn.dispose();
+      } catch (_) {}
+    }
+    _devices.removeWhere((d) => d.id == deviceId);
+    if (_selectedDeviceId == deviceId) {
+      _selectedDeviceId = _devices.isNotEmpty ? _devices.first.id : '';
+    }
+    registry.removeDevice(deviceId);
     notifyListeners();
   }
 
@@ -210,16 +254,20 @@ class DeviceManager extends ChangeNotifier {
 
     final dev = _devices.firstWhere((d) => d.id == deviceId);
     final transportType = dev.selectedTransport.toLowerCase();
+    final known = registry.findById(deviceId);
+    final psk = known?.psk;
 
     if (transportType == 'bluetooth' && dev.macAddress != null && dev.macAddress!.isNotEmpty) {
       await conn.connectBluetooth(
         bleAddress: dev.macAddress!,
+        psk: psk,
         clientId: _clientId,
       );
     } else if (transportType == 'wifi' && dev.ipAddress != null && dev.ipAddress!.isNotEmpty) {
       await conn.connectWifi(
         host: dev.ipAddress!,
         port: dev.port,
+        psk: psk,
         clientId: _clientId,
       );
     } else {
@@ -229,6 +277,7 @@ class DeviceManager extends ChangeNotifier {
           : (dev.profile == 'raspberry_pi' ? 'raspberry_pi' : 'pico');
       await conn.connectMock(
         mockDeviceType: mockType,
+        psk: psk,
         clientId: _clientId,
       );
     }
@@ -243,6 +292,93 @@ class DeviceManager extends ChangeNotifier {
     final conn = _connections[deviceId];
     if (conn != null) {
       await conn.disconnect();
+    }
+  }
+
+  /// Executes an arbitrary registered tool on the connected device.
+  Future<DcpExecuteResponse> executeTool(
+    String deviceId,
+    String toolName,
+    Map<String, dynamic> params,
+  ) async {
+    final conn = _connections[deviceId];
+    if (conn == null || conn.session == null) {
+      throw Exception('Device $deviceId is not connected');
+    }
+    return await conn.session!.executeTool(toolName, params);
+  }
+
+  /// Parses natural language voice text and executes the matching tool on the device.
+  Future<VoiceExecutionResult> executeVoiceCommand(
+    String deviceId,
+    String voiceText,
+  ) async {
+    final dev = _devices.firstWhere(
+      (d) => d.id == deviceId,
+      orElse: () => DeviceItem(
+        id: deviceId,
+        name: 'Device',
+        profile: 'quadruped',
+        deviceType: 'Quadruped Robot',
+        availableTransports: ['wifi'],
+        selectedTransport: 'wifi',
+        isPaired: true,
+        isConnected: false,
+        iconKey: 'quadruped',
+      ),
+    );
+
+    final knownTools = tool.getTools(deviceId).map((t) => t.name).toList();
+    final cmd = VoiceCommandService.parse(voiceText, availableTools: knownTools);
+
+    if (cmd == null) {
+      return VoiceExecutionResult(
+        success: false,
+        userPrompt: voiceText,
+        message: 'Command not recognized. Try "walk forward", "turn left", "stand", "sit", or "light on".',
+      );
+    }
+
+    final conn = _connections[deviceId];
+    if (conn == null || !conn.isConnected || conn.session == null) {
+      return VoiceExecutionResult(
+        success: false,
+        toolName: cmd.toolName,
+        params: cmd.parameters,
+        userPrompt: voiceText,
+        message: '${dev.name} is not connected. Connect from the Devices tab first.',
+      );
+    }
+
+    try {
+      final response = await conn.session!.executeTool(cmd.toolName, cmd.parameters);
+      if (response.success) {
+        return VoiceExecutionResult(
+          success: true,
+          toolName: cmd.toolName,
+          params: cmd.parameters,
+          userPrompt: voiceText,
+          message: '${cmd.description} executed',
+          response: response,
+        );
+      } else {
+        return VoiceExecutionResult(
+          success: false,
+          toolName: cmd.toolName,
+          params: cmd.parameters,
+          userPrompt: voiceText,
+          message: response.error ?? 'Execution rejected by device',
+          response: response,
+        );
+      }
+    } catch (e) {
+      return VoiceExecutionResult(
+        success: false,
+        toolName: cmd.toolName,
+        params: cmd.parameters,
+        userPrompt: voiceText,
+        message: 'Communication error: $e',
+      );
     }
   }
 

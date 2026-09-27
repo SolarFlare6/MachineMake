@@ -165,13 +165,24 @@ class DcpMessage {
 
     Map<String, dynamic> payloadData = {};
     if (json['data'] is Map<String, dynamic>) {
-      payloadData = json['data'] as Map<String, dynamic>;
+      payloadData = Map<String, dynamic>.from(json['data'] as Map<String, dynamic>);
+      if (json['success'] != null) payloadData['success'] = json['success'];
+      if (json['error'] != null) payloadData['error'] = json['error'];
+      if (json['task_id'] != null) payloadData['task_id'] = json['task_id'];
     } else if (json['payload'] is Map<String, dynamic>) {
-      payloadData = json['payload'] as Map<String, dynamic>;
+      payloadData = Map<String, dynamic>.from(json['payload'] as Map<String, dynamic>);
+      if (json['success'] != null) payloadData['success'] = json['success'];
+      if (json['error'] != null) payloadData['error'] = json['error'];
+      if (json['task_id'] != null) payloadData['task_id'] = json['task_id'];
     } else if (json['data'] != null) {
-      payloadData = {'data': json['data']};
+      payloadData = {
+        'data': json['data'],
+        if (json['success'] != null) 'success': json['success'],
+        if (json['error'] != null) 'error': json['error'],
+        if (json['task_id'] != null) 'task_id': json['task_id'],
+      };
     } else {
-      payloadData = json;
+      payloadData = Map<String, dynamic>.from(json);
     }
 
     return DcpMessage(
@@ -235,6 +246,36 @@ class DcpMessage {
         type: DcpMessageType.auth,
         command: 'authenticate',
         payload: {'method': method, 'token': token},
+      );
+
+  static DcpMessage authenticateChallenge({required String clientId}) =>
+      DcpMessage(
+        type: DcpMessageType.auth,
+        command: 'authenticate',
+        payload: {'client_id': clientId},
+      );
+
+  static DcpMessage authenticateResponse({
+    required String clientId,
+    required String responseHex,
+  }) =>
+      DcpMessage(
+        type: DcpMessageType.auth,
+        command: 'authenticate',
+        payload: {
+          'client_id': clientId,
+          'response': responseHex,
+        },
+      );
+
+  static DcpMessage raw({
+    required String command,
+    required Map<String, dynamic> arguments,
+  }) =>
+      DcpMessage(
+        type: DcpMessageType.execute,
+        command: command,
+        payload: arguments,
       );
 
   static DcpMessage getCapabilities() => DcpMessage(

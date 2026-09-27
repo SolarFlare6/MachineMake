@@ -489,20 +489,61 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                       ),
                       onPressed: () async {
                         final messenger = ScaffoldMessenger.of(context);
-                        final result = await Navigator.of(context).push<PairingRequest>(
+                        final result = await Navigator.of(context).push<dynamic>(
                           MaterialPageRoute(
                             builder: (_) => const QrScannerScreen(),
                           ),
                         );
                         if (result != null && mounted) {
-                          messenger.showSnackBar(
-                            SnackBar(
-                              content: Text('Pairing initiated with ${result.deviceName}'),
-                              backgroundColor: AppTheme.primaryOrange,
-                            ),
-                          );
-                          // Trigger scan refresh
-                          _deviceManager.startScan();
+                          if (result is Map && result['success'] == true) {
+                            final deviceId = result['device_id'] as String;
+                            final name = (result['name'] as String?) ?? 'Device';
+                            final profile = (result['profile'] as String?) ?? 'quadruped';
+                            final host = result['host'] as String?;
+                            final port = (result['port'] as int?) ?? 8765;
+
+                            final dev = DeviceItem(
+                              id: deviceId,
+                              name: name,
+                              profile: profile,
+                              deviceType: profile == 'quadruped'
+                                  ? 'Quadruped Robot'
+                                  : 'Device',
+                              availableTransports: const ['wifi'],
+                              selectedTransport: 'wifi',
+                              isPaired: true,
+                              isConnected: true,
+                              iconKey: profile,
+                              ipAddress: host,
+                              port: port,
+                            );
+
+                            _deviceManager.addDevice(dev);
+                            _deviceManager.setSelectedDevice(dev.id);
+                            AppStartupService.setFirstSetupDone(true);
+
+                            messenger.showSnackBar(
+                              SnackBar(
+                                content: Text('Successfully paired & connected to $name!'),
+                                backgroundColor: const Color(0xFF00E676),
+                              ),
+                            );
+
+                            if (!mounted) return;
+                            Navigator.of(context).pushReplacement(
+                              MaterialPageRoute(
+                                builder: (_) => const MainLayout(),
+                              ),
+                            );
+                          } else if (result is PairingRequest) {
+                            messenger.showSnackBar(
+                              SnackBar(
+                                content: Text('Pairing initiated with ${result.deviceName}'),
+                                backgroundColor: AppTheme.primaryOrange,
+                              ),
+                            );
+                            _deviceManager.startScan();
+                          }
                         }
                       },
                     ),

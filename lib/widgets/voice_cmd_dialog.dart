@@ -7,6 +7,7 @@ import 'package:speech_to_text/speech_to_text.dart';
 
 import '../models/dcp_models.dart';
 import '../screens/discovery_screen.dart';
+import '../services/device_manager.dart';
 import '../theme/app_theme.dart';
 import 'voice_sphere.dart';
 
@@ -221,11 +222,21 @@ class _VoiceCmdDialogState extends State<VoiceCmdDialog> {
 
     if (!mounted) return;
 
+    final messenger = ScaffoldMessenger.of(context);
+
     // Pop the dialog
     Navigator.of(context).pop();
 
-    // 2. Show user-requested Toast (floating SnackBar)
-    ScaffoldMessenger.of(context).showSnackBar(
+    // 2. Dispatch command to robot server via DeviceManager
+    final result = await DeviceManager().executeVoiceCommand(targetId, commandText.trim());
+
+    final isSuccess = result.success;
+    final accentColor = isSuccess
+        ? const Color(0xFF00E676)
+        : (result.toolName != null ? AppTheme.primaryOrange : const Color(0xFFFF5252));
+
+    // 3. Show execution feedback Toast (floating SnackBar)
+    messenger.showSnackBar(
       SnackBar(
         backgroundColor: AppTheme.darkCard,
         behavior: SnackBarBehavior.floating,
@@ -233,7 +244,7 @@ class _VoiceCmdDialogState extends State<VoiceCmdDialog> {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: AppTheme.primaryOrange, width: 1.5),
+          side: BorderSide(color: accentColor, width: 1.5),
         ),
         duration: const Duration(seconds: 4),
         content: Row(
@@ -242,12 +253,14 @@ class _VoiceCmdDialogState extends State<VoiceCmdDialog> {
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                color: AppTheme.primaryOrange.withAlpha(35),
+                color: accentColor.withAlpha(35),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
-                Icons.mic,
-                color: AppTheme.primaryOrange,
+              child: Icon(
+                isSuccess
+                    ? Icons.check
+                    : (result.toolName != null ? Icons.warning_amber : Icons.help_outline),
+                color: accentColor,
                 size: 20,
               ),
             ),
@@ -258,7 +271,7 @@ class _VoiceCmdDialogState extends State<VoiceCmdDialog> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Voice command for $deviceName',
+                    'Voice: "$commandText"  •  $deviceName',
                     style: GoogleFonts.exo2(
                       color: AppTheme.textMuted,
                       fontSize: 11,
@@ -266,10 +279,10 @@ class _VoiceCmdDialogState extends State<VoiceCmdDialog> {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '"$commandText"',
+                    result.message,
                     style: GoogleFonts.exo2(
                       color: Colors.white,
-                      fontSize: 14,
+                      fontSize: 13,
                       fontWeight: FontWeight.bold,
                     ),
                   ),

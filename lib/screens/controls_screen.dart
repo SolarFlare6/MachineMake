@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
+import '../services/device_manager.dart';
 import '../theme/app_theme.dart';
 
 class ControlsScreen extends StatefulWidget {
   final String deviceName;
+  final String? deviceId;
 
   const ControlsScreen({
     super.key,
     required this.deviceName,
+    this.deviceId,
   });
 
   @override
@@ -16,6 +19,15 @@ class ControlsScreen extends StatefulWidget {
 class _ControlsScreenState extends State<ControlsScreen> {
   double _speed = 0.5;
   String _currentAction = 'Standing';
+
+  String get _targetId => widget.deviceId ?? DeviceManager().selectedDeviceId;
+
+  Future<void> _sendTool(String tool, Map<String, dynamic> params, String actionLabel) async {
+    setState(() => _currentAction = actionLabel);
+    try {
+      await DeviceManager().executeTool(_targetId, tool, params);
+    } catch (_) {}
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -83,7 +95,11 @@ class _ControlsScreenState extends State<ControlsScreen> {
                     child: _buildDPadButton(
                       icon: Icons.keyboard_arrow_up,
                       label: 'FORWARD',
-                      onPressed: () => setState(() => _currentAction = 'Walking Forward'),
+                      onPressed: () => _sendTool(
+                        'walk',
+                        {'direction': 'forward', 'distance': (_speed * 2.0).clamp(0.2, 5.0)},
+                        'Walking Forward',
+                      ),
                     ),
                   ),
                   // Left
@@ -92,14 +108,18 @@ class _ControlsScreenState extends State<ControlsScreen> {
                     child: _buildDPadButton(
                       icon: Icons.keyboard_arrow_left,
                       label: 'LEFT',
-                      onPressed: () => setState(() => _currentAction = 'Turning Left'),
+                      onPressed: () => _sendTool(
+                        'turn',
+                        {'direction': 'left', 'angle': 45.0},
+                        'Turning Left',
+                      ),
                     ),
                   ),
                   // Center / Stop
                   Align(
                     alignment: Alignment.center,
                     child: GestureDetector(
-                      onTap: () => setState(() => _currentAction = 'Standing'),
+                      onTap: () => _sendTool('stand', {}, 'Standing'),
                       child: Container(
                         width: 70,
                         height: 70,
@@ -131,7 +151,11 @@ class _ControlsScreenState extends State<ControlsScreen> {
                     child: _buildDPadButton(
                       icon: Icons.keyboard_arrow_right,
                       label: 'RIGHT',
-                      onPressed: () => setState(() => _currentAction = 'Turning Right'),
+                      onPressed: () => _sendTool(
+                        'turn',
+                        {'direction': 'right', 'angle': 45.0},
+                        'Turning Right',
+                      ),
                     ),
                   ),
                   // Backward
@@ -140,7 +164,11 @@ class _ControlsScreenState extends State<ControlsScreen> {
                     child: _buildDPadButton(
                       icon: Icons.keyboard_arrow_down,
                       label: 'BACK',
-                      onPressed: () => setState(() => _currentAction = 'Walking Backward'),
+                      onPressed: () => _sendTool(
+                        'walk',
+                        {'direction': 'backward', 'distance': (_speed * 2.0).clamp(0.2, 5.0)},
+                        'Walking Backward',
+                      ),
                     ),
                   ),
                 ],
@@ -190,21 +218,21 @@ class _ControlsScreenState extends State<ControlsScreen> {
               children: [
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: () => setState(() => _currentAction = 'Sitting'),
+                    onPressed: () => _sendTool('sit', {}, 'Sitting'),
                     child: const Text('Sit'),
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: () => setState(() => _currentAction = 'Standing'),
+                    onPressed: () => _sendTool('stand', {}, 'Standing'),
                     child: const Text('Stand'),
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: () => setState(() => _currentAction = 'Bow'),
+                    onPressed: () => _sendTool('sit', {}, 'Bow'),
                     child: const Text('Bow'),
                   ),
                 ),

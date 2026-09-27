@@ -50,6 +50,7 @@ dependencies:
   speech_to_text: ^7.4.0
   dartssh2: ^4.1.0
   xterm: ^4.0.0
+  crypto: ^3.0.7
 
 dev_dependencies:
   flutter_test:

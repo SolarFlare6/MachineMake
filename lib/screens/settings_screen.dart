@@ -5,7 +5,7 @@ import '../services/app_startup_service.dart';
 import '../services/device_manager.dart';
 import '../theme/app_theme.dart';
 import '../widgets/machine_make_logo.dart';
-import 'discovery_screen.dart';
+import 'device_manager_screen.dart';
 import 'welcome_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -264,11 +264,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
             _buildSettingCard(
               title: 'Device manager',
-              trailing: const SizedBox.shrink(),
+              subtitle: 'View paired devices and manage security credentials',
+              trailing: const Icon(
+                Icons.arrow_forward_ios,
+                size: 16,
+                color: AppTheme.textMuted,
+              ),
               onTap: () {
                 Navigator.of(context).push(
                   MaterialPageRoute(
-                    builder: (_) => const DiscoveryScreen(),
+                    builder: (_) => const DeviceManagerScreen(),
                   ),
                 );
               },

@@ -4,8 +4,10 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:uuid/uuid.dart';
 
 import 'device_manager.dart';
+import 'device_registry.dart';
 
 /// Runs once at app startup and wires up the auto-enable BT/Wi-Fi settings.
 ///
@@ -20,9 +22,13 @@ class AppStartupService {
   static const String _keyAutoEnableBT         = 'setting_auto_enable_bt';
   static const String _keyAutoEnableWifi       = 'setting_auto_enable_wifi';
   static const String _keyFirstSetupDone       = 'first_setup_done';
+  static const String _keyClientId             = 'dcp_client_id';
 
   /// Whether the user has completed initial setup/onboarding.
   static bool isFirstSetupDone = false;
+
+  /// Stable unique client ID for DCP authentication.
+  static String clientId = '';
 
   /// Loads persisted settings into [DeviceManager] then honours the auto-enable
   /// flags.  Must be awaited from `main()`.
@@ -32,6 +38,17 @@ class AppStartupService {
 
     final prefs = await SharedPreferences.getInstance();
     final dm    = DeviceManager();
+
+    // ── Restore or generate stable client ID ──────────────────────────────
+    clientId = prefs.getString(_keyClientId) ?? '';
+    if (clientId.isEmpty) {
+      clientId = const Uuid().v4();
+      await prefs.setString(_keyClientId, clientId);
+    }
+
+    // ── Restore saved device registry ─────────────────────────────────────
+    await DeviceRegistry().load();
+    dm.initFromStartup(clientId: clientId);
 
     // ── Restore setup state ───────────────────────────────────────────────
     isFirstSetupDone = prefs.getBool(_keyFirstSetupDone) ?? false;
@@ -116,6 +133,8 @@ class AppStartupService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
     isFirstSetupDone = false;
+    clientId = const Uuid().v4();
+    await prefs.setString(_keyClientId, clientId);
     DeviceManager().clearAllDevices();
   }
 }
