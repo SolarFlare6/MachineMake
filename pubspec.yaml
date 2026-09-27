@@ -51,6 +51,7 @@ dependencies:
   dartssh2: ^4.1.0
   xterm: ^4.0.0
   crypto: ^3.0.7
+  flutter_local_notifications: ^20.1.0
 
 dev_dependencies:
   flutter_test:

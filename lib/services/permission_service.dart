@@ -40,6 +40,19 @@ class PermissionService {
     return status == PermissionStatus.granted;
   }
 
+  // ── Notifications (Android 13+ POST_NOTIFICATIONS) ──────────────────────
+
+  Future<bool> notificationPermissionGranted() async {
+    if (!defaultTargetPlatform.isAndroid) return true;
+    return (await Permission.notification.isGranted);
+  }
+
+  Future<bool> requestNotificationPermission() async {
+    if (!defaultTargetPlatform.isAndroid) return true;
+    final status = await Permission.notification.request();
+    return status.isGranted;
+  }
+
   // ── Helpers ────────────────────────────────────────────────────────────
 
   static List<Permission> get _discoveryPermissions => [

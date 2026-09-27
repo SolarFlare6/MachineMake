@@ -78,27 +78,36 @@ class _QuadrupedDashboardScreenState extends State<QuadrupedDashboardScreen> {
   }
 
   void _handleMove(String direction) {
-    widget.conn?.session?.executeTool('walk', {'direction': direction, 'speed': 0.65});
+    // Server requires direction + distance; use 1.0m default per tap
+    widget.conn?.session?.executeTool('walk', {
+      'direction': direction,
+      'distance': 1.0,
+    });
   }
 
   void _handleSpeedChanged(double speed) {
-    widget.conn?.session?.executeTool('set_speed', {'speed': speed});
+    // Server has no set_speed tool; speed slider is UI-only for now
   }
 
   void _handleGaitChanged(String gait) {
-    widget.conn?.session?.executeTool('set_gait', {'mode': gait});
+    // set_gait not yet server-supported; UI feedback only
+    setState(() {});
   }
 
   void _handlePoseSelected(String pose) {
-    widget.conn?.session?.executeTool('set_pose', {'preset': pose});
+    // Map common pose names to server-supported tools
+    switch (pose) {
+      case 'stand':
+        widget.conn?.session?.executeTool('stand', {});
+      case 'sit':
+        widget.conn?.session?.executeTool('sit', {});
+      default:
+        widget.conn?.session?.executeTool('stand', {});
+    }
   }
 
   void _handleKinematics(double pitch, double roll, double height) {
-    widget.conn?.session?.executeTool('set_pose', {
-      'pitch': pitch,
-      'roll': roll,
-      'height': height,
-    });
+    // set_pose not yet server-supported; UI feedback only
   }
 
   void _toggleCameraStream() {

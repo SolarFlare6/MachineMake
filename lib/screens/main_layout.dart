@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../services/notification_service.dart';
 import '../theme/app_theme.dart';
 import 'devices_screen.dart';
 import 'operations_screen.dart';
@@ -20,11 +22,92 @@ class MainLayout extends StatefulWidget {
 
 class _MainLayoutState extends State<MainLayout> {
   late int _currentIndex;
+  StreamSubscription<InAppNotification>? _notifSub;
 
   @override
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex;
+    _notifSub =
+        NotificationService.instance.inAppNotifications.listen(_showInAppBanner);
+  }
+
+  @override
+  void dispose() {
+    _notifSub?.cancel();
+    super.dispose();
+  }
+
+  void _showInAppBanner(InAppNotification notif) {
+    if (!mounted) return;
+
+    Color border = AppTheme.primaryOrange;
+    IconData icon = Icons.info_outline;
+
+    if (notif.type == 'disconnected') {
+      border = Colors.redAccent;
+      icon = Icons.link_off;
+    } else if (notif.type == 'connected') {
+      border = Colors.greenAccent;
+      icon = Icons.check_circle_outline;
+    } else if (notif.type == 'alert') {
+      border = Colors.amberAccent;
+      icon = Icons.warning_amber_rounded;
+    }
+
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: AppTheme.modalBackground,
+        elevation: 8,
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.only(left: 16, right: 16, bottom: 90),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: border, width: 1.5),
+        ),
+        duration: const Duration(seconds: 4),
+        content: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: border.withAlpha(30),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: border, size: 22),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    notif.title,
+                    style: GoogleFonts.exo2(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    notif.message,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.exo2(
+                      color: AppTheme.textMuted,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _onTabSelected(int index) {

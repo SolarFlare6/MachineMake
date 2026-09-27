@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import '../services/capability_manager.dart';
 import '../services/device_manager.dart';
+import '../services/tool_manager.dart';
 import '../theme/app_theme.dart';
+import '../widgets/dynamic_ui/capability_widget_factory.dart';
+import '../widgets/dynamic_ui/tool_invoke_card.dart';
 import '../widgets/machine_make_logo.dart';
 import '../widgets/ssh_dialog.dart';
 import '../widgets/voice_cmd_dialog.dart';
@@ -397,6 +401,9 @@ class _OperationsScreenState extends State<OperationsScreen> {
                     title: 'Power options',
                     onTap: () => _openPowerOptionsModal(context),
                   ),
+
+                  // ── Dynamic Capability & Tool Cards ──────────────────────
+                  if (selectedId.isNotEmpty) ..._buildDynamicSection(selectedId),
                 ],
               ),
             ),
@@ -404,6 +411,51 @@ class _OperationsScreenState extends State<OperationsScreen> {
         ),
       ),
     );
+  }
+
+  /// Builds capability and tool cards from the live device manifest.
+  List<Widget> _buildDynamicSection(String deviceId) {
+    final caps = CapabilityManager().getCapabilities(deviceId);
+    final tools = ToolManager().getTools(deviceId);
+    final conn = _deviceManager.getConnection(deviceId);
+
+    if (caps.isEmpty && tools.isEmpty) return [];
+
+    final widgets = <Widget>[];
+
+    if (caps.isNotEmpty) {
+      widgets.add(const Padding(
+        padding: EdgeInsets.only(top: 24, bottom: 10),
+        child: Text(
+          'Device Capabilities',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+      ));
+      widgets.addAll(caps.map((cap) =>
+        CapabilityWidgetFactory.buildForCapability(cap, conn)));
+    }
+
+    if (tools.isNotEmpty) {
+      widgets.add(const Padding(
+        padding: EdgeInsets.only(top: 24, bottom: 10),
+        child: Text(
+          'Device Tools',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+      ));
+      widgets.addAll(tools.map((t) => ToolInvokeCard(tool: t, conn: conn)));
+      widgets.add(const SizedBox(height: 8));
+    }
+
+    return widgets;
   }
 
   Widget _buildOpCard({

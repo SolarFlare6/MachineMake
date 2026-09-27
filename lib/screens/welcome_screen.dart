@@ -1,12 +1,55 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/app_startup_service.dart';
+import '../services/discovery_manager.dart';
 import '../theme/app_theme.dart';
 import '../widgets/machine_make_logo.dart';
 import 'discovery_screen.dart';
 
-class WelcomeScreen extends StatelessWidget {
+class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
+
+  @override
+  State<WelcomeScreen> createState() => _WelcomeScreenState();
+}
+
+class _WelcomeScreenState extends State<WelcomeScreen> {
+  final DiscoveryManager _discovery = DiscoveryManager();
+  Timer? _autoNavTimer;
+  bool _autoNavigated = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Start scanning immediately
+    _discovery.startScan();
+    _discovery.addListener(_onDiscoveryChange);
+    // Auto-navigate after 3s even without finding a device
+    _autoNavTimer = Timer(const Duration(seconds: 3), _navigateIfReady);
+  }
+
+  @override
+  void dispose() {
+    _discovery.removeListener(_onDiscoveryChange);
+    _autoNavTimer?.cancel();
+    super.dispose();
+  }
+
+  void _onDiscoveryChange() {
+    if (_discovery.discovered.isNotEmpty && !_autoNavigated) {
+      _navigateIfReady();
+    }
+  }
+
+  void _navigateIfReady() {
+    if (_autoNavigated || !mounted) return;
+    _autoNavigated = true;
+    AppStartupService.setFirstSetupDone(true);
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => const DiscoveryScreen()),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -80,16 +123,46 @@ class WelcomeScreen extends StatelessWidget {
                             height: 1.3,
                           ),
                         ),
-                        const SizedBox(height: 32),
-                        ElevatedButton(
-                          onPressed: () {
-                            AppStartupService.setFirstSetupDone(true);
-                            Navigator.of(context).pushReplacement(
-                              MaterialPageRoute(
-                                builder: (_) => const DiscoveryScreen(),
-                              ),
+                        const SizedBox(height: 20),
+                        // Scanning indicator
+                        ListenableBuilder(
+                          listenable: _discovery,
+                          builder: (context, _) {
+                            final count = _discovery.discovered.length;
+                            return Row(
+                              children: [
+                                if (_discovery.isScanning)
+                                  const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: AppTheme.primaryOrange,
+                                    ),
+                                  ),
+                                const SizedBox(width: 10),
+                                Text(
+                                  _discovery.isScanning
+                                      ? (count > 0
+                                          ? 'Found $count device${count > 1 ? 's' : ''}…'
+                                          : 'Scanning for devices…')
+                                      : (count > 0
+                                          ? 'Found $count device${count > 1 ? 's' : ''}'
+                                          : 'No devices found nearby'),
+                                  style: GoogleFonts.exo2(
+                                    fontSize: 13,
+                                    color: count > 0
+                                        ? Colors.greenAccent
+                                        : AppTheme.textMuted,
+                                  ),
+                                ),
+                              ],
                             );
                           },
+                        ),
+                        const SizedBox(height: 20),
+                        ElevatedButton(
+                          onPressed: _navigateIfReady,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppTheme.primaryOrange,
                             foregroundColor: AppTheme.textDarkButton,

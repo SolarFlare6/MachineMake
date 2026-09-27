@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/connection/connection_state_enum.dart';
 import '../core/routing/profile_router.dart';
 import '../services/device_manager.dart';
 import '../theme/app_theme.dart';
@@ -229,6 +230,10 @@ class _DevicesScreenState extends State<DevicesScreen> {
                       itemBuilder: (context, index) {
                         final device = devices[index];
                         final isSelected = device.id == _deviceManager.selectedDeviceId;
+                        final conn = _deviceManager.getConnection(device.id);
+                        final connState = conn?.state;
+                        final stateColor = _connectionStateColor(connState);
+                        final stateLabel = _connectionStateLabel(connState);
 
                         return GestureDetector(
                           onTap: () {
@@ -236,7 +241,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
                             ProfileRouter.openDeviceDashboard(
                               context,
                               device,
-                              conn: _deviceManager.getConnection(device.id),
+                              conn: conn,
                             );
                           },
                           child: Container(
@@ -254,7 +259,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                // Top Row: Icon + Toggle
+                                // Top Row: Icon + Connection State Badge
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
@@ -262,31 +267,70 @@ class _DevicesScreenState extends State<DevicesScreen> {
                                       iconKey: device.iconKey,
                                       size: 24,
                                     ),
-                                    Transform.scale(
-                                      scale: 0.85,
-                                      child: Switch(
-                                        value: device.isConnected,
-                                        activeColor: AppTheme.primaryOrange,
-                                        activeTrackColor: AppTheme.primaryOrange.withOpacity(0.3),
-                                        inactiveThumbColor: Colors.white,
-                                        inactiveTrackColor: AppTheme.darkBorder,
-                                        onChanged: (val) {
-                                          _deviceManager.toggleDeviceConnection(
-                                            device.id,
-                                            val,
-                                          );
-                                        },
-                                      ),
+                                    // Connection state dot
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Container(
+                                          width: 8,
+                                          height: 8,
+                                          decoration: BoxDecoration(
+                                            color: stateColor,
+                                            shape: BoxShape.circle,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Transform.scale(
+                                          scale: 0.85,
+                                          child: Switch(
+                                            value: device.isConnected,
+                                            activeColor: AppTheme.primaryOrange,
+                                            activeTrackColor: AppTheme.primaryOrange.withAlpha(76),
+                                            inactiveThumbColor: Colors.white,
+                                            inactiveTrackColor: AppTheme.darkBorder,
+                                            onChanged: (val) {
+                                              _deviceManager.toggleDeviceConnection(
+                                                device.id,
+                                                val,
+                                              );
+                                            },
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ],
                                 ),
                                 const Spacer(),
+                                // Transport badges
+                                if (device.availableTransports.isNotEmpty)
+                                  Wrap(
+                                    spacing: 4,
+                                    children: device.availableTransports.map((t) =>
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: AppTheme.darkSurface,
+                                          borderRadius: BorderRadius.circular(4),
+                                          border: Border.all(color: AppTheme.darkBorder),
+                                        ),
+                                        child: Text(
+                                          t.toUpperCase(),
+                                          style: const TextStyle(
+                                            fontSize: 9,
+                                            color: AppTheme.textMuted,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    ).toList(),
+                                  ),
+                                const SizedBox(height: 4),
                                 Text(
-                                  device.deviceType,
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    color: AppTheme.textMuted,
-                                    fontWeight: FontWeight.w500,
+                                  stateLabel,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: stateColor,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
                                 const SizedBox(height: 2),
@@ -404,5 +448,53 @@ class _DevicesScreenState extends State<DevicesScreen> {
         ),
       ),
     );
+  }
+
+  Color _connectionStateColor(DeviceConnectionState? state) {
+    switch (state) {
+      case DeviceConnectionState.connected:
+        return Colors.greenAccent;
+      case DeviceConnectionState.pairing:
+      case DeviceConnectionState.authenticating:
+      case DeviceConnectionState.negotiating:
+        return Colors.amberAccent;
+      case DeviceConnectionState.discovered:
+      case DeviceConnectionState.paired:
+        return Colors.blueAccent;
+      case DeviceConnectionState.error:
+        return Colors.redAccent;
+      case DeviceConnectionState.disconnecting:
+      case DeviceConnectionState.offline:
+      case null:
+        return AppTheme.textMuted;
+      default:
+        return AppTheme.textMuted;
+    }
+  }
+
+  String _connectionStateLabel(DeviceConnectionState? state) {
+    switch (state) {
+      case DeviceConnectionState.connected:
+        return 'Connected';
+      case DeviceConnectionState.pairing:
+        return 'Pairing…';
+      case DeviceConnectionState.authenticating:
+        return 'Authenticating…';
+      case DeviceConnectionState.negotiating:
+        return 'Negotiating…';
+      case DeviceConnectionState.discovered:
+        return 'Discovered';
+      case DeviceConnectionState.paired:
+        return 'Paired';
+      case DeviceConnectionState.error:
+        return 'Error';
+      case DeviceConnectionState.disconnecting:
+        return 'Disconnecting…';
+      case DeviceConnectionState.offline:
+      case null:
+        return 'Offline';
+      default:
+        return 'Unknown';
+    }
   }
 }

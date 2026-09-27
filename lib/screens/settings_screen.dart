@@ -3,6 +3,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/app_startup_service.dart';
 import '../services/device_manager.dart';
+import '../services/notification_service.dart';
+import '../services/permission_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/machine_make_logo.dart';
 import 'device_manager_screen.dart';
@@ -17,11 +19,14 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   final DeviceManager _deviceManager = DeviceManager();
+  bool _notificationGranted = false;
+  bool _isCheckingConnections = false;
 
   @override
   void initState() {
     super.initState();
     _deviceManager.addListener(_onManagerChange);
+    _checkNotificationPermission();
   }
 
   @override
@@ -32,6 +37,80 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   void _onManagerChange() {
     if (mounted) setState(() {});
+  }
+
+  Future<void> _checkNotificationPermission() async {
+    final granted =
+        await PermissionService.instance.notificationPermissionGranted();
+    if (mounted) {
+      setState(() => _notificationGranted = granted);
+    }
+  }
+
+  Future<void> _requestNotificationPermission() async {
+    final granted =
+        await PermissionService.instance.requestNotificationPermission();
+    if (mounted) {
+      setState(() => _notificationGranted = granted);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            granted
+                ? 'Notification permission granted'
+                : 'Notification permission denied. Please enable in device settings.',
+            style: GoogleFonts.exo2(),
+          ),
+          backgroundColor: granted ? Colors.green : Colors.redAccent,
+        ),
+      );
+    }
+  }
+
+  Future<void> _sendTestNotification() async {
+    await NotificationService.instance.showNotification(
+      title: 'MachineMake Notification Test',
+      body: 'Notifications are active! You will be alerted if a device disconnects.',
+    );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Test notification sent', style: GoogleFonts.exo2()),
+          backgroundColor: AppTheme.primaryOrange,
+        ),
+      );
+    }
+  }
+
+  Future<void> _checkConnectionsNow() async {
+    setState(() => _isCheckingConnections = true);
+    final results = await _deviceManager.checkAllDeviceConnections();
+    if (mounted) {
+      setState(() => _isCheckingConnections = false);
+      if (results.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'No active devices connected to check.',
+              style: GoogleFonts.exo2(),
+            ),
+            backgroundColor: AppTheme.darkCard,
+          ),
+        );
+      } else {
+        final onlineCount = results.values.where((v) => v).length;
+        final total = results.length;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Health check: $onlineCount/$total devices online and responding.',
+              style: GoogleFonts.exo2(),
+            ),
+            backgroundColor:
+                onlineCount == total ? Colors.green : Colors.orangeAccent,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _launchGitHubRepo() async {
@@ -182,26 +261,60 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const SizedBox(height: 14),
 
             _buildSettingCard(
-              title: 'Grant notification permission',
-              trailing: const SizedBox.shrink(),
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Notification permission granted'),
-                    backgroundColor: AppTheme.primaryOrange,
+              title: 'Notification permission',
+              subtitle: _notificationGranted
+                  ? 'Permission active — alerts will appear in system tray'
+                  : 'Tap to grant permission for push and background alerts',
+              trailing: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: _notificationGranted
+                      ? Colors.green.withAlpha(35)
+                      : AppTheme.primaryOrange.withAlpha(35),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: _notificationGranted
+                        ? Colors.greenAccent
+                        : AppTheme.primaryOrange,
+                    width: 1,
                   ),
-                );
-              },
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      _notificationGranted ? Icons.check_circle : Icons.notifications_none,
+                      size: 15,
+                      color: _notificationGranted
+                          ? Colors.greenAccent
+                          : AppTheme.primaryOrange,
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      _notificationGranted ? 'Granted' : 'Grant',
+                      style: GoogleFonts.exo2(
+                        color: _notificationGranted
+                            ? Colors.greenAccent
+                            : AppTheme.primaryOrange,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              onTap: _requestNotificationPermission,
             ),
             const SizedBox(height: 12),
 
             _buildSettingCard(
               title: 'Alert when device disconnects',
+              subtitle: 'Sends a system notification if a connected device drops off',
               trailing: Transform.scale(
                 scale: 0.85,
                 child: Switch(
                   value: _deviceManager.alertOnDisconnect,
-                  activeColor: AppTheme.primaryOrange,
+                  activeThumbColor: AppTheme.primaryOrange,
                   activeTrackColor: AppTheme.primaryOrange.withAlpha(80),
                   inactiveThumbColor: Colors.white,
                   inactiveTrackColor: AppTheme.darkBorder,
@@ -210,6 +323,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   },
                 ),
               ),
+            ),
+            const SizedBox(height: 12),
+
+            _buildSettingCard(
+              title: 'Check device connection',
+              subtitle: 'Sends a DCP ping to verify if connected devices are still alive',
+              trailing: _isCheckingConnections
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AppTheme.primaryOrange,
+                      ),
+                    )
+                  : const Icon(
+                      Icons.sync,
+                      color: AppTheme.primaryOrange,
+                      size: 22,
+                    ),
+              onTap: _isCheckingConnections ? null : _checkConnectionsNow,
+            ),
+            const SizedBox(height: 12),
+
+            _buildSettingCard(
+              title: 'Send test notification',
+              subtitle: 'Test push notification delivery on this device',
+              trailing: const Icon(
+                Icons.send_outlined,
+                color: AppTheme.textMuted,
+                size: 20,
+              ),
+              onTap: _sendTestNotification,
             ),
 
             // Control Section
@@ -231,7 +377,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 scale: 0.85,
                 child: Switch(
                   value: _deviceManager.autoEnableBTOnStart,
-                  activeColor: AppTheme.primaryOrange,
+                  activeThumbColor: AppTheme.primaryOrange,
                   activeTrackColor: AppTheme.primaryOrange.withAlpha(80),
                   inactiveThumbColor: Colors.white,
                   inactiveTrackColor: AppTheme.darkBorder,
@@ -250,7 +396,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 scale: 0.85,
                 child: Switch(
                   value: _deviceManager.autoEnableWifiOnStart,
-                  activeColor: AppTheme.primaryOrange,
+                  activeThumbColor: AppTheme.primaryOrange,
                   activeTrackColor: AppTheme.primaryOrange.withAlpha(80),
                   inactiveThumbColor: Colors.white,
                   inactiveTrackColor: AppTheme.darkBorder,

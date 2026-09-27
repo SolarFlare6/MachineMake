@@ -4,12 +4,15 @@ import 'package:uuid/uuid.dart';
 
 import '../core/connection/device_connection.dart';
 import '../core/dcp/dcp_message.dart';
+import '../core/models/device_event.dart';
+import '../core/models/task_model.dart';
 import '../models/dcp_models.dart';
 import 'app_startup_service.dart';
 import 'capability_manager.dart';
 import 'device_registry.dart';
 import 'discovery_manager.dart';
 import 'event_manager.dart';
+import 'notification_service.dart';
 import 'pairing_manager.dart';
 import 'task_manager.dart';
 import 'tool_manager.dart';
@@ -60,7 +63,17 @@ class DeviceManager extends ChangeNotifier {
 
   // Active DeviceConnection instances per device ID
   final Map<String, DeviceConnection> _connections = {};
+  final Set<String> _intentionalDisconnects = {};
+
   DeviceConnection? getConnection(String deviceId) => _connections[deviceId];
+
+  DeviceConnection _getOrCreateConnection(String deviceId) {
+    return _connections.putIfAbsent(deviceId, () {
+      final conn = DeviceConnection(deviceId: deviceId);
+      conn.addListener(() => _handleConnectionChange(deviceId, conn));
+      return conn;
+    });
+  }
 
   DeviceManager._internal() {
     discovery.addListener(notifyListeners);
@@ -235,6 +248,11 @@ class DeviceManager extends ChangeNotifier {
   void toggleDeviceConnection(String deviceId, bool connected) {
     final idx = _devices.indexWhere((d) => d.id == deviceId);
     if (idx != -1) {
+      if (!connected) {
+        _intentionalDisconnects.add(deviceId);
+      } else {
+        _intentionalDisconnects.remove(deviceId);
+      }
       _devices[idx].isConnected = connected;
 
       if (connected) {
@@ -246,11 +264,76 @@ class DeviceManager extends ChangeNotifier {
     }
   }
 
+  void _handleConnectionChange(String deviceId, DeviceConnection conn) {
+    final idx = _devices.indexWhere((d) => d.id == deviceId);
+    if (idx == -1) return;
+
+    final dev = _devices[idx];
+    final isConn = conn.isConnected;
+
+    if (dev.isConnected && !isConn) {
+      // Unexpected or transport-level disconnect
+      dev.isConnected = false;
+      notifyListeners();
+
+      final wasIntentional = _intentionalDisconnects.remove(deviceId);
+      if (!wasIntentional && alertOnDisconnect) {
+        NotificationService.instance.showDeviceDisconnectedNotification(
+          deviceName: dev.name,
+          deviceId: dev.id,
+        );
+
+        event.emit(DeviceEvent(
+          eventType: 'alert',
+          deviceId: deviceId,
+          data: {
+            'title': 'Device Disconnected',
+            'message': '${dev.name} disconnected unexpectedly',
+            'level': 'warning',
+            'timestamp': DateTime.now().toIso8601String(),
+          },
+        ));
+      }
+    } else if (!dev.isConnected && isConn) {
+      dev.isConnected = true;
+      _intentionalDisconnects.remove(deviceId);
+      notifyListeners();
+
+      NotificationService.instance.showDeviceConnectedNotification(
+        deviceName: dev.name,
+        deviceId: dev.id,
+      );
+    }
+  }
+
+  /// Actively checks whether a connected device is still reachable over the network/BLE.
+  Future<bool> checkDeviceConnection(String deviceId) async {
+    final conn = _connections[deviceId];
+    if (conn == null) return false;
+    final alive = await conn.checkConnection();
+    final idx = _devices.indexWhere((d) => d.id == deviceId);
+    if (idx != -1) {
+      if (!alive && _devices[idx].isConnected) {
+        _handleConnectionChange(deviceId, conn);
+      }
+    }
+    return alive;
+  }
+
+  /// Actively checks connection health across all connected devices.
+  Future<Map<String, bool>> checkAllDeviceConnections() async {
+    final results = <String, bool>{};
+    for (final dev in _devices) {
+      if (dev.isConnected) {
+        final alive = await checkDeviceConnection(dev.id);
+        results[dev.id] = alive;
+      }
+    }
+    return results;
+  }
+
   Future<void> _connectDevice(String deviceId) async {
-    final conn = _connections.putIfAbsent(
-      deviceId,
-      () => DeviceConnection(deviceId: deviceId),
-    );
+    final conn = _getOrCreateConnection(deviceId);
 
     final dev = _devices.firstWhere((d) => d.id == deviceId);
     final transportType = dev.selectedTransport.toLowerCase();
@@ -296,6 +379,7 @@ class DeviceManager extends ChangeNotifier {
   }
 
   /// Executes an arbitrary registered tool on the connected device.
+  /// If the tool is async and returns a task_id, the task is tracked in [TaskManager].
   Future<DcpExecuteResponse> executeTool(
     String deviceId,
     String toolName,
@@ -305,7 +389,19 @@ class DeviceManager extends ChangeNotifier {
     if (conn == null || conn.session == null) {
       throw Exception('Device $deviceId is not connected');
     }
-    return await conn.session!.executeTool(toolName, params);
+    final response = await conn.session!.executeTool(toolName, params);
+
+    // Track long-running tasks in TaskManager
+    if (response.taskId != null) {
+      task.addTask(DeviceTask(
+        taskId: response.taskId!,
+        deviceId: deviceId,
+        toolName: toolName,
+        params: params,
+      ));
+    }
+
+    return response;
   }
 
   /// Parses natural language voice text and executes the matching tool on the device.

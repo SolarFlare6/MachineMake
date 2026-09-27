@@ -185,6 +185,20 @@ class DcpSession {
     return DcpExecuteResponse.fromPayload(response.payload);
   }
 
+  /// Sends a DCP ping to verify remote device liveness.
+  Future<bool> ping({Duration timeout = const Duration(seconds: 4)}) async {
+    try {
+      final msg = DcpMessage.ping();
+      final response = await sendRequest(msg, timeout: timeout);
+      return response.payload['pong'] == true ||
+          response.payload['success'] == true ||
+          response.type == DcpMessageType.pong ||
+          response.type == DcpMessageType.helloAck;
+    } catch (_) {
+      return false;
+    }
+  }
+
   void _handleIncomingMessage(String rawJson) {
     try {
       final json = jsonDecode(rawJson) as Map<String, dynamic>;

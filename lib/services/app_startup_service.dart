@@ -8,6 +8,7 @@ import 'package:uuid/uuid.dart';
 
 import 'device_manager.dart';
 import 'device_registry.dart';
+import 'notification_service.dart';
 
 /// Runs once at app startup and wires up the auto-enable BT/Wi-Fi settings.
 ///
@@ -49,6 +50,9 @@ class AppStartupService {
     // ── Restore saved device registry ─────────────────────────────────────
     await DeviceRegistry().load();
     dm.initFromStartup(clientId: clientId);
+
+    // ── Initialize Notifications ──────────────────────────────────────────
+    await NotificationService.instance.init();
 
     // ── Restore setup state ───────────────────────────────────────────────
     isFirstSetupDone = prefs.getBool(_keyFirstSetupDone) ?? false;
