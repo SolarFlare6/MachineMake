@@ -44,9 +44,16 @@ class DeviceProfileIcon extends StatelessWidget {
 
       case 'quadruped':
       case 'robot':
-        child = CustomPaint(
-          size: Size(size, size),
-          painter: QuadrupedIconPainter(color: color),
+      case 'quad':
+        child = SvgPicture.asset(
+          'assets/Robot_icon.svg',
+          width: size,
+          height: size,
+          fit: BoxFit.contain,
+          placeholderBuilder: (_) => CustomPaint(
+            size: Size(size, size),
+            painter: QuadrupedIconPainter(color: color),
+          ),
         );
         break;
 
