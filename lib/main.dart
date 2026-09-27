@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'screens/main_layout.dart';
 import 'screens/welcome_screen.dart';
 import 'services/app_startup_service.dart';
 import 'theme/app_theme.dart';
@@ -10,7 +11,8 @@ void main() async {
 }
 
 class MachineMakeApp extends StatelessWidget {
-  const MachineMakeApp({super.key});
+  final Widget? home;
+  const MachineMakeApp({super.key, this.home});
 
   @override
   Widget build(BuildContext context) {
@@ -18,7 +20,10 @@ class MachineMakeApp extends StatelessWidget {
       title: 'MachineMake',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme,
-      home: const WelcomeScreen(),
+      home: home ??
+          (AppStartupService.isFirstSetupDone
+              ? const MainLayout()
+              : const WelcomeScreen()),
     );
   }
 }

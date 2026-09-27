@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../services/app_startup_service.dart';
 import '../services/device_manager.dart';
 import '../theme/app_theme.dart';
 import '../widgets/machine_make_logo.dart';
 import 'discovery_screen.dart';
+import 'welcome_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -34,18 +36,119 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _launchGitHubRepo() async {
     final uri = Uri.parse('https://github.com/SolarFlare6/MachineMake');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } else {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Could not open https://github.com/SolarFlare6/MachineMake'),
-            backgroundColor: AppTheme.primaryOrange,
-          ),
+    try {
+      final launched = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (!launched) {
+        final fallback = await launchUrl(
+          uri,
+          mode: LaunchMode.platformDefault,
         );
+        if (!fallback && mounted) {
+          _showLaunchError();
+        }
+      }
+    } catch (_) {
+      try {
+        final fallback = await launchUrl(
+          uri,
+          mode: LaunchMode.platformDefault,
+        );
+        if (!fallback && mounted) {
+          _showLaunchError();
+        }
+      } catch (_) {
+        if (mounted) {
+          _showLaunchError();
+        }
       }
     }
+  }
+
+  void _showLaunchError() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Could not open https://github.com/SolarFlare6/MachineMake in browser'),
+        backgroundColor: AppTheme.primaryOrange,
+      ),
+    );
+  }
+
+  void _showClearDataConfirmationDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.modalBackground,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: Colors.redAccent, width: 1.2),
+        ),
+        title: Row(
+          children: [
+            const Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 26),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Clear App Data',
+                style: GoogleFonts.exo2(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'This will remove all paired devices, saved credentials, and settings. The app will reset back to the initial start screen.\n\nAre you sure you want to proceed?',
+          style: GoogleFonts.exo2(
+            fontSize: 14,
+            color: AppTheme.textMuted,
+            height: 1.4,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.exo2(color: Colors.white70),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              await AppStartupService.clearAllData();
+              if (mounted) {
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (_) => const WelcomeScreen()),
+                  (route) => false,
+                );
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('App data cleared. Reset to initial setup.'),
+                    backgroundColor: AppTheme.primaryOrange,
+                  ),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: Text(
+              'Clear & Reset',
+              style: GoogleFonts.exo2(fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -169,6 +272,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 );
               },
+            ),
+            const SizedBox(height: 12),
+
+            _buildSettingCard(
+              title: 'Clear app data',
+              subtitle: 'Resets all settings, paired devices, and returns to initial setup',
+              trailing: const Icon(
+                Icons.delete_forever_outlined,
+                color: Colors.redAccent,
+                size: 22,
+              ),
+              onTap: _showClearDataConfirmationDialog,
             ),
 
             // Backup Section

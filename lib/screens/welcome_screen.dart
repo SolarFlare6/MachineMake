@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../services/app_startup_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/machine_make_logo.dart';
 import 'discovery_screen.dart';
@@ -82,6 +83,7 @@ class WelcomeScreen extends StatelessWidget {
                         const SizedBox(height: 32),
                         ElevatedButton(
                           onPressed: () {
+                            AppStartupService.setFirstSetupDone(true);
                             Navigator.of(context).pushReplacement(
                               MaterialPageRoute(
                                 builder: (_) => const DiscoveryScreen(),

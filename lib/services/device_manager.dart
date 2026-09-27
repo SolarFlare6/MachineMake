@@ -63,6 +63,20 @@ class DeviceManager extends ChangeNotifier {
     notifyListeners();
   }
 
+  void clearAllDevices() {
+    for (final conn in _connections.values) {
+      try {
+        conn.disconnect();
+        conn.dispose();
+      } catch (_) {}
+    }
+    _connections.clear();
+    _devices.clear();
+    _selectedDeviceId = '';
+    registry.clearAll();
+    notifyListeners();
+  }
+
   // Discovered Nearby Devices (for Discovery screen — only real detected devices)
   List<DeviceItem> get nearbyDevices {
     return discovery.discovered.map((d) {

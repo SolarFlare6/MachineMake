@@ -85,4 +85,10 @@ class DeviceRegistry extends ChangeNotifier {
       await save();
     }
   }
+
+  Future<void> clearAll() async {
+    _devices.clear();
+    notifyListeners();
+    await save();
+  }
 }

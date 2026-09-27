@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/dcp_models.dart';
+import '../services/app_startup_service.dart';
 import '../services/device_manager.dart';
 import '../services/pairing_manager.dart';
 import '../theme/app_theme.dart';
@@ -133,6 +134,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
               _deviceManager.addDevice(dev);
               _deviceManager.setSelectedDevice(dev.id);
 
+              AppStartupService.setFirstSetupDone(true);
               Navigator.of(ctx).pop();
               Navigator.of(context).pushReplacement(
                 MaterialPageRoute(builder: (_) => const MainLayout()),
@@ -225,6 +227,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                         device.isPaired = true;
                         device.isConnected = true;
                         _deviceManager.addDevice(device);
+                        AppStartupService.setFirstSetupDone(true);
                         Navigator.of(context).pop();
                         Navigator.of(context).pushReplacement(
                           MaterialPageRoute(
@@ -511,6 +514,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
               Center(
                 child: TextButton(
                   onPressed: () {
+                    AppStartupService.setFirstSetupDone(true);
                     Navigator.of(context).pushReplacement(
                       MaterialPageRoute(
                         builder: (_) => const MainLayout(),

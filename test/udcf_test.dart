@@ -10,16 +10,31 @@ import 'package:machmake2/core/models/tool_definition.dart';
 import 'package:flutter/material.dart';
 import 'package:machmake2/main.dart';
 import 'package:machmake2/models/dcp_models.dart';
+import 'package:machmake2/services/app_startup_service.dart';
 import 'package:machmake2/widgets/ssh_dialog.dart';
 import 'package:machmake2/screens/ssh_terminal_screen.dart';
 import 'package:machmake2/widgets/voice_cmd_dialog.dart';
 import 'package:machmake2/widgets/voice_sphere.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   testWidgets('MachineMakeApp launches to WelcomeScreen', (WidgetTester tester) async {
+    SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(const MachineMakeApp());
     expect(find.text('Scan for devices'), findsOneWidget);
     expect(find.textContaining('connect, control & create'), findsOneWidget);
+  });
+
+  test('AppStartupService setup done and clear data round-trip', () async {
+    SharedPreferences.setMockInitialValues({});
+    AppStartupService.isFirstSetupDone = false;
+    expect(AppStartupService.isFirstSetupDone, isFalse);
+
+    await AppStartupService.setFirstSetupDone(true);
+    expect(AppStartupService.isFirstSetupDone, isTrue);
+
+    await AppStartupService.clearAllData();
+    expect(AppStartupService.isFirstSetupDone, isFalse);
   });
 
   group('UDCF Core Models', () {

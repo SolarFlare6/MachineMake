@@ -34,6 +34,18 @@
         android:name="android.hardware.camera"
         android:required="false" />
 
+    <!-- Queries for url_launcher (Android 11+ package visibility) -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="http" />
+        </intent>
+    </queries>
+
     <application
         android:label="MachineMake"
         android:name="${applicationName}"

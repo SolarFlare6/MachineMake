@@ -19,6 +19,10 @@ class AppStartupService {
   static const String _keyAlertOnDisconnect    = 'setting_alert_disconnect';
   static const String _keyAutoEnableBT         = 'setting_auto_enable_bt';
   static const String _keyAutoEnableWifi       = 'setting_auto_enable_wifi';
+  static const String _keyFirstSetupDone       = 'first_setup_done';
+
+  /// Whether the user has completed initial setup/onboarding.
+  static bool isFirstSetupDone = false;
 
   /// Loads persisted settings into [DeviceManager] then honours the auto-enable
   /// flags.  Must be awaited from `main()`.
@@ -28,6 +32,9 @@ class AppStartupService {
 
     final prefs = await SharedPreferences.getInstance();
     final dm    = DeviceManager();
+
+    // ── Restore setup state ───────────────────────────────────────────────
+    isFirstSetupDone = prefs.getBool(_keyFirstSetupDone) ?? false;
 
     // ── Restore persisted settings ────────────────────────────────────────
     dm.alertOnDisconnect    = prefs.getBool(_keyAlertOnDisconnect) ?? true;
@@ -95,5 +102,20 @@ class AppStartupService {
     await prefs.setBool(_keyAlertOnDisconnect, alertOnDisconnect);
     await prefs.setBool(_keyAutoEnableBT,      autoEnableBT);
     await prefs.setBool(_keyAutoEnableWifi,    autoEnableWifi);
+  }
+
+  /// Sets whether the first-time setup has completed and persists it.
+  static Future<void> setFirstSetupDone(bool done) async {
+    isFirstSetupDone = done;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyFirstSetupDone, done);
+  }
+
+  /// Clears all stored app data, paired devices, and resets to initial state.
+  static Future<void> clearAllData() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
+    isFirstSetupDone = false;
+    DeviceManager().clearAllDevices();
   }
 }
