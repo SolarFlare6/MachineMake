@@ -1,10 +1,6 @@
 import 'package:flutter/material.dart';
-import '../services/capability_manager.dart';
 import '../services/device_manager.dart';
-import '../services/tool_manager.dart';
 import '../theme/app_theme.dart';
-import '../widgets/dynamic_ui/capability_widget_factory.dart';
-import '../widgets/dynamic_ui/tool_invoke_card.dart';
 import '../widgets/machine_make_logo.dart';
 import '../widgets/ssh_dialog.dart';
 import '../widgets/voice_cmd_dialog.dart';
@@ -339,47 +335,87 @@ class _OperationsScreenState extends State<OperationsScreen> {
                   _buildOpCard(
                     icon: Icons.terminal,
                     title: 'SSH session',
+                    subtitle: _deviceManager.selectedDevice != null &&
+                            _deviceManager.hasSavedSshCredentials(_deviceManager.selectedDevice!.id)
+                        ? 'Tap to open shell (saved credentials)'
+                        : 'Tap to configure and connect',
                     onTap: () {
                       final selectedDev = _deviceManager.selectedDevice;
-                      final deviceId = selectedDev?.id ??
-                          (_deviceManager.devices.isNotEmpty
-                              ? _deviceManager.devices.first.id
-                              : 'device-01');
+                      if (selectedDev == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('No active device selected'),
+                            backgroundColor: Colors.redAccent,
+                          ),
+                        );
+                        return;
+                      }
+
+                      final deviceId = selectedDev.id;
+                      final hasStored = _deviceManager.hasSavedSshCredentials(deviceId);
                       final cfg = _deviceManager.getSSHConfig(deviceId);
                       final defaultHost = cfg.hostname.isNotEmpty
                           ? cfg.hostname
-                          : (selectedDev?.ipAddress ?? '');
+                          : (selectedDev.ipAddress ?? '192.168.1.102');
 
-                      showDialog(
-                        context: context,
-                        builder: (_) => SSHDialog(
-                          initialHostname: defaultHost,
-                          initialUsername: cfg.username.isNotEmpty ? cfg.username : 'pi',
-                          initialPassword: cfg.password,
-                          initialPort: cfg.port,
-                          onConnectDetailed: (hostname, username, password, port) {
-                            _deviceManager.saveSSHConfig(
-                              deviceId,
-                              hostname,
-                              password,
-                              username: username,
-                              port: port,
-                            );
-
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => SshTerminalScreen(
-                                  host: hostname,
-                                  port: port,
+                      if (hasStored) {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => SshTerminalScreen(
+                              host: defaultHost,
+                              port: cfg.port,
+                              username: cfg.username,
+                              password: cfg.password,
+                              deviceName: selectedDev.name,
+                            ),
+                          ),
+                        );
+                      } else {
+                        showDialog(
+                          context: context,
+                          builder: (_) => SSHDialog(
+                            initialHostname: defaultHost,
+                            initialUsername: cfg.username.isNotEmpty ? cfg.username : 'pi',
+                            initialPassword: cfg.password,
+                            initialPort: cfg.port,
+                            initialSaveCredentials: true,
+                            showSaveCheckbox: true,
+                            onConnectDetailedWithSave: (hostname, username, password, port, saveCredentials) async {
+                              if (saveCredentials) {
+                                await _deviceManager.saveSshCredentials(
+                                  deviceId,
                                   username: username,
                                   password: password,
-                                  deviceName: selectedDev?.name,
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      );
+                                  hostname: hostname,
+                                  port: port,
+                                );
+                              } else {
+                                _deviceManager.saveSSHConfig(
+                                  deviceId,
+                                  hostname,
+                                  password,
+                                  username: username,
+                                  port: port,
+                                );
+                              }
+
+                              if (context.mounted) {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => SshTerminalScreen(
+                                      host: hostname,
+                                      port: port,
+                                      username: username,
+                                      password: password,
+                                      deviceName: selectedDev.name,
+                                    ),
+                                  ),
+                                );
+                              }
+                            },
+                          ),
+                        );
+                      }
                     },
                   ),
                   _buildOpCard(
@@ -401,9 +437,6 @@ class _OperationsScreenState extends State<OperationsScreen> {
                     title: 'Power options',
                     onTap: () => _openPowerOptionsModal(context),
                   ),
-
-                  // ── Dynamic Capability & Tool Cards ──────────────────────
-                  if (selectedId.isNotEmpty) ..._buildDynamicSection(selectedId),
                 ],
               ),
             ),
@@ -413,54 +446,10 @@ class _OperationsScreenState extends State<OperationsScreen> {
     );
   }
 
-  /// Builds capability and tool cards from the live device manifest.
-  List<Widget> _buildDynamicSection(String deviceId) {
-    final caps = CapabilityManager().getCapabilities(deviceId);
-    final tools = ToolManager().getTools(deviceId);
-    final conn = _deviceManager.getConnection(deviceId);
-
-    if (caps.isEmpty && tools.isEmpty) return [];
-
-    final widgets = <Widget>[];
-
-    if (caps.isNotEmpty) {
-      widgets.add(const Padding(
-        padding: EdgeInsets.only(top: 24, bottom: 10),
-        child: Text(
-          'Device Capabilities',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-      ));
-      widgets.addAll(caps.map((cap) =>
-        CapabilityWidgetFactory.buildForCapability(cap, conn)));
-    }
-
-    if (tools.isNotEmpty) {
-      widgets.add(const Padding(
-        padding: EdgeInsets.only(top: 24, bottom: 10),
-        child: Text(
-          'Device Tools',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-      ));
-      widgets.addAll(tools.map((t) => ToolInvokeCard(tool: t, conn: conn)));
-      widgets.add(const SizedBox(height: 8));
-    }
-
-    return widgets;
-  }
-
   Widget _buildOpCard({
     required IconData icon,
     required String title,
+    String? subtitle,
     required VoidCallback onTap,
   }) {
     return Container(
@@ -500,6 +489,15 @@ class _OperationsScreenState extends State<OperationsScreen> {
             color: Colors.white,
           ),
         ),
+        subtitle: subtitle != null
+            ? Text(
+                subtitle,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppTheme.textMuted,
+                ),
+              )
+            : null,
         trailing: const Icon(
           Icons.chevron_right,
           color: AppTheme.textMuted,

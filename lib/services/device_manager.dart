@@ -29,6 +29,14 @@ class DeviceManager extends ChangeNotifier {
   void initFromStartup({required String clientId}) {
     _clientId = clientId;
     for (final known in registry.devices) {
+      if (known.sshUsername != null && known.sshPassword != null) {
+        _sshConfigs[known.deviceId] = SSHConfig(
+          hostname: known.lastIp ?? '192.168.1.102',
+          username: known.sshUsername!,
+          password: known.sshPassword!,
+          port: known.sshPort ?? 22,
+        );
+      }
       if (!_devices.any((d) => d.id == known.deviceId)) {
         final t = known.type.toLowerCase();
         final isQuad = t.contains('quad') || t.contains('robot');
@@ -189,8 +197,75 @@ class DeviceManager extends ChangeNotifier {
   final Map<String, SSHConfig> _sshConfigs = {};
 
   SSHConfig getSSHConfig(String deviceId) {
-    return _sshConfigs.putIfAbsent(
-        deviceId, () => SSHConfig(hostname: '192.168.1.102'));
+    return _sshConfigs.putIfAbsent(deviceId, () {
+      final known = registry.findById(deviceId);
+      final dev = _devices.where((d) => d.id == deviceId).firstOrNull;
+      final host = (known?.lastIp != null && known!.lastIp!.isNotEmpty)
+          ? known.lastIp!
+          : (dev?.ipAddress ?? '192.168.1.102');
+      return SSHConfig(
+        hostname: host,
+        username: known?.sshUsername ?? 'pi',
+        password: known?.sshPassword ?? '',
+        port: known?.sshPort ?? 22,
+      );
+    });
+  }
+
+  bool hasSavedSshCredentials(String deviceId) {
+    final known = registry.findById(deviceId);
+    if (known != null &&
+        known.sshUsername != null &&
+        known.sshUsername!.isNotEmpty &&
+        known.sshPassword != null &&
+        known.sshPassword!.isNotEmpty) {
+      return true;
+    }
+    final cfg = _sshConfigs[deviceId];
+    return cfg != null && cfg.username.isNotEmpty && cfg.password.isNotEmpty;
+  }
+
+  Future<void> saveSshCredentials(
+    String deviceId, {
+    required String username,
+    required String password,
+    String? hostname,
+    int port = 22,
+  }) async {
+    final known = registry.findById(deviceId);
+    if (known != null) {
+      final updated = known.copyWith(
+        sshUsername: username,
+        sshPassword: password,
+        sshPort: port,
+        lastIp: (hostname != null && hostname.isNotEmpty) ? hostname : known.lastIp,
+      );
+      await registry.addOrUpdate(updated);
+    }
+
+    final dev = _devices.where((d) => d.id == deviceId).firstOrNull;
+    final host = (hostname != null && hostname.isNotEmpty)
+        ? hostname
+        : (known?.lastIp ?? dev?.ipAddress ?? '192.168.1.102');
+
+    saveSSHConfig(
+      deviceId,
+      host,
+      password,
+      username: username,
+      port: port,
+    );
+    notifyListeners();
+  }
+
+  Future<void> removeSshCredentials(String deviceId) async {
+    final known = registry.findById(deviceId);
+    if (known != null) {
+      final updated = known.copyWith(clearSsh: true);
+      await registry.addOrUpdate(updated);
+    }
+    _sshConfigs.remove(deviceId);
+    notifyListeners();
   }
 
   void saveSSHConfig(

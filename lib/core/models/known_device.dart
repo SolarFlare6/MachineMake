@@ -7,6 +7,9 @@ class KnownDevice {
   final String? lastIp;
   final int? lastPort;
   final String? lastBleAddress;
+  final String? sshUsername;
+  final String? sshPassword;
+  final int? sshPort;
   final DateTime pairedAt;
   DateTime lastSeenAt;
   bool isTrusted;
@@ -19,6 +22,9 @@ class KnownDevice {
     this.lastIp,
     this.lastPort,
     this.lastBleAddress,
+    this.sshUsername,
+    this.sshPassword,
+    this.sshPort,
     DateTime? pairedAt,
     DateTime? lastSeenAt,
     this.isTrusted = true,
@@ -32,6 +38,10 @@ class KnownDevice {
     String? lastIp,
     int? lastPort,
     String? lastBleAddress,
+    String? sshUsername,
+    String? sshPassword,
+    int? sshPort,
+    bool clearSsh = false,
     DateTime? lastSeenAt,
     bool? isTrusted,
   }) {
@@ -43,6 +53,9 @@ class KnownDevice {
       lastIp: lastIp ?? this.lastIp,
       lastPort: lastPort ?? this.lastPort,
       lastBleAddress: lastBleAddress ?? this.lastBleAddress,
+      sshUsername: clearSsh ? null : (sshUsername ?? this.sshUsername),
+      sshPassword: clearSsh ? null : (sshPassword ?? this.sshPassword),
+      sshPort: clearSsh ? null : (sshPort ?? this.sshPort),
       pairedAt: pairedAt,
       lastSeenAt: lastSeenAt ?? this.lastSeenAt,
       isTrusted: isTrusted ?? this.isTrusted,
@@ -58,6 +71,9 @@ class KnownDevice {
       lastIp: json['last_ip'] as String?,
       lastPort: json['last_port'] as int?,
       lastBleAddress: json['last_ble_address'] as String?,
+      sshUsername: json['ssh_username'] as String?,
+      sshPassword: json['ssh_password'] as String?,
+      sshPort: json['ssh_port'] as int?,
       pairedAt: json['paired_at'] != null
           ? DateTime.tryParse(json['paired_at'].toString()) ?? DateTime.now()
           : DateTime.now(),
@@ -76,6 +92,9 @@ class KnownDevice {
         if (lastIp != null) 'last_ip': lastIp,
         if (lastPort != null) 'last_port': lastPort,
         if (lastBleAddress != null) 'last_ble_address': lastBleAddress,
+        if (sshUsername != null) 'ssh_username': sshUsername,
+        if (sshPassword != null) 'ssh_password': sshPassword,
+        if (sshPort != null) 'ssh_port': sshPort,
         'paired_at': pairedAt.toIso8601String(),
         'last_seen_at': lastSeenAt.toIso8601String(),
         'is_trusted': isTrusted,

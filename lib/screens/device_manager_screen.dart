@@ -108,6 +108,335 @@ class _DeviceManagerScreenState extends State<DeviceManagerScreen> {
     );
   }
 
+  void _showSshCredentialsDialog(String deviceId, String deviceName) {
+    final known = _registry.findById(deviceId);
+    final live = _deviceManager.allPairedDevices
+        .where((d) => d.id == deviceId)
+        .firstOrNull;
+    final cfg = _deviceManager.getSSHConfig(deviceId);
+
+    final initialHost = (known?.lastIp != null && known!.lastIp!.isNotEmpty)
+        ? known.lastIp!
+        : (live?.ipAddress ?? (cfg.hostname.isNotEmpty ? cfg.hostname : '192.168.1.102'));
+    final initialPort = known?.sshPort ?? cfg.port;
+    final initialUser = (known?.sshUsername != null && known!.sshUsername!.isNotEmpty)
+        ? known.sshUsername!
+        : (cfg.username.isNotEmpty ? cfg.username : 'pi');
+    final initialPass = known?.sshPassword ?? cfg.password;
+    final hasStored = _deviceManager.hasSavedSshCredentials(deviceId);
+
+    final hostCtrl = TextEditingController(text: initialHost);
+    final portCtrl = TextEditingController(text: initialPort.toString());
+    final userCtrl = TextEditingController(text: initialUser);
+    final passCtrl = TextEditingController(text: initialPass);
+    bool obscurePass = true;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => Dialog(
+          backgroundColor: AppTheme.modalBackground,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: const BorderSide(color: AppTheme.darkBorder, width: 1.5),
+          ),
+          insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 400),
+            padding: const EdgeInsets.all(22),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryOrange.withAlpha(30),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.terminal, color: AppTheme.primaryOrange, size: 22),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'SSH Credentials',
+                              style: GoogleFonts.exo2(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            Text(
+                              deviceName,
+                              style: GoogleFonts.exo2(
+                                fontSize: 12,
+                                color: AppTheme.primaryOrange,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+
+                  // Host & Port Row
+                  Row(
+                    children: [
+                      Expanded(
+                        flex: 3,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Host / IP',
+                              style: GoogleFonts.exo2(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.primaryOrange,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            TextField(
+                              controller: hostCtrl,
+                              style: GoogleFonts.exo2(color: Colors.white, fontSize: 13),
+                              decoration: InputDecoration(
+                                hintText: '192.168.1.100',
+                                hintStyle: GoogleFonts.exo2(color: AppTheme.textMuted, fontSize: 12),
+                                filled: true,
+                                fillColor: AppTheme.darkCard,
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide: const BorderSide(color: AppTheme.darkBorder),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide: const BorderSide(color: AppTheme.primaryOrange),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        flex: 1,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Port',
+                              style: GoogleFonts.exo2(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.primaryOrange,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            TextField(
+                              controller: portCtrl,
+                              keyboardType: TextInputType.number,
+                              style: GoogleFonts.exo2(color: Colors.white, fontSize: 13),
+                              decoration: InputDecoration(
+                                hintText: '22',
+                                hintStyle: GoogleFonts.exo2(color: AppTheme.textMuted, fontSize: 12),
+                                filled: true,
+                                fillColor: AppTheme.darkCard,
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide: const BorderSide(color: AppTheme.darkBorder),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide: const BorderSide(color: AppTheme.primaryOrange),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Username
+                  Text(
+                    'Username',
+                    style: GoogleFonts.exo2(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.primaryOrange,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: userCtrl,
+                    style: GoogleFonts.exo2(color: Colors.white, fontSize: 13),
+                    decoration: InputDecoration(
+                      hintText: 'pi',
+                      hintStyle: GoogleFonts.exo2(color: AppTheme.textMuted, fontSize: 12),
+                      filled: true,
+                      fillColor: AppTheme.darkCard,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: AppTheme.darkBorder),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: AppTheme.primaryOrange),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Password
+                  Text(
+                    'Password',
+                    style: GoogleFonts.exo2(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.primaryOrange,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: passCtrl,
+                    obscureText: obscurePass,
+                    style: GoogleFonts.exo2(color: Colors.white, fontSize: 13),
+                    decoration: InputDecoration(
+                      hintText: 'Enter SSH password',
+                      hintStyle: GoogleFonts.exo2(color: AppTheme.textMuted, fontSize: 12),
+                      filled: true,
+                      fillColor: AppTheme.darkCard,
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          obscurePass ? Icons.visibility_off : Icons.visibility,
+                          color: AppTheme.textMuted,
+                          size: 18,
+                        ),
+                        onPressed: () => setDialogState(() => obscurePass = !obscurePass),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: AppTheme.darkBorder),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: AppTheme.primaryOrange),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Actions
+                  ElevatedButton(
+                    onPressed: () async {
+                      final host = hostCtrl.text.trim();
+                      final user = userCtrl.text.trim();
+                      final pass = passCtrl.text;
+                      final port = int.tryParse(portCtrl.text.trim()) ?? 22;
+
+                      if (user.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Please specify a username', style: GoogleFonts.exo2()),
+                            backgroundColor: Colors.redAccent,
+                          ),
+                        );
+                        return;
+                      }
+
+                      await _deviceManager.saveSshCredentials(
+                        deviceId,
+                        username: user,
+                        password: pass,
+                        hostname: host,
+                        port: port,
+                      );
+
+                      if (ctx.mounted) Navigator.of(ctx).pop();
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('SSH credentials saved for $deviceName', style: GoogleFonts.exo2()),
+                            backgroundColor: AppTheme.primaryOrange,
+                          ),
+                        );
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primaryOrange,
+                      foregroundColor: AppTheme.textDarkButton,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: Text(
+                      hasStored ? 'Update Credentials' : 'Save Credentials',
+                      style: GoogleFonts.exo2(fontWeight: FontWeight.bold, fontSize: 14),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+
+                  if (hasStored) ...[
+                    OutlinedButton(
+                      onPressed: () async {
+                        await _deviceManager.removeSshCredentials(deviceId);
+                        if (ctx.mounted) Navigator.of(ctx).pop();
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('SSH credentials removed for $deviceName', style: GoogleFonts.exo2()),
+                              backgroundColor: Colors.redAccent,
+                            ),
+                          );
+                        }
+                      },
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.redAccent,
+                        side: const BorderSide(color: Colors.redAccent),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: Text(
+                        'Remove SSH Credentials',
+                        style: GoogleFonts.exo2(fontWeight: FontWeight.bold, fontSize: 14),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+
+                  TextButton(
+                    onPressed: () => Navigator.of(ctx).pop(),
+                    child: Text(
+                      'Cancel',
+                      style: GoogleFonts.exo2(color: Colors.white70),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   void _confirmClearAllCredentials() {
     showDialog(
       context: context,
@@ -318,6 +647,8 @@ class _DeviceManagerScreenState extends State<DeviceManagerScreen> {
           final port = live?.port ?? known?.lastPort ?? 8765;
           final isConnected = live?.isConnected ?? false;
           final hasPsk = known?.psk != null && known!.psk!.isNotEmpty;
+          final hasSsh = _deviceManager.hasSavedSshCredentials(id);
+          final sshUser = known?.sshUsername;
 
           return Container(
             margin: const EdgeInsets.only(bottom: 14),
@@ -437,17 +768,83 @@ class _DeviceManagerScreenState extends State<DeviceManagerScreen> {
                             ),
                         ],
                       ),
+                      const SizedBox(height: 6),
+                      InkWell(
+                        onTap: () => _showSshCredentialsDialog(id, name),
+                        borderRadius: BorderRadius.circular(6),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 7,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: hasSsh
+                                ? AppTheme.primaryOrange.withAlpha(25)
+                                : Colors.white.withAlpha(12),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: hasSsh
+                                  ? AppTheme.primaryOrange.withAlpha(120)
+                                  : AppTheme.darkBorder,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.terminal,
+                                size: 12,
+                                color: hasSsh
+                                    ? AppTheme.primaryOrange
+                                    : AppTheme.textMuted,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                hasSsh ? 'SSH: $sshUser' : 'Set SSH Credentials',
+                                style: GoogleFonts.exo2(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: hasSsh
+                                      ? AppTheme.primaryOrange
+                                      : AppTheme.textMuted,
+                                ),
+                              ),
+                              const SizedBox(width: 3),
+                              Icon(
+                                Icons.edit,
+                                size: 10,
+                                color: hasSsh
+                                    ? AppTheme.primaryOrange
+                                    : AppTheme.textMuted,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
                 const SizedBox(width: 10),
-                IconButton(
-                  tooltip: 'Delete credentials',
-                  icon: const Icon(
-                    Icons.delete_outline,
-                    color: Colors.redAccent,
-                  ),
-                  onPressed: () => _confirmDeleteDevice(id, name),
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      tooltip: 'Manage SSH credentials',
+                      icon: Icon(
+                        Icons.terminal,
+                        color: hasSsh ? AppTheme.primaryOrange : AppTheme.textMuted,
+                      ),
+                      onPressed: () => _showSshCredentialsDialog(id, name),
+                    ),
+                    IconButton(
+                      tooltip: 'Delete credentials',
+                      icon: const Icon(
+                        Icons.delete_outline,
+                        color: Colors.redAccent,
+                      ),
+                      onPressed: () => _confirmDeleteDevice(id, name),
+                    ),
+                  ],
                 ),
               ],
             ),

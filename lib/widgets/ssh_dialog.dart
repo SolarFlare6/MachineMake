@@ -7,8 +7,11 @@ class SSHDialog extends StatefulWidget {
   final String initialUsername;
   final String initialPassword;
   final int initialPort;
+  final bool initialSaveCredentials;
+  final bool showSaveCheckbox;
   final Function(String hostname, String password)? onConnect;
   final Function(String hostname, String username, String password, int port)? onConnectDetailed;
+  final Function(String hostname, String username, String password, int port, bool saveCredentials)? onConnectDetailedWithSave;
 
   const SSHDialog({
     super.key,
@@ -16,8 +19,11 @@ class SSHDialog extends StatefulWidget {
     this.initialUsername = 'pi',
     this.initialPassword = '',
     this.initialPort = 22,
+    this.initialSaveCredentials = true,
+    this.showSaveCheckbox = true,
     this.onConnect,
     this.onConnectDetailed,
+    this.onConnectDetailedWithSave,
   });
 
   @override
@@ -30,10 +36,12 @@ class _SSHDialogState extends State<SSHDialog> {
   late final TextEditingController _passwordController;
   late final TextEditingController _portController;
   bool _obscurePassword = true;
+  bool _saveCredentials = true;
 
   @override
   void initState() {
     super.initState();
+    _saveCredentials = widget.initialSaveCredentials;
     _hostnameController = TextEditingController(text: widget.initialHostname);
     _usernameController = TextEditingController(text: widget.initialUsername);
     _passwordController = TextEditingController(text: widget.initialPassword);
@@ -83,7 +91,9 @@ class _SSHDialogState extends State<SSHDialog> {
 
     Navigator.of(context).pop();
 
-    if (widget.onConnectDetailed != null) {
+    if (widget.onConnectDetailedWithSave != null) {
+      widget.onConnectDetailedWithSave!(rawHost, username, password, port, _saveCredentials);
+    } else if (widget.onConnectDetailed != null) {
       widget.onConnectDetailed!(rawHost, username, password, port);
     } else if (widget.onConnect != null) {
       widget.onConnect!(rawHost, password);
@@ -283,7 +293,36 @@ class _SSHDialogState extends State<SSHDialog> {
                   ),
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
+
+              if (widget.showSaveCheckbox)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: InkWell(
+                    onTap: () => setState(() => _saveCredentials = !_saveCredentials),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: Checkbox(
+                            value: _saveCredentials,
+                            activeColor: AppTheme.primaryOrange,
+                            onChanged: (val) => setState(() => _saveCredentials = val ?? false),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Save credentials for this device',
+                            style: GoogleFonts.exo2(color: Colors.white, fontSize: 13),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
 
               ElevatedButton.icon(
                 icon: const Icon(Icons.login, size: 20),

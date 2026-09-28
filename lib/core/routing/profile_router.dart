@@ -3,9 +3,7 @@ import '../../core/connection/device_connection.dart';
 import '../../core/models/device_manifest.dart';
 import '../../core/models/device_profile.dart';
 import '../../models/dcp_models.dart';
-import '../../screens/computer/computer_dashboard_screen.dart';
 import '../../screens/generic/generic_device_dashboard_screen.dart';
-import '../../screens/microcontroller/microcontroller_dashboard_screen.dart';
 import '../../screens/robot/quadruped_dashboard_screen.dart';
 
 /// Routes a device to its specialized profile dashboard screen,
@@ -28,19 +26,7 @@ class ProfileRouter {
           conn: conn,
           manifest: manifest,
         );
-      case DeviceProfile.computer:
-        return ComputerDashboardScreen(
-          device: device,
-          conn: conn,
-          manifest: manifest,
-        );
-      case DeviceProfile.microcontroller:
-        return MicrocontrollerDashboardScreen(
-          device: device,
-          conn: conn,
-          manifest: manifest,
-        );
-      case DeviceProfile.generic:
+      default:
         return GenericDeviceDashboardScreen(
           device: device,
           conn: conn,
