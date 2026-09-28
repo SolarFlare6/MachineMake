@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:dartssh2/dartssh2.dart';
 import 'package:xterm/xterm.dart';
@@ -36,6 +37,7 @@ class SshTerminalScreen extends StatefulWidget {
 class _SshTerminalScreenState extends State<SshTerminalScreen> {
   late final Terminal _terminal;
   final TerminalController _terminalController = TerminalController();
+  final FocusNode _terminalFocusNode = FocusNode();
 
   SSHClient? _client;
   SSHSession? _session;
@@ -254,6 +256,7 @@ class _SshTerminalScreenState extends State<SshTerminalScreen> {
     _session?.close();
     _client?.close();
     _terminalController.dispose();
+    _terminalFocusNode.dispose();
     super.dispose();
   }
 
@@ -330,12 +333,25 @@ class _SshTerminalScreenState extends State<SshTerminalScreen> {
                 child: TerminalView(
                   _terminal,
                   controller: _terminalController,
+                  focusNode: _terminalFocusNode,
                   autofocus: true,
                   backgroundOpacity: 1.0,
+                  keyboardType: TextInputType.visiblePassword,
+                  deleteDetection: true,
+                  alwaysShowCursor: true,
+                  cursorType: TerminalCursorType.block,
                   textStyle: const TerminalStyle(
                     fontSize: 13,
                     fontFamily: 'monospace',
                   ),
+                  onKeyEvent: (focusNode, event) {
+                    if (event is KeyDownEvent &&
+                        event.logicalKey == LogicalKeyboardKey.tab) {
+                      _sendRawInput('\t');
+                      return KeyEventResult.handled;
+                    }
+                    return KeyEventResult.ignored;
+                  },
                   theme: const TerminalTheme(
                     cursor: AppTheme.primaryOrange,
                     selection: Color(0x66F37032),
@@ -380,13 +396,17 @@ class _SshTerminalScreenState extends State<SshTerminalScreen> {
                 child: Row(
                   children: [
                     _buildQuickKey('ESC', () => _sendRawInput('\x1b')),
-                    _buildQuickKey('TAB', () => _sendRawInput('\t')),
+                    _buildQuickKey('TAB', () => _sendRawInput('\t'), isHighlighted: true),
                     _buildQuickKey('Ctrl+C', () => _sendRawInput('\x03')),
                     _buildQuickKey('Ctrl+D', () => _sendRawInput('\x04')),
                     _buildQuickKey('▲', () => _sendRawInput('\x1b[A')),
                     _buildQuickKey('▼', () => _sendRawInput('\x1b[B')),
                     _buildQuickKey('◀', () => _sendRawInput('\x1b[D')),
                     _buildQuickKey('▶', () => _sendRawInput('\x1b[C')),
+                    _buildQuickKey('/', () => _sendRawInput('/')),
+                    _buildQuickKey('-', () => _sendRawInput('-')),
+                    _buildQuickKey('|', () => _sendRawInput('|')),
+                    _buildQuickKey('~', () => _sendRawInput('~')),
                     _buildQuickKey('ENTER', () => _sendRawInput('\r')),
                   ],
                 ),
@@ -398,25 +418,39 @@ class _SshTerminalScreenState extends State<SshTerminalScreen> {
     );
   }
 
-  Widget _buildQuickKey(String label, VoidCallback onTap) {
+  Widget _buildQuickKey(
+    String label,
+    VoidCallback onTap, {
+    bool isHighlighted = false,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(right: 8),
       child: Material(
-        color: AppTheme.darkCard,
+        color: isHighlighted
+            ? AppTheme.primaryOrange.withAlpha(45)
+            : AppTheme.darkCard,
         borderRadius: BorderRadius.circular(8),
         child: InkWell(
           borderRadius: BorderRadius.circular(8),
-          onTap: onTap,
+          onTap: () {
+            onTap();
+            _terminalFocusNode.requestFocus();
+          },
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: AppTheme.darkBorder),
+              border: Border.all(
+                color: isHighlighted
+                    ? AppTheme.primaryOrange
+                    : AppTheme.darkBorder,
+                width: isHighlighted ? 1.5 : 1,
+              ),
             ),
             child: Text(
               label,
               style: GoogleFonts.exo2(
-                color: Colors.white,
+                color: isHighlighted ? AppTheme.primaryOrange : Colors.white,
                 fontWeight: FontWeight.bold,
                 fontSize: 12,
               ),
