@@ -3,6 +3,7 @@ import '../../core/connection/device_connection.dart';
 import '../../core/models/device_manifest.dart';
 import '../../core/models/device_profile.dart';
 import '../../models/dcp_models.dart';
+import '../../screens/computer/computer_dashboard_screen.dart';
 import '../../screens/generic/generic_device_dashboard_screen.dart';
 import '../../screens/robot/quadruped_dashboard_screen.dart';
 
@@ -22,6 +23,12 @@ class ProfileRouter {
       case DeviceProfile.quadruped:
       case DeviceProfile.robot:
         return QuadrupedDashboardScreen(
+          device: device,
+          conn: conn,
+          manifest: manifest,
+        );
+      case DeviceProfile.computer:
+        return ComputerDashboardScreen(
           device: device,
           conn: conn,
           manifest: manifest,

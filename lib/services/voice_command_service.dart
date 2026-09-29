@@ -1,4 +1,5 @@
 import '../core/dcp/dcp_message.dart';
+import '../core/needle/needle_models.dart';
 
 /// Represents a parsed natural language voice command ready for execution.
 class VoiceCommand {
@@ -24,6 +25,7 @@ class VoiceExecutionResult {
   final Map<String, dynamic>? params;
   final String message;
   final DcpExecuteResponse? response;
+  final NeedleExecutionMode? executedWhere;
 
   const VoiceExecutionResult({
     required this.success,
@@ -32,6 +34,7 @@ class VoiceExecutionResult {
     this.params,
     required this.message,
     this.response,
+    this.executedWhere,
   });
 }
 

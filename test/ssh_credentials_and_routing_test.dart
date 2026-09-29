@@ -1,8 +1,8 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:machmake2/core/models/known_device.dart';
 import 'package:machmake2/core/routing/profile_router.dart';
 import 'package:machmake2/models/dcp_models.dart';
+import 'package:machmake2/screens/computer/computer_dashboard_screen.dart';
 import 'package:machmake2/screens/generic/generic_device_dashboard_screen.dart';
 import 'package:machmake2/screens/robot/quadruped_dashboard_screen.dart';
 import 'package:machmake2/services/device_manager.dart';
@@ -45,12 +45,12 @@ void main() {
       expect(widget, isA<QuadrupedDashboardScreen>());
     });
 
-    test('routes computer / raspberry_pi to GenericDeviceDashboardScreen', () {
+    test('routes computer / pc / macos to ComputerDashboardScreen', () {
       final dev = DeviceItem(
-        id: 'pi-01',
-        name: 'Raspberry Pi',
-        profile: 'raspberry_pi',
-        deviceType: 'Raspberry Pi',
+        id: 'mac-01',
+        name: 'MacBook Pro',
+        profile: 'macos',
+        deviceType: 'Computer',
         availableTransports: ['wifi'],
         selectedTransport: 'wifi',
         isPaired: true,
@@ -58,7 +58,7 @@ void main() {
         iconKey: 'rpi',
       );
       final widget = ProfileRouter.buildProfileUI(dev);
-      expect(widget, isA<GenericDeviceDashboardScreen>());
+      expect(widget, isA<ComputerDashboardScreen>());
     });
 
     test('routes microcontroller to GenericDeviceDashboardScreen', () {

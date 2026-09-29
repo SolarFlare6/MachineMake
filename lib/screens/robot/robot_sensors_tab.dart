@@ -9,16 +9,16 @@ class RobotSensorsTab extends StatelessWidget {
   final double pitch;
   final double roll;
   final double yaw;
-  final int batteryLevel;
-  final double batteryVoltage;
+  final int? batteryLevel;
+  final double? batteryVoltage;
 
   const RobotSensorsTab({
     super.key,
     this.pitch = 1.2,
     this.roll = -0.4,
     this.yaw = 42.8,
-    this.batteryLevel = 88,
-    this.batteryVoltage = 12.4,
+    this.batteryLevel,
+    this.batteryVoltage,
   });
 
   @override
@@ -29,12 +29,65 @@ class RobotSensorsTab extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Battery Bar
-          RobotBatteryBar(
-            percentage: batteryLevel,
-            voltage: batteryVoltage,
-          ),
-          const SizedBox(height: 16),
+          // Power / Battery Indicator
+          if (batteryLevel != null) ...[
+            RobotBatteryBar(
+              percentage: batteryLevel!,
+              voltage: batteryVoltage ?? 12.0,
+            ),
+            const SizedBox(height: 16),
+          ] else ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: AppTheme.darkCard,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppTheme.darkBorder),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF00E676).withAlpha(30),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.power,
+                      color: Color(0xFF00E676),
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Power: DC / External Supply',
+                          style: GoogleFonts.exo2(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Direct external power; no battery telemetry circuit',
+                          style: GoogleFonts.exo2(
+                            color: AppTheme.textMuted,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
 
           // IMU Orientation
           RobotImuDisplay(

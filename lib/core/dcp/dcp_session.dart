@@ -143,6 +143,16 @@ class DcpSession {
     } catch (_) {}
 
     // Build Manifest
+    final Map<String, dynamic> helloMetadata = {};
+    if (helloAck.payload['metadata'] is Map<String, dynamic>) {
+      helloMetadata.addAll(helloAck.payload['metadata'] as Map<String, dynamic>);
+    } else if (helloAck.payload['metadata'] is Map) {
+      helloMetadata.addAll(Map<String, dynamic>.from(helloAck.payload['metadata'] as Map));
+    }
+    if (helloAck.payload['ai'] != null) {
+      helloMetadata['ai'] = helloAck.payload['ai'];
+    }
+
     _manifest = DeviceManifest(
       deviceId: transport.deviceId,
       name: deviceName,
@@ -150,6 +160,7 @@ class DcpSession {
       firmwareVersion: firmware,
       capabilities: _capabilities,
       tools: _tools,
+      metadata: helloMetadata,
     );
 
     _state = DeviceConnectionState.connected;

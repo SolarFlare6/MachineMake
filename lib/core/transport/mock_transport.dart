@@ -103,6 +103,7 @@ class MockTransport implements DeviceTransport {
             'profile': mockDeviceType == 'robot' ? 'quadruped' : (mockDeviceType == 'raspberry_pi' ? 'computer' : 'microcontroller'),
             'firmware_version': '2.1.0',
             'supported_versions': ['1.0', '1.1'],
+            'ai': _aiMetadataForType(mockDeviceType),
           };
           break;
 
@@ -197,6 +198,25 @@ class MockTransport implements DeviceTransport {
     }
   }
 
+  Map<String, dynamic> _aiMetadataForType(String type) {
+    if (type == 'pico') {
+      return {
+        'needle': {
+          'supported': false,
+          'execution': ['client'],
+          'preferred': 'client',
+        }
+      };
+    }
+    return {
+      'needle': {
+        'supported': true,
+        'execution': ['device', 'client'],
+        'preferred': 'device',
+      }
+    };
+  }
+
   List<Map<String, dynamic>> _capabilitiesForType(String type) {
     if (type == 'robot') {
       return [
@@ -205,6 +225,7 @@ class MockTransport implements DeviceTransport {
         {'id': 'pwm', 'type': 'pwm', 'name': 'PWM Driver', 'description': '16-channel PCA9685'},
         {'id': 'telemetry', 'type': 'telemetry', 'name': 'Telemetry', 'description': 'IMU and load metrics'},
         {'id': 'camera', 'type': 'camera', 'name': 'Camera', 'description': 'Wide-angle navigation feed'},
+        {'id': 'ai_inference', 'type': 'ai_inference', 'name': 'Needle AI', 'description': 'On-device AI reasoning engine'},
       ];
     } else if (type == 'pico') {
       return [
@@ -219,12 +240,13 @@ class MockTransport implements DeviceTransport {
         {'id': 'camera', 'type': 'camera', 'name': 'CSI Camera', 'description': '1080p Pi Camera V2'},
         {'id': 'telemetry', 'type': 'telemetry', 'name': 'System Monitor', 'description': 'CPU/RAM/Temp telemetry'},
         {'id': 'networking', 'type': 'networking', 'name': 'WiFi & Eth', 'description': 'Gigabit + 802.11ac'},
+        {'id': 'ai_inference', 'type': 'ai_inference', 'name': 'Needle AI', 'description': 'On-device AI reasoning engine'},
       ];
     }
   }
 
   List<Map<String, dynamic>> _toolsForType(String type) {
-    return [
+    final baseTools = <Map<String, dynamic>>[
       {
         'name': 'gpio_write',
         'description': 'Set state of a GPIO pin (HIGH/LOW)',
@@ -248,6 +270,87 @@ class MockTransport implements DeviceTransport {
         'description': 'Reboots the device system',
         'parameters': [],
         'is_async': true,
+      },
+    ];
+
+    if (type == 'pico') {
+      return baseTools;
+    }
+
+    if (type == 'robot') {
+      return [
+        ...baseTools,
+        {
+          'name': 'walk',
+          'description': 'Walk in a direction for a given distance',
+          'parameters': [
+            {'name': 'direction', 'type': 'string', 'description': 'forward/backward/left/right', 'required': true},
+            {'name': 'distance', 'type': 'float', 'description': 'Distance in meters', 'required': true},
+          ],
+          'is_async': false,
+        },
+        {
+          'name': 'turn',
+          'description': 'Turn in a direction by angle',
+          'parameters': [
+            {'name': 'direction', 'type': 'string', 'description': 'left/right', 'required': true},
+            {'name': 'angle', 'type': 'float', 'description': 'Angle in degrees', 'required': true},
+          ],
+          'is_async': false,
+        },
+        {
+          'name': 'stand',
+          'description': 'Stand up pose',
+          'parameters': [],
+          'is_async': false,
+        },
+        {
+          'name': 'sit',
+          'description': 'Sit down pose',
+          'parameters': [],
+          'is_async': false,
+        },
+        {
+          'name': 'set_led',
+          'description': 'Turn illumination LED on or off',
+          'parameters': [
+            {'name': 'on', 'type': 'bool', 'description': 'LED power state', 'required': true},
+          ],
+          'is_async': false,
+        },
+        {
+          'name': 'camera_snapshot',
+          'description': 'Capture photo from camera',
+          'parameters': [],
+          'is_async': false,
+        },
+        {
+          'name': 'needle_prompt',
+          'description': 'Executes on-device Needle AI prompt',
+          'parameters': [
+            {'name': 'prompt', 'type': 'string', 'description': 'Natural language instruction', 'required': true},
+          ],
+          'is_async': false,
+        },
+      ];
+    }
+
+    // Raspberry Pi / PC
+    return [
+      ...baseTools,
+      {
+        'name': 'camera_snapshot',
+        'description': 'Capture photo from camera',
+        'parameters': [],
+        'is_async': false,
+      },
+      {
+        'name': 'needle_prompt',
+        'description': 'Executes on-device Needle AI prompt',
+        'parameters': [
+          {'name': 'prompt', 'type': 'string', 'description': 'Natural language instruction', 'required': true},
+        ],
+        'is_async': false,
       },
     ];
   }

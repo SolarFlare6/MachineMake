@@ -17,6 +17,8 @@ import 'pairing_manager.dart';
 import 'task_manager.dart';
 import 'tool_manager.dart';
 import 'voice_command_service.dart';
+import 'needle_ai_service.dart';
+import '../core/needle/needle_models.dart';
 
 /// Central facade orchestrating discovery, pairing, transports, DCP sessions,
 /// and telemetry for the MachineMake application.
@@ -479,7 +481,7 @@ class DeviceManager extends ChangeNotifier {
     return response;
   }
 
-  /// Parses natural language voice text and executes the matching tool on the device.
+  /// Parses natural language voice text and executes through Needle AI (dual on-device/local engine).
   Future<VoiceExecutionResult> executeVoiceCommand(
     String deviceId,
     String voiceText,
@@ -499,58 +501,32 @@ class DeviceManager extends ChangeNotifier {
       ),
     );
 
-    final knownTools = tool.getTools(deviceId).map((t) => t.name).toList();
-    final cmd = VoiceCommandService.parse(voiceText, availableTools: knownTools);
-
-    if (cmd == null) {
-      return VoiceExecutionResult(
-        success: false,
-        userPrompt: voiceText,
-        message: 'Command not recognized. Try "walk forward", "turn left", "stand", "sit", or "light on".',
-      );
-    }
-
     final conn = _connections[deviceId];
     if (conn == null || !conn.isConnected || conn.session == null) {
       return VoiceExecutionResult(
         success: false,
-        toolName: cmd.toolName,
-        params: cmd.parameters,
         userPrompt: voiceText,
         message: '${dev.name} is not connected. Connect from the Devices tab first.',
       );
     }
 
-    try {
-      final response = await conn.session!.executeTool(cmd.toolName, cmd.parameters);
-      if (response.success) {
-        return VoiceExecutionResult(
-          success: true,
-          toolName: cmd.toolName,
-          params: cmd.parameters,
-          userPrompt: voiceText,
-          message: '${cmd.description} executed',
-          response: response,
-        );
-      } else {
-        return VoiceExecutionResult(
-          success: false,
-          toolName: cmd.toolName,
-          params: cmd.parameters,
-          userPrompt: voiceText,
-          message: response.error ?? 'Execution rejected by device',
-          response: response,
-        );
-      }
-    } catch (e) {
-      return VoiceExecutionResult(
-        success: false,
-        toolName: cmd.toolName,
-        params: cmd.parameters,
-        userPrompt: voiceText,
-        message: 'Communication error: $e',
-      );
-    }
+    final needleResponse = await NeedleAiService.instance.processCommand(
+      deviceId: deviceId,
+      prompt: voiceText,
+    );
+
+    final locPrefix = needleResponse.executedWhere == NeedleExecutionMode.device
+        ? '[On-Device AI]'
+        : '[Local App AI]';
+
+    return VoiceExecutionResult(
+      success: needleResponse.success,
+      toolName: needleResponse.plan?.toolName,
+      params: needleResponse.plan?.parameters,
+      userPrompt: voiceText,
+      message: '$locPrefix ${needleResponse.message}',
+      executedWhere: needleResponse.executedWhere,
+    );
   }
 
   void startScan() {

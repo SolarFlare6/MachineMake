@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
+import '../core/models/device_capability.dart';
+import '../core/models/device_profile.dart';
 import '../core/routing/profile_router.dart';
+import '../models/dcp_models.dart';
+import '../services/capability_manager.dart';
 import '../services/device_manager.dart';
 import '../services/task_manager.dart';
+import '../services/tool_manager.dart';
 import '../theme/app_theme.dart';
 import '../widgets/device_icons.dart';
 import '../widgets/event_log_widget.dart';
@@ -130,6 +135,9 @@ class _OverviewScreenState extends State<OverviewScreen> {
                         final device = connectedDevices[index];
                         final isExpanded = _expandedDeviceIds.contains(device.id);
                         final telemetry = _deviceManager.getTelemetry(device.id);
+                        final profile = DeviceProfile.fromString(device.profile);
+                        final conn = _deviceManager.getConnection(device.id);
+                        final hasCamera = _deviceHasCamera(device);
 
                         return Container(
                           margin: const EdgeInsets.only(bottom: 16),
@@ -260,44 +268,85 @@ class _OverviewScreenState extends State<OverviewScreen> {
                                       const SizedBox(height: 12),
 
                                       // Operation Buttons
-                                      _buildQuickOpButton(
-                                        'Camera feed',
-                                        () {
-                                          Navigator.of(context).push(
-                                            MaterialPageRoute(
-                                              builder: (_) => CameraFeedScreen(
-                                                deviceName: device.name,
+                                      if (hasCamera) ...[
+                                        _buildQuickOpButton(
+                                          'Camera feed',
+                                          () {
+                                            Navigator.of(context).push(
+                                              MaterialPageRoute(
+                                                builder: (_) => CameraFeedScreen(
+                                                  deviceName: device.name,
+                                                ),
                                               ),
-                                            ),
-                                          );
-                                        },
-                                      ),
-                                      const SizedBox(height: 10),
-                                      _buildQuickOpButton(
-                                        'Hardware control',
-                                        () {
-                                          Navigator.of(context).push(
-                                            MaterialPageRoute(
-                                              builder: (_) => HardwareControlScreen(
-                                                deviceName: device.name,
+                                            );
+                                          },
+                                        ),
+                                        const SizedBox(height: 10),
+                                      ],
+
+                                      if (profile.isGenericOrMcu) ...[
+                                        // For generic devices like microcontrollers, unify open device & hardware control
+                                        _buildQuickOpButton(
+                                          'Hardware control',
+                                          () {
+                                            _deviceManager.setSelectedDevice(device.id);
+                                            Navigator.of(context).push(
+                                              MaterialPageRoute(
+                                                builder: (_) => HardwareControlScreen(
+                                                  deviceName: device.name,
+                                                  deviceId: device.id,
+                                                  conn: conn,
+                                                ),
                                               ),
-                                            ),
-                                          );
-                                        },
-                                      ),
-                                      const SizedBox(height: 10),
-                                      _buildQuickOpButton(
-                                        'Open device',
-                                        () {
-                                          _deviceManager.setSelectedDevice(device.id);
-                                          ProfileRouter.openDeviceDashboard(
-                                            context,
-                                            device,
-                                            conn: _deviceManager.getConnection(device.id),
-                                          );
-                                        },
-                                      ),
-                                      const SizedBox(height: 10),
+                                            );
+                                          },
+                                        ),
+                                        const SizedBox(height: 10),
+                                      ] else if (profile.isComputer) ...[
+                                         // PCs / Laptops / macOS open specialized computer dashboard
+                                        _buildQuickOpButton(
+                                          'Open device',
+                                          () {
+                                            _deviceManager.setSelectedDevice(device.id);
+                                            ProfileRouter.openDeviceDashboard(
+                                              context,
+                                              device,
+                                              conn: conn,
+                                            );
+                                          },
+                                        ),
+                                        const SizedBox(height: 10),
+                                      ] else ...[
+                                        // Robots have both hardware control and robot dashboard
+                                        _buildQuickOpButton(
+                                          'Hardware control',
+                                          () {
+                                            Navigator.of(context).push(
+                                              MaterialPageRoute(
+                                                builder: (_) => HardwareControlScreen(
+                                                  deviceName: device.name,
+                                                  deviceId: device.id,
+                                                  conn: conn,
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                        const SizedBox(height: 10),
+                                        _buildQuickOpButton(
+                                          'Open device',
+                                          () {
+                                            _deviceManager.setSelectedDevice(device.id);
+                                            ProfileRouter.openDeviceDashboard(
+                                              context,
+                                              device,
+                                              conn: conn,
+                                            );
+                                          },
+                                        ),
+                                        const SizedBox(height: 10),
+                                      ],
+
                                       // Active Tasks
                                       ListenableBuilder(
                                         listenable: TaskManager(),
@@ -365,5 +414,22 @@ class _OverviewScreenState extends State<OverviewScreen> {
         ),
       ),
     );
+  }
+
+  bool _deviceHasCamera(DeviceItem device) {
+    if (device.profile == 'quadruped' || device.profile == 'robot') {
+      return true;
+    }
+    if (CapabilityManager().hasCapability(device.id, CapabilityType.camera)) {
+      return true;
+    }
+    final conn = _deviceManager.getConnection(device.id);
+    if (conn?.manifest?.capabilities.any((c) => c.type == CapabilityType.camera) ?? false) {
+      return true;
+    }
+    if (ToolManager().getTools(device.id).any((t) => t.name.toLowerCase().contains('camera'))) {
+      return true;
+    }
+    return false;
   }
 }

@@ -13,7 +13,7 @@ class RobotDashboardHeader extends StatelessWidget {
   final DeviceConnection? conn;
   final VoidCallback onEmergencyStop;
   final VoidCallback onBack;
-  final int batteryLevel; // 0 - 100
+  final int? batteryLevel; // 0 - 100, null if no battery indicator
   final bool isControlSession;
 
   const RobotDashboardHeader({
@@ -22,7 +22,7 @@ class RobotDashboardHeader extends StatelessWidget {
     this.conn,
     required this.onEmergencyStop,
     required this.onBack,
-    this.batteryLevel = 88,
+    this.batteryLevel,
     this.isControlSession = true,
   });
 
@@ -33,10 +33,12 @@ class RobotDashboardHeader extends StatelessWidget {
     final isOnline = state == DeviceConnectionState.connected;
 
     Color batteryColor = AppTheme.primaryOrange;
-    if (batteryLevel > 50) {
-      batteryColor = const Color(0xFF00E676);
-    } else if (batteryLevel <= 20) {
-      batteryColor = Colors.redAccent;
+    if (batteryLevel != null) {
+      if (batteryLevel! > 50) {
+        batteryColor = const Color(0xFF00E676);
+      } else if (batteryLevel! <= 20) {
+        batteryColor = Colors.redAccent;
+      }
     }
 
     return Container(
@@ -219,25 +221,45 @@ class RobotDashboardHeader extends StatelessWidget {
 
               const Spacer(),
 
-              // Battery status indicator
-              Row(
-                children: [
-                  Icon(
-                    batteryLevel > 20 ? Icons.battery_full : Icons.battery_alert,
-                    size: 18,
-                    color: batteryColor,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    '$batteryLevel%',
-                    style: GoogleFonts.exo2(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
+              // Battery / Power status indicator
+              if (batteryLevel != null)
+                Row(
+                  children: [
+                    Icon(
+                      batteryLevel! > 20 ? Icons.battery_full : Icons.battery_alert,
+                      size: 18,
                       color: batteryColor,
                     ),
-                  ),
-                ],
-              ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '$batteryLevel%',
+                      style: GoogleFonts.exo2(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: batteryColor,
+                      ),
+                    ),
+                  ],
+                )
+              else
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.power,
+                      size: 15,
+                      color: Color(0xFF00E676),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'DC In',
+                      style: GoogleFonts.exo2(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFF00E676),
+                      ),
+                    ),
+                  ],
+                ),
             ],
           ),
         ],

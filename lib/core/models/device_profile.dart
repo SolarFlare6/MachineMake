@@ -18,6 +18,11 @@ enum DeviceProfile {
       case 'raspberry_pi':
       case 'pc':
       case 'laptop':
+      case 'macos':
+      case 'mac':
+      case 'osx':
+      case 'windows':
+      case 'linux':
         return DeviceProfile.computer;
       case 'microcontroller':
       case 'pico':
@@ -45,4 +50,6 @@ enum DeviceProfile {
   }
 
   bool get isRobot => this == DeviceProfile.quadruped || this == DeviceProfile.robot;
+  bool get isComputer => this == DeviceProfile.computer;
+  bool get isGenericOrMcu => this == DeviceProfile.generic || this == DeviceProfile.microcontroller;
 }

@@ -5,9 +5,11 @@ import 'package:speech_to_text/speech_recognition_error.dart';
 import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
+import '../core/needle/needle_models.dart';
 import '../models/dcp_models.dart';
 import '../screens/discovery_screen.dart';
 import '../services/device_manager.dart';
+import '../services/needle_ai_service.dart';
 import '../theme/app_theme.dart';
 import 'voice_sphere.dart';
 
@@ -518,7 +520,9 @@ class _VoiceCmdDialogState extends State<VoiceCmdDialog> {
             ),
           ),
         ),
-        const SizedBox(height: 28),
+        const SizedBox(height: 12),
+        _buildNeedleBadge(_currentDeviceId),
+        const SizedBox(height: 20),
         ElevatedButton.icon(
           icon: const Icon(Icons.mic, size: 20),
           label: Text(
@@ -604,6 +608,8 @@ class _VoiceCmdDialogState extends State<VoiceCmdDialog> {
             ),
           ],
         ),
+        const SizedBox(height: 8),
+        _buildNeedleBadge(_currentDeviceId),
         const SizedBox(height: 12),
         Text(
           _isListening ? 'Listening...' : (_recognizedText.isNotEmpty ? 'Processed' : 'Ready'),
@@ -787,6 +793,63 @@ class _VoiceCmdDialogState extends State<VoiceCmdDialog> {
           ],
         ),
       ],
+    );
+  }
+
+  Widget _buildNeedleBadge(String? deviceId) {
+    if (deviceId == null) return const SizedBox.shrink();
+    final mode = NeedleAiService.instance.resolveExecutionMode(deviceId);
+    final isDevice = mode == NeedleExecutionMode.device;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: isDevice
+            ? const Color(0xFF673AB7).withAlpha(35)
+            : const Color(0xFF00B0FF).withAlpha(30),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: isDevice
+              ? const Color(0xFF9C27B0).withAlpha(120)
+              : const Color(0xFF00B0FF).withAlpha(110),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            isDevice ? Icons.psychology : Icons.phone_android,
+            size: 15,
+            color: isDevice ? const Color(0xFFCE93D8) : const Color(0xFF80D8FF),
+          ),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  isDevice ? 'Needle AI: On-Device Executor' : 'Needle AI: Local App Executor',
+                  style: GoogleFonts.exo2(
+                    color: isDevice ? const Color(0xFFE1BEE7) : const Color(0xFFB3E5FC),
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  isDevice
+                      ? 'Target hardware runs AI decision engine'
+                      : 'Microcontroller detected; AI runs locally in-app',
+                  style: GoogleFonts.exo2(
+                    color: AppTheme.textMuted,
+                    fontSize: 9.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

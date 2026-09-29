@@ -422,11 +422,13 @@ class _OperationsScreenState extends State<OperationsScreen> {
                     icon: Icons.build_outlined,
                     title: 'Hardware control',
                     onTap: () {
+                      final dev = _deviceManager.selectedDevice;
                       Navigator.of(context).push(
                         MaterialPageRoute(
                           builder: (_) => HardwareControlScreen(
-                            deviceName:
-                                _deviceManager.selectedDevice?.name ?? 'Device',
+                            deviceName: dev?.name ?? 'Device',
+                            deviceId: dev?.id,
+                            conn: dev != null ? _deviceManager.getConnection(dev.id) : null,
                           ),
                         ),
                       );

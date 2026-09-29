@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/connection/device_connection.dart';
+import '../../core/models/device_capability.dart';
 import '../../core/models/device_manifest.dart';
 import '../../models/dcp_models.dart';
 import '../../theme/app_theme.dart';
@@ -31,8 +32,16 @@ class QuadrupedDashboardScreen extends StatefulWidget {
 class _QuadrupedDashboardScreenState extends State<QuadrupedDashboardScreen> {
   int _currentTabIndex = 0;
   bool _isStreaming = false;
-  int _battery = 88;
-  double _voltage = 12.4;
+
+  bool get _hasBattery =>
+      widget.manifest?.capabilities.any((c) =>
+          c.type == CapabilityType.power ||
+          c.id.toLowerCase().contains('battery') ||
+          c.name.toLowerCase().contains('battery')) ??
+      false;
+
+  int? get _battery => _hasBattery ? 88 : null;
+  double? get _voltage => _hasBattery ? 12.4 : null;
 
   void _triggerEmergencyStop() {
     // Send emergency stop over DCP session if connected
