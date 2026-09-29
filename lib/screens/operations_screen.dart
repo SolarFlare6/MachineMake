@@ -60,25 +60,14 @@ class _OperationsScreenState extends State<OperationsScreen> {
                 ),
                 const SizedBox(height: 20),
                 _buildPowerOptionTile(
-                  icon: Icons.restart_alt,
-                  title: 'Reboot Device',
-                  color: AppTheme.primaryOrange,
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Reboot command sent to device'),
-                        backgroundColor: AppTheme.primaryOrange,
-                      ),
-                    );
-                  },
-                ),
-                const SizedBox(height: 10),
-                _buildPowerOptionTile(
                   icon: Icons.power_settings_new,
                   title: 'Shutdown Device',
                   color: Colors.redAccent,
                   onTap: () {
+                    final selectedId = _deviceManager.selectedDeviceId;
+                    if (selectedId.isNotEmpty) {
+                      _deviceManager.executeTool(selectedId, 'shutdown', {});
+                    }
                     Navigator.of(context).pop();
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
@@ -90,15 +79,39 @@ class _OperationsScreenState extends State<OperationsScreen> {
                 ),
                 const SizedBox(height: 10),
                 _buildPowerOptionTile(
-                  icon: Icons.bedtime,
-                  title: 'Sleep / Low Power',
-                  color: Colors.blueAccent,
+                  icon: Icons.restart_alt,
+                  title: 'Reboot Device',
+                  color: AppTheme.primaryOrange,
                   onTap: () {
+                    final selectedId = _deviceManager.selectedDeviceId;
+                    if (selectedId.isNotEmpty) {
+                      _deviceManager.executeTool(selectedId, 'reboot', {});
+                    }
                     Navigator.of(context).pop();
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                        content: Text('Low power mode enabled'),
-                        backgroundColor: Colors.blueAccent,
+                        content: Text('Reboot command sent to device'),
+                        backgroundColor: AppTheme.primaryOrange,
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 10),
+                _buildPowerOptionTile(
+                  icon: Icons.front_hand,
+                  title: 'Halt (Release Servos)',
+                  color: Colors.amberAccent,
+                  onTap: () {
+                    final selectedId = _deviceManager.selectedDeviceId;
+                    if (selectedId.isNotEmpty) {
+                      _deviceManager.executeTool(selectedId, 'cleanup_servos', {});
+                      _deviceManager.executeTool(selectedId, 'emergency_stop', {});
+                    }
+                    Navigator.of(context).pop();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Halt command sent: All servos de-energized and released'),
+                        backgroundColor: Colors.amber,
                       ),
                     );
                   },

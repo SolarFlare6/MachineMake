@@ -1,268 +1,271 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../core/connection/device_connection.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/robot/robot_imu_display.dart';
-import '../../widgets/robot/robot_battery_bar.dart';
 
-/// Sensor telemetry tab for quadruped robot: IMU, foot contact sensors, proximity, and battery.
-class RobotSensorsTab extends StatelessWidget {
+/// Simplified telemetry tab for quadruped robot:
+/// Shows only actual MPU6050 gyro and accel telemetry (pitch, roll, gyro x/y/z, accel x/y/z).
+/// Foot contact, proximity, and battery gauges are removed.
+class RobotSensorsTab extends StatefulWidget {
+  final DeviceConnection? conn;
   final double pitch;
   final double roll;
   final double yaw;
-  final int? batteryLevel;
-  final double? batteryVoltage;
 
   const RobotSensorsTab({
     super.key,
+    this.conn,
     this.pitch = 1.2,
     this.roll = -0.4,
-    this.yaw = 42.8,
-    this.batteryLevel,
-    this.batteryVoltage,
+    this.yaw = 0.0,
   });
+
+  @override
+  State<RobotSensorsTab> createState() => _RobotSensorsTabState();
+}
+
+class _RobotSensorsTabState extends State<RobotSensorsTab> {
+  // MPU6050 state values
+  late double _pitch;
+  late double _roll;
+
+  double _accelX = 0.02;
+  double _accelY = -0.05;
+  double _accelZ = 0.98;
+
+  double _gyroX = 0.8;
+  double _gyroY = -1.2;
+  double _gyroZ = 0.3;
+
+  @override
+  void initState() {
+    super.initState();
+    _pitch = widget.pitch;
+    _roll = widget.roll;
+  }
+
+  void _refreshSensors() {
+    widget.conn?.session?.executeTool('get_pitch_roll', {});
+    widget.conn?.session?.executeTool('get_sensor_accel', {});
+    widget.conn?.session?.executeTool('get_sensor_gyro', {});
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Requested MPU6050 telemetry update', style: GoogleFonts.exo2()),
+        backgroundColor: AppTheme.primaryOrange,
+        duration: const Duration(milliseconds: 700),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Power / Battery Indicator
-          if (batteryLevel != null) ...[
-            RobotBatteryBar(
-              percentage: batteryLevel!,
-              voltage: batteryVoltage ?? 12.0,
+          // Power supply notice (DC In / No battery)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: AppTheme.darkCard,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppTheme.darkBorder),
             ),
-            const SizedBox(height: 16),
-          ] else ...[
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              decoration: BoxDecoration(
-                color: AppTheme.darkCard,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppTheme.darkBorder),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 38,
-                    height: 38,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF00E676).withAlpha(30),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.power,
-                      color: Color(0xFF00E676),
-                      size: 20,
-                    ),
+            child: Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF00E676).withAlpha(25),
+                    shape: BoxShape.circle,
                   ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                  child: const Icon(Icons.bolt, color: Color(0xFF00E676), size: 20),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Power: DC In / External Supply',
+                        style: GoogleFonts.exo2(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        'External 5V/12V regulator direct supply',
+                        style: GoogleFonts.exo2(
+                          color: AppTheme.textMuted,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.refresh, color: AppTheme.primaryOrange, size: 20),
+                  onPressed: _refreshSensors,
+                  tooltip: 'Refresh MPU6050',
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 14),
+
+          // MPU6050 Pitch & Roll Attitude
+          RobotImuDisplay(
+            pitch: _pitch,
+            roll: _roll,
+            yaw: widget.yaw,
+          ),
+
+          const SizedBox(height: 14),
+
+          // Accelerometer 3-Axis Readout
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppTheme.darkCard,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: AppTheme.darkBorder),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
                       children: [
+                        const Icon(Icons.speed, color: AppTheme.primaryOrange, size: 20),
+                        const SizedBox(width: 8),
                         Text(
-                          'Power: DC / External Supply',
+                          'MPU6050 Accelerometer',
                           style: GoogleFonts.exo2(
                             color: Colors.white,
-                            fontSize: 14,
                             fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Direct external power; no battery telemetry circuit',
-                          style: GoogleFonts.exo2(
-                            color: AppTheme.textMuted,
-                            fontSize: 11,
+                            fontSize: 15,
                           ),
                         ),
                       ],
                     ),
-                  ),
-                ],
+                    Text(
+                      'Unit: g (9.81 m/s²)',
+                      style: GoogleFonts.exo2(
+                        color: AppTheme.textMuted,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                _buildAxisBar('Accel X', _accelX, const Color(0xFF4FC3F7)),
+                const SizedBox(height: 10),
+                _buildAxisBar('Accel Y', _accelY, const Color(0xFF81D4FA)),
+                const SizedBox(height: 10),
+                _buildAxisBar('Accel Z', _accelZ, const Color(0xFF00E676)),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 14),
+
+          // Gyroscope 3-Axis Readout
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppTheme.darkCard,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: AppTheme.darkBorder),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.rotate_right, color: AppTheme.primaryOrange, size: 20),
+                        const SizedBox(width: 8),
+                        Text(
+                          'MPU6050 Gyroscope',
+                          style: GoogleFonts.exo2(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Text(
+                      'Unit: °/s',
+                      style: GoogleFonts.exo2(
+                        color: AppTheme.textMuted,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                _buildAxisBar('Gyro X (Pitch Rate)', _gyroX, const Color(0xFFFFB74D), maxVal: 50.0),
+                const SizedBox(height: 10),
+                _buildAxisBar('Gyro Y (Roll Rate)', _gyroY, const Color(0xFFFF8A65), maxVal: 50.0),
+                const SizedBox(height: 10),
+                _buildAxisBar('Gyro Z (Yaw Rate)', _gyroZ, const Color(0xFFE57373), maxVal: 50.0),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAxisBar(String label, double value, Color color, {double maxVal = 2.0}) {
+    final progress = ((value.abs() / maxVal)).clamp(0.0, 1.0);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              label,
+              style: GoogleFonts.exo2(
+                color: Colors.white70,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
               ),
             ),
-            const SizedBox(height: 16),
+            Text(
+              '${value >= 0 ? '+' : ''}${value.toStringAsFixed(2)}',
+              style: GoogleFonts.firaCode(
+                color: color,
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ],
-
-          // IMU Orientation
-          RobotImuDisplay(
-            pitch: pitch,
-            roll: roll,
-            yaw: yaw,
-          ),
-          const SizedBox(height: 16),
-
-          // Foot Contact Pressure (Quadruped 4 feet)
-          Container(
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              color: AppTheme.darkCard,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: AppTheme.darkBorder),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Icon(Icons.touch_app, color: AppTheme.primaryOrange, size: 20),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Foot Contact & Ground Force',
-                      style: GoogleFonts.exo2(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(child: _buildFootSensor('Front Left', true, 14.2)),
-                    const SizedBox(width: 12),
-                    Expanded(child: _buildFootSensor('Front Right', true, 13.8)),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(child: _buildFootSensor('Rear Left', true, 16.1)),
-                    const SizedBox(width: 12),
-                    Expanded(child: _buildFootSensor('Rear Right', true, 15.5)),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // Ultrasonic Proximity Grid
-          Container(
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              color: AppTheme.darkCard,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: AppTheme.darkBorder),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Icon(Icons.radar, color: AppTheme.primaryOrange, size: 20),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Obstacle Proximity',
-                      style: GoogleFonts.exo2(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(child: _buildProxCard('Front Range', '142 cm', Colors.greenAccent)),
-                    const SizedBox(width: 10),
-                    Expanded(child: _buildProxCard('Left Flank', '85 cm', Colors.greenAccent)),
-                    const SizedBox(width: 10),
-                    Expanded(child: _buildProxCard('Right Flank', '92 cm', Colors.greenAccent)),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFootSensor(String name, bool inContact, double loadN) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppTheme.darkSurface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: inContact ? const Color(0xFF00E676).withAlpha(120) : AppTheme.darkBorder,
         ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                name,
-                style: GoogleFonts.exo2(
-                  color: AppTheme.textMuted,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: inContact ? const Color(0xFF00E676) : Colors.grey,
-                ),
-              ),
-            ],
+        const SizedBox(height: 6),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(4),
+          child: LinearProgressIndicator(
+            value: progress,
+            backgroundColor: AppTheme.darkBorder,
+            valueColor: AlwaysStoppedAnimation<Color>(color),
+            minHeight: 6,
           ),
-          const SizedBox(height: 6),
-          Text(
-            '${loadN.toStringAsFixed(1)} N',
-            style: GoogleFonts.exo2(
-              color: Colors.white,
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildProxCard(String label, String value, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-      decoration: BoxDecoration(
-        color: AppTheme.darkSurface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppTheme.darkBorder),
-      ),
-      child: Column(
-        children: [
-          Text(
-            label,
-            style: GoogleFonts.exo2(
-              color: AppTheme.textMuted,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: GoogleFonts.exo2(
-              color: color,
-              fontSize: 15,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

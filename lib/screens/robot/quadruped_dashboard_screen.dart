@@ -1,18 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/connection/device_connection.dart';
-import '../../core/models/device_capability.dart';
 import '../../core/models/device_manifest.dart';
 import '../../models/dcp_models.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/robot/robot_dashboard_header.dart';
 import 'robot_move_tab.dart';
-import 'robot_pose_tab.dart';
+import 'robot_servo_sim_tab.dart';
 import 'robot_camera_tab.dart';
 import 'robot_sensors_tab.dart';
 import 'robot_config_tab.dart';
 
-/// Full Quadruped / Robot Dashboard with dedicated header and internal navigation.
+/// Full Quadruped / Robot Dashboard with dedicated header and internal navigation:
+/// - Move: Cam feed & Sim preview cards + Hardware modules accordions
+/// - Sim: Full 3D Kinematic Wireframe Dog Simulator + 16-channel servo controls
+/// - Camera: Live stream preview & snapshot capture
+/// - Sensors: Clean MPU6050 Gyroscope & Accelerometer attitude dashboard
+/// - Config: IMU Active Stabilizer & Autonomy Switch
 class QuadrupedDashboardScreen extends StatefulWidget {
   final DeviceItem device;
   final DeviceConnection? conn;
@@ -33,18 +37,9 @@ class _QuadrupedDashboardScreenState extends State<QuadrupedDashboardScreen> {
   int _currentTabIndex = 0;
   bool _isStreaming = false;
 
-  bool get _hasBattery =>
-      widget.manifest?.capabilities.any((c) =>
-          c.type == CapabilityType.power ||
-          c.id.toLowerCase().contains('battery') ||
-          c.name.toLowerCase().contains('battery')) ??
-      false;
-
-  int? get _battery => _hasBattery ? 88 : null;
-  double? get _voltage => _hasBattery ? 12.4 : null;
-
   void _triggerEmergencyStop() {
-    // Send emergency stop over DCP session if connected
+    // Send emergency stop / cleanup_servos over DCP session
+    widget.conn?.session?.executeTool('cleanup_servos', {});
     widget.conn?.session?.executeTool('emergency_stop', {});
 
     showDialog(
@@ -69,7 +64,7 @@ class _QuadrupedDashboardScreenState extends State<QuadrupedDashboardScreen> {
           ],
         ),
         content: Text(
-          'All motors halted immediately. Locomotion paused for safety.',
+          'All motors de-energized and halted immediately. Locomotion paused for safety.',
           style: GoogleFonts.exo2(color: Colors.white),
         ),
         actions: [
@@ -87,7 +82,6 @@ class _QuadrupedDashboardScreenState extends State<QuadrupedDashboardScreen> {
   }
 
   void _handleMove(String direction) {
-    // Server requires direction + distance; use 1.0m default per tap
     widget.conn?.session?.executeTool('walk', {
       'direction': direction,
       'distance': 1.0,
@@ -95,28 +89,7 @@ class _QuadrupedDashboardScreenState extends State<QuadrupedDashboardScreen> {
   }
 
   void _handleSpeedChanged(double speed) {
-    // Server has no set_speed tool; speed slider is UI-only for now
-  }
-
-  void _handleGaitChanged(String gait) {
-    // set_gait not yet server-supported; UI feedback only
-    setState(() {});
-  }
-
-  void _handlePoseSelected(String pose) {
-    // Map common pose names to server-supported tools
-    switch (pose) {
-      case 'stand':
-        widget.conn?.session?.executeTool('stand', {});
-      case 'sit':
-        widget.conn?.session?.executeTool('sit', {});
-      default:
-        widget.conn?.session?.executeTool('stand', {});
-    }
-  }
-
-  void _handleKinematics(double pitch, double roll, double height) {
-    // set_pose not yet server-supported; UI feedback only
+    // UI speed adjustment passed to walk calls
   }
 
   void _toggleCameraStream() {
@@ -146,24 +119,33 @@ class _QuadrupedDashboardScreenState extends State<QuadrupedDashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final tabs = [
+      // 0. Move Tab (Image 1 layout)
       RobotMoveTab(
+        conn: widget.conn,
         onMove: _handleMove,
         onSpeedChanged: _handleSpeedChanged,
-        onGaitChanged: _handleGaitChanged,
+        onExpandCamera: () => setState(() => _currentTabIndex = 2),
+        onExpandSim: () => setState(() => _currentTabIndex = 1),
       ),
-      RobotPoseTab(
-        onPoseSelected: _handlePoseSelected,
-        onAdjustKinematics: _handleKinematics,
+
+      // 1. Sim / Servo Control Tab (Image 2 wireframe 3D simulator + sliders)
+      RobotServoSimTab(
+        conn: widget.conn,
       ),
+
+      // 2. Camera Tab
       RobotCameraTab(
         isStreaming: _isStreaming,
         onToggleStream: _toggleCameraStream,
         onSnapshot: _takeSnapshot,
       ),
+
+      // 3. Sensors Tab (MPU6050 only)
       RobotSensorsTab(
-        batteryLevel: _battery,
-        batteryVoltage: _voltage,
+        conn: widget.conn,
       ),
+
+      // 4. Config Tab (Stabilizer & Autonomy)
       RobotConfigTab(
         onParamChanged: _handleParamChanged,
       ),
@@ -179,7 +161,7 @@ class _QuadrupedDashboardScreenState extends State<QuadrupedDashboardScreen> {
             RobotDashboardHeader(
               manifest: widget.manifest,
               conn: widget.conn,
-              batteryLevel: _battery,
+              batteryLevel: null, // Robot uses DC In
               isControlSession: true,
               onEmergencyStop: _triggerEmergencyStop,
               onBack: () => Navigator.of(context).pop(),
@@ -219,7 +201,7 @@ class _QuadrupedDashboardScreenState extends State<QuadrupedDashboardScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
             _buildNavItem(0, Icons.gamepad, 'Move'),
-            _buildNavItem(1, Icons.accessibility_new, 'Pose'),
+            _buildNavItem(1, Icons.view_in_ar, 'Sim'),
             _buildNavItem(2, Icons.videocam, 'Camera'),
             _buildNavItem(3, Icons.sensors, 'Sensors'),
             _buildNavItem(4, Icons.settings, 'Config'),
