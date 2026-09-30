@@ -56,30 +56,20 @@ void main() {
     await tester.tap(find.text('Sensors'));
     await tester.pumpAndSettle();
     expect(find.text('MPU6050 Accelerometer'), findsOneWidget);
-    expect(find.text('Audio & Buzzer'), findsOneWidget);
+    expect(find.text('MPU6050 Gyroscope'), findsOneWidget);
+    // Audio is no longer on Sensors tab
+    expect(find.text('Audio & Buzzer'), findsNothing);
 
-    // 7. Scroll to and expand Audio & Buzzer accordion under Sensors tab
-    await tester.ensureVisible(find.text('Audio & Buzzer'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Audio & Buzzer'));
-    await tester.pumpAndSettle();
-    expect(find.text('Speaker  —  pygame.mixer'), findsOneWidget);
-    expect(find.text('Tonal Buzzer  —  GPIO 23'), findsOneWidget);
-    expect(find.text('Dog Bark'), findsOneWidget);
-    expect(find.text('C4'), findsWidgets);
-
-    // 8. Collapse Audio & Buzzer accordion
-    await tester.tap(find.text('Audio & Buzzer'));
-    await tester.pumpAndSettle();
-
-    // 9. Switch to Config tab
+    // 7. Switch to Config tab
     await tester.tap(find.text('Config'));
     await tester.pumpAndSettle();
     expect(find.text('Control & Safety'), findsOneWidget);
     expect(find.text('IMU Active Stabilizer'), findsOneWidget);
     expect(find.text('Autonomy Switch'), findsOneWidget);
-    // Audio is NOT in Config tab
-    expect(find.text('Speaker  —  pygame.mixer'), findsNothing);
+    // Audio control section is in Config tab
+    expect(find.text('Audio control'), findsOneWidget);
+    expect(find.text('Tonal Buzzer  —  GPIO 23'), findsOneWidget);
+    expect(find.text('Speaker  —  pygame.mixer'), findsOneWidget);
 
     // 10. Switch back to Move tab
     await tester.tap(find.text('Move'));
