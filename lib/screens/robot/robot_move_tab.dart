@@ -551,6 +551,7 @@ class _RobotMoveTabState extends State<RobotMoveTab> {
                 child: DropdownButtonHideUnderline(
                   child: DropdownButton<int>(
                     value: _selectedServo,
+                    isExpanded: true,
                     dropdownColor: AppTheme.modalBackground,
                     icon: const Icon(Icons.arrow_drop_down, color: AppTheme.primaryOrange),
                     items: List.generate(16, (i) {

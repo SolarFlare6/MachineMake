@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 // ── Robot Dog 3D Simulator Widget ─────────────────────────────────
 // Usage:
@@ -80,6 +81,8 @@ class RobotSimulator extends StatefulWidget {
   final double? height;
   final bool showControls;
   final bool isMiniPreview;
+  final bool isMirroring;
+  final Map<int, double>? externalAngles;
   final Map<int, double>? initialAngles;
   final Function(int servoIndex, double angle)? onSingleServoChanged;
   final ValueChanged<Map<int, double>>? onAnglesChanged;
@@ -89,6 +92,8 @@ class RobotSimulator extends StatefulWidget {
     this.height,
     this.showControls = true,
     this.isMiniPreview = false,
+    this.isMirroring = false,
+    this.externalAngles,
     this.initialAngles,
     this.onSingleServoChanged,
     this.onAnglesChanged,
@@ -99,10 +104,14 @@ class RobotSimulator extends StatefulWidget {
 }
 
 class _RobotSimulatorState extends State<RobotSimulator> {
-  // camera
+  // camera & orientation
   double _camX = 0.35;
   double _camY = 0.55;
   double _camD = 90.0;
+  double _zoom = 1.0;
+
+  // gesture tracking
+  double _prevScale = 1.0;
 
   // servo state
   late Map<int, double> _servos;
@@ -113,16 +122,20 @@ class _RobotSimulatorState extends State<RobotSimulator> {
   @override
   void initState() {
     super.initState();
-    _servos = Map.from(widget.initialAngles ?? kStandAngles);
+    _servos = Map.from(widget.externalAngles ?? widget.initialAngles ?? kStandAngles);
     if (widget.isMiniPreview) {
-      _camD = 110.0;
+      _camD = 100.0;
     }
   }
 
   @override
   void didUpdateWidget(covariant RobotSimulator oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.initialAngles != null && widget.initialAngles != oldWidget.initialAngles) {
+    if (widget.isMirroring && widget.externalAngles != null) {
+      setState(() {
+        _servos.addAll(widget.externalAngles!);
+      });
+    } else if (widget.initialAngles != null && widget.initialAngles != oldWidget.initialAngles) {
       setState(() {
         _servos = Map.from(widget.initialAngles!);
       });
@@ -171,14 +184,13 @@ class _RobotSimulatorState extends State<RobotSimulator> {
     final ry = v.y * cx - tmp * sx;
     final rz = v.y * sx + tmp * cx;
     final sc = _camD / (_camD + rz + 10);
-    final scaleFactor = widget.isMiniPreview ? 10.5 : 18.0;
+    final baseScale = widget.isMiniPreview ? 3.6 : 8.0;
+    final scaleFactor = baseScale * _zoom;
     return Offset(
       size.width / 2 + rx * sc * scaleFactor,
-      size.height / 2 - ry * sc * scaleFactor,
+      size.height / 2 - ry * sc * scaleFactor + (widget.isMiniPreview ? 6 : 8),
     );
   }
-
-  double _prevScale = 1.0;
 
   void _onScaleStart(ScaleStartDetails d) {
     _prevScale = 1.0;
@@ -191,8 +203,28 @@ class _RobotSimulatorState extends State<RobotSimulator> {
       if (d.scale != 1.0) {
         final scaleDelta = d.scale / _prevScale;
         _prevScale = d.scale;
-        _camD = (_camD / scaleDelta).clamp(40, 200);
+        _zoom = (_zoom * scaleDelta).clamp(0.35, 3.5);
       }
+    });
+  }
+
+  void _zoomIn() {
+    setState(() {
+      _zoom = (_zoom * 1.2).clamp(0.35, 3.5);
+    });
+  }
+
+  void _zoomOut() {
+    setState(() {
+      _zoom = (_zoom / 1.2).clamp(0.35, 3.5);
+    });
+  }
+
+  void _resetView() {
+    setState(() {
+      _camX = 0.35;
+      _camY = 0.55;
+      _zoom = 1.0;
     });
   }
 
@@ -214,55 +246,94 @@ class _RobotSimulatorState extends State<RobotSimulator> {
     widget.onAnglesChanged?.call(_servos);
   }
 
-  // ── Servo sliders for selected leg ────────────────────────────
+  // ── Servo sliders for selected leg (compact & unclipped) ───────
   Widget _buildSliders() {
     final idx = kLegIdx[_selectedLeg]!;
     final labels = ['Shoulder', 'Upper leg', 'Lower leg'];
-    return ListView.builder(
-      physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      itemCount: 3,
-      itemBuilder: (context, i) {
-        final index = idx[i];
-        final val = _servos[index] ?? 90.0;
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          child: Row(
-            children: [
-              SizedBox(
-                width: 90,
-                child: Text(
-                  '$index · ${labels[i]}',
-                  style: const TextStyle(fontSize: 12, color: Color(0xFF888888)),
-                ),
-              ),
-              Expanded(
-                child: Slider(
-                  value: val.clamp(0.0, 180.0),
-                  min: 0,
-                  max: 180,
-                  activeColor: const Color(0xFF4FC3F7),
-                  inactiveColor: const Color(0xFF2A2A30),
-                  onChanged: (v) => _updateServo(index, v),
-                ),
-              ),
-              SizedBox(
-                width: 36,
-                child: Text(
-                  val.round().toString(),
-                  textAlign: TextAlign.right,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFF4FC3F7),
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'monospace',
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (widget.isMirroring)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 7,
+                    height: 7,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Color(0xFF00E676),
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 6),
+                  const Text(
+                    'Realtime Mirroring Active · Reflecting Robot Servos',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF00E676),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
-        );
-      },
+            ),
+          ...List.generate(3, (i) {
+            final index = idx[i];
+            final val = _servos[index] ?? 90.0;
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 1),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 86,
+                    child: Text(
+                      '$index · ${labels[i]}',
+                      style: const TextStyle(fontSize: 11, color: Color(0xFF9E9E9E)),
+                    ),
+                  ),
+                  Expanded(
+                    child: SliderTheme(
+                      data: SliderTheme.of(context).copyWith(
+                        trackHeight: 3.0,
+                        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
+                        overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
+                        disabledActiveTrackColor: const Color(0xFF00E676),
+                        disabledInactiveTrackColor: const Color(0xFF2A2A30),
+                        disabledThumbColor: const Color(0xFF00E676),
+                      ),
+                      child: Slider(
+                        value: val.clamp(0.0, 180.0),
+                        min: 0,
+                        max: 180,
+                        activeColor: widget.isMirroring ? const Color(0xFF00E676) : const Color(0xFF4FC3F7),
+                        inactiveColor: const Color(0xFF2A2A30),
+                        onChanged: widget.isMirroring ? null : (v) => _updateServo(index, v),
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 32,
+                    child: Text(
+                      val.round().toString(),
+                      textAlign: TextAlign.right,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: widget.isMirroring ? const Color(0xFF00E676) : const Color(0xFF4FC3F7),
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
     );
   }
 
@@ -277,7 +348,7 @@ class _RobotSimulatorState extends State<RobotSimulator> {
           child: GestureDetector(
             onTap: () => setState(() => _selectedLeg = legs[i]),
             child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 10),
+              padding: const EdgeInsets.symmetric(vertical: 8),
               decoration: BoxDecoration(
                 border: Border(
                   bottom: BorderSide(
@@ -292,7 +363,7 @@ class _RobotSimulatorState extends State<RobotSimulator> {
                 labels[i],
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 11,
                   color: selected ? const Color(0xFF4FC3F7) : const Color(0xFF888888),
                   fontWeight: selected ? FontWeight.bold : FontWeight.normal,
                   fontFamily: 'monospace',
@@ -308,7 +379,7 @@ class _RobotSimulatorState extends State<RobotSimulator> {
   // ── Action buttons ────────────────────────────────────────────
   Widget _buildButtons() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       child: Row(
         children: [
           _btn('STAND', () => _applyAnglePreset(kStandAngles)),
@@ -325,7 +396,7 @@ class _RobotSimulatorState extends State<RobotSimulator> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
           color: const Color(0xFF1E1E26),
           border: Border.all(
@@ -360,12 +431,125 @@ class _RobotSimulatorState extends State<RobotSimulator> {
     });
     lines.add('}');
     Clipboard.setData(ClipboardData(text: lines.join('\n')));
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Angles copied to clipboard:\n${lines.join('\n')}',
-          style: const TextStyle(fontFamily: 'monospace', fontSize: 11)),
-        backgroundColor: const Color(0xFF16161A),
-        duration: const Duration(seconds: 4),
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: Color(0xFF00E676), width: 1.2),
+        ),
+        backgroundColor: const Color(0xFF1E2028),
+        duration: const Duration(seconds: 2),
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle_outline, color: Color(0xFF00E676), size: 20),
+            const SizedBox(width: 10),
+            Text(
+              'Servo angles copied to clipboard',
+              style: GoogleFonts.exo2(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Floating Zoom / Reset Control Overlay ───────────────────────
+  Widget _buildZoomControls() {
+    return Positioned(
+      right: 10,
+      top: 10,
+      child: Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFF16161A).withAlpha(220),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: const Color(0xFF2A2A30), width: 1.0),
+          boxShadow: const [
+            BoxShadow(color: Colors.black45, blurRadius: 6),
+          ],
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Zoom In (+)
+            InkWell(
+              onTap: _zoomIn,
+              borderRadius: BorderRadius.circular(6),
+              child: const Padding(
+                padding: EdgeInsets.all(4.0),
+                child: Icon(Icons.add, color: Color(0xFF4FC3F7), size: 20),
+              ),
+            ),
+            // Zoom indicator
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2.0),
+              child: Text(
+                '${(_zoom * 100).toInt()}%',
+                style: const TextStyle(
+                  fontSize: 9,
+                  color: Colors.white70,
+                  fontFamily: 'monospace',
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            // Zoom Out (-)
+            InkWell(
+              onTap: _zoomOut,
+              borderRadius: BorderRadius.circular(6),
+              child: const Padding(
+                padding: EdgeInsets.all(4.0),
+                child: Icon(Icons.remove, color: Color(0xFF4FC3F7), size: 20),
+              ),
+            ),
+            const SizedBox(height: 2),
+            Container(height: 1, width: 22, color: const Color(0xFF2A2A30)),
+            const SizedBox(height: 2),
+            // Reset View
+            InkWell(
+              onTap: _resetView,
+              borderRadius: BorderRadius.circular(6),
+              child: const Padding(
+                padding: EdgeInsets.all(4.0),
+                child: Icon(Icons.restart_alt, color: Colors.white70, size: 18),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _build3DCanvas() {
+    return ClipRect(
+      child: Stack(
+        children: [
+          GestureDetector(
+            onScaleStart: _onScaleStart,
+            onScaleUpdate: _onScaleUpdate,
+            child: SizedBox.expand(
+              child: CustomPaint(
+                painter: RobotPainter(
+                  camX: _camX,
+                  camY: _camY,
+                  camD: _camD,
+                  zoom: _zoom,
+                  legPoints: { for (final l in kLegIdx.keys) l: _legPoints(l) },
+                  project: _project,
+                  isMini: widget.isMiniPreview,
+                ),
+              ),
+            ),
+          ),
+          if (!widget.isMiniPreview) _buildZoomControls(),
+        ],
       ),
     );
   }
@@ -377,57 +561,43 @@ class _RobotSimulatorState extends State<RobotSimulator> {
         borderRadius: BorderRadius.circular(14),
         child: SizedBox(
           height: widget.height ?? 120,
-          child: CustomPaint(
-            painter: RobotPainter(
-              camX: 0.38,
-              camY: 0.65,
-              camD: 105.0,
-              legPoints: { for (final l in kLegIdx.keys) l: _legPoints(l) },
-              project: (v, s) {
-                final cy = cos(0.65), sy = sin(0.65);
-                final cx = cos(0.38), sx = sin(0.38);
-                final rx = v.x * cy + v.z * sy;
-                final tmp = -v.x * sy + v.z * cy;
-                final ry = v.y * cx - tmp * sx;
-                final rz = v.y * sx + tmp * cx;
-                final sc = 105.0 / (105.0 + rz + 10);
-                return Offset(
-                  s.width / 2 + rx * sc * 5.2,
-                  s.height / 2 - ry * sc * 5.2 + 8,
-                );
-              },
-              isMini: true,
-            ),
-            child: Container(),
-          ),
+          child: _build3DCanvas(),
         ),
       );
     }
 
-    final viewH = widget.height ?? MediaQuery.of(context).size.height;
-    final canvasH = widget.showControls ? (viewH * 0.45).clamp(240.0, 380.0) : viewH;
+    if (widget.height != null) {
+      final canvasH = widget.showControls ? (widget.height! * 0.55) : widget.height!;
+      return Container(
+        color: const Color(0xFF0D0D0F),
+        height: widget.height,
+        child: Column(
+          children: [
+            SizedBox(
+              height: canvasH,
+              child: _build3DCanvas(),
+            ),
+            if (widget.showControls) ...[
+              Container(height: 1, color: const Color(0xFF2A2A30)),
+              Container(color: const Color(0xFF16161A), child: _buildButtons()),
+              Container(height: 1, color: const Color(0xFF2A2A30)),
+              Container(color: const Color(0xFF16161A), child: _buildLegTabs()),
+              Container(height: 1, color: const Color(0xFF2A2A30)),
+              Container(color: const Color(0xFF16161A), child: _buildSliders()),
+            ],
+          ],
+        ),
+      );
+    }
 
+    // Full screen / expanded mode: 3D canvas expands, controls stay pinned and visible at bottom
     return Container(
       color: const Color(0xFF0D0D0F),
       child: Column(
         children: [
-          // ── 3D view ──────────────────────────────────────────
-          GestureDetector(
-            onScaleStart: _onScaleStart,
-            onScaleUpdate: _onScaleUpdate,
-            child: SizedBox(
-              height: canvasH,
-              child: CustomPaint(
-                painter: RobotPainter(
-                  camX: _camX,
-                  camY: _camY,
-                  camD: _camD,
-                  legPoints: { for (final l in kLegIdx.keys) l: _legPoints(l) },
-                  project: _project,
-                ),
-                child: Container(),
-              ),
-            ),
+          // ── 3D View (Fills remaining space, never overflows) ──
+          Expanded(
+            child: _build3DCanvas(),
           ),
 
           if (widget.showControls) ...[
@@ -436,12 +606,7 @@ class _RobotSimulatorState extends State<RobotSimulator> {
             Container(height: 1, color: const Color(0xFF2A2A30)),
             Container(color: const Color(0xFF16161A), child: _buildLegTabs()),
             Container(height: 1, color: const Color(0xFF2A2A30)),
-            Expanded(
-              child: Container(
-                color: const Color(0xFF16161A),
-                child: _buildSliders(),
-              ),
-            ),
+            Container(color: const Color(0xFF16161A), child: _buildSliders()),
           ],
         ],
       ),
@@ -451,7 +616,7 @@ class _RobotSimulatorState extends State<RobotSimulator> {
 
 // ── CustomPainter ─────────────────────────────────────────────────
 class RobotPainter extends CustomPainter {
-  final double camX, camY, camD;
+  final double camX, camY, camD, zoom;
   final Map<String, Map<String, Vec3>> legPoints;
   final Offset Function(Vec3, Size) project;
   final bool isMini;
@@ -460,6 +625,7 @@ class RobotPainter extends CustomPainter {
     required this.camX,
     required this.camY,
     required this.camD,
+    required this.zoom,
     required this.legPoints,
     required this.project,
     this.isMini = false,
@@ -474,8 +640,9 @@ class RobotPainter extends CustomPainter {
     final tmp = -v.x*sy+v.z*cy;
     final rz = v.y*sx+tmp*cx;
     final sc = camD / (camD + rz + 10);
-    final scaleFactor = isMini ? 5.2 : 18.0;
-    c.drawCircle(project(v, s), r * sc * scaleFactor, Paint()..color = col);
+    final baseScale = isMini ? 3.6 : 8.0;
+    final dotRadius = (r * sc * baseScale * zoom).clamp(2.0, 9.0);
+    c.drawCircle(project(v, s), dotRadius, Paint()..color = col);
   }
 
   @override
@@ -523,9 +690,9 @@ class RobotPainter extends CustomPainter {
       final col = kLegColors[leg]!;
 
       _line(canvas, size, pts['shoulder']!, pts['knee']!,
-        Paint()..color = col..strokeWidth = isMini ? 1.8 : 3.0);
+        Paint()..color = col..strokeWidth = isMini ? 1.8 : 2.6);
       _line(canvas, size, pts['knee']!, pts['foot']!,
-        Paint()..color = col..strokeWidth = isMini ? 1.4 : 2.5);
+        Paint()..color = col..strokeWidth = isMini ? 1.4 : 2.2);
 
       _dot(canvas, size, pts['shoulder']!, 0.5, const Color(0xFFCCCCCC));
       _dot(canvas, size, pts['knee']!,     0.4, col);
@@ -550,5 +717,5 @@ class RobotPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(RobotPainter old) =>
-    old.camX != camX || old.camY != camY || old.camD != camD || old.legPoints != legPoints;
+    old.camX != camX || old.camY != camY || old.camD != camD || old.zoom != zoom || old.legPoints != legPoints;
 }

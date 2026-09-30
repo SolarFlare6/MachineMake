@@ -15,8 +15,8 @@ import 'robot_config_tab.dart';
 /// - Move: Cam feed & Sim preview cards + Hardware modules accordions
 /// - Sim: Full 3D Kinematic Wireframe Dog Simulator + 16-channel servo controls
 /// - Camera: Live stream preview & snapshot capture
-/// - Sensors: Clean MPU6050 Gyroscope & Accelerometer attitude dashboard
-/// - Config: IMU Active Stabilizer & Autonomy Switch
+/// - Sensors: MPU6050 Gyro & Accel + Audio Soundboard & Tonal Buzzer
+/// - Config: Control & Safety switches (IMU Active Stabilizer, Autonomy Switch)
 class QuadrupedDashboardScreen extends StatefulWidget {
   final DeviceItem device;
   final DeviceConnection? conn;
@@ -38,7 +38,6 @@ class _QuadrupedDashboardScreenState extends State<QuadrupedDashboardScreen> {
   bool _isStreaming = false;
 
   void _triggerEmergencyStop() {
-    // Send emergency stop / cleanup_servos over DCP session
     widget.conn?.session?.executeTool('cleanup_servos', {});
     widget.conn?.session?.executeTool('emergency_stop', {});
 
@@ -56,10 +55,7 @@ class _QuadrupedDashboardScreenState extends State<QuadrupedDashboardScreen> {
             const SizedBox(width: 10),
             Text(
               'EMERGENCY STOP',
-              style: GoogleFonts.exo2(
-                fontWeight: FontWeight.bold,
-                color: Colors.redAccent,
-              ),
+              style: GoogleFonts.exo2(fontWeight: FontWeight.bold, color: Colors.redAccent),
             ),
           ],
         ),
@@ -82,15 +78,10 @@ class _QuadrupedDashboardScreenState extends State<QuadrupedDashboardScreen> {
   }
 
   void _handleMove(String direction) {
-    widget.conn?.session?.executeTool('walk', {
-      'direction': direction,
-      'distance': 1.0,
-    });
+    widget.conn?.session?.executeTool('walk', {'direction': direction, 'distance': 1.0});
   }
 
-  void _handleSpeedChanged(double speed) {
-    // UI speed adjustment passed to walk calls
-  }
+  void _handleSpeedChanged(double speed) {}
 
   void _toggleCameraStream() {
     setState(() => _isStreaming = !_isStreaming);
@@ -103,13 +94,11 @@ class _QuadrupedDashboardScreenState extends State<QuadrupedDashboardScreen> {
 
   void _takeSnapshot() {
     widget.conn?.session?.executeTool('camera_snapshot', {});
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Camera snapshot captured', style: GoogleFonts.exo2()),
-        backgroundColor: AppTheme.primaryOrange,
-        duration: const Duration(seconds: 1),
-      ),
-    );
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text('Camera snapshot captured', style: GoogleFonts.exo2()),
+      backgroundColor: AppTheme.primaryOrange,
+      duration: const Duration(seconds: 1),
+    ));
   }
 
   void _handleParamChanged(String param, dynamic val) {
@@ -119,7 +108,7 @@ class _QuadrupedDashboardScreenState extends State<QuadrupedDashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final tabs = [
-      // 0. Move Tab (Image 1 layout)
+      // 0. Move Tab
       RobotMoveTab(
         conn: widget.conn,
         onMove: _handleMove,
@@ -128,10 +117,8 @@ class _QuadrupedDashboardScreenState extends State<QuadrupedDashboardScreen> {
         onExpandSim: () => setState(() => _currentTabIndex = 1),
       ),
 
-      // 1. Sim / Servo Control Tab (Image 2 wireframe 3D simulator + sliders)
-      RobotServoSimTab(
-        conn: widget.conn,
-      ),
+      // 1. Sim / Servo Control Tab
+      RobotServoSimTab(conn: widget.conn),
 
       // 2. Camera Tab
       RobotCameraTab(
@@ -140,72 +127,72 @@ class _QuadrupedDashboardScreenState extends State<QuadrupedDashboardScreen> {
         onSnapshot: _takeSnapshot,
       ),
 
-      // 3. Sensors Tab (MPU6050 only)
-      RobotSensorsTab(
-        conn: widget.conn,
-      ),
+      // 3. Sensors Tab (MPU6050 Gyro & Accel)
+      RobotSensorsTab(conn: widget.conn),
 
-      // 4. Config Tab (Stabilizer & Autonomy)
-      RobotConfigTab(
-        onParamChanged: _handleParamChanged,
-      ),
+      // 4. Config Tab (Control & Safety + Speaker + Buzzer)
+      RobotConfigTab(onParamChanged: _handleParamChanged, conn: widget.conn),
     ];
 
     return Scaffold(
       backgroundColor: AppTheme.darkBackground,
-      body: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            // Custom Robot Unique Header
-            RobotDashboardHeader(
-              manifest: widget.manifest,
-              conn: widget.conn,
-              batteryLevel: null, // Robot uses DC In
-              isControlSession: true,
-              onEmergencyStop: _triggerEmergencyStop,
-              onBack: () => Navigator.of(context).pop(),
+      body: Column(
+        children: [
+          // Header sits below status bar with seamless dark background
+          Container(
+            color: const Color(0xFF1B1C21),
+            child: SafeArea(
+              bottom: false,
+              child: RobotDashboardHeader(
+                manifest: widget.manifest,
+                conn: widget.conn,
+                batteryLevel: null,
+                isControlSession: true,
+                onEmergencyStop: _triggerEmergencyStop,
+                onBack: () => Navigator.of(context).pop(),
+              ),
             ),
+          ),
 
-            // Tab Content
-            Expanded(
+          // Tab Content cleanly fills remaining height without any overlap
+          Expanded(
+            child: MediaQuery.removePadding(
+              context: context,
+              removeTop: true,
               child: IndexedStack(
                 index: _currentTabIndex,
                 children: tabs,
               ),
             ),
-
-            // Exclusive Robot Internal Bottom Navigation
-            _buildRobotBottomNav(),
-          ],
-        ),
+          ),
+        ],
       ),
+      bottomNavigationBar: _buildRobotBottomNav(),
     );
   }
 
   Widget _buildRobotBottomNav() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
         color: const Color(0xFF1B1C21),
         border: Border(
-          top: BorderSide(
-            color: AppTheme.darkBorder,
-            width: 1.5,
-          ),
+          top: BorderSide(color: AppTheme.darkBorder, width: 1.5),
         ),
       ),
       child: SafeArea(
         top: false,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            _buildNavItem(0, Icons.gamepad, 'Move'),
-            _buildNavItem(1, Icons.view_in_ar, 'Sim'),
-            _buildNavItem(2, Icons.videocam, 'Camera'),
-            _buildNavItem(3, Icons.sensors, 'Sensors'),
-            _buildNavItem(4, Icons.settings, 'Config'),
-          ],
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildNavItem(0, Icons.gamepad,     'Move'),
+              _buildNavItem(1, Icons.view_in_ar,  'Sim'),
+              _buildNavItem(2, Icons.videocam,    'Camera'),
+              _buildNavItem(3, Icons.sensors,     'Sensors'),
+              _buildNavItem(4, Icons.settings,    'Config'),
+            ],
+          ),
         ),
       ),
     );
@@ -215,9 +202,9 @@ class _QuadrupedDashboardScreenState extends State<QuadrupedDashboardScreen> {
     final isSelected = _currentTabIndex == index;
     return InkWell(
       onTap: () => setState(() => _currentTabIndex = index),
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(10),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -226,13 +213,13 @@ class _QuadrupedDashboardScreenState extends State<QuadrupedDashboardScreen> {
               color: isSelected ? AppTheme.primaryOrange : AppTheme.textMuted,
               size: 22,
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 3),
             Text(
               label,
               style: GoogleFonts.exo2(
                 color: isSelected ? AppTheme.primaryOrange : AppTheme.textMuted,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                fontSize: 12,
+                fontSize: 11,
               ),
             ),
           ],

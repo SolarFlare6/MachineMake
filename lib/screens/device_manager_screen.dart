@@ -658,193 +658,225 @@ class _DeviceManagerScreenState extends State<DeviceManagerScreen> {
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
                 color: isConnected
-                    ? const Color(0xFF00E676).withAlpha(100)
+                    ? const Color(0xFF00E676).withAlpha(120)
                     : AppTheme.darkBorder,
                 width: 1.2,
               ),
             ),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                DeviceProfileIcon(
-                  iconKey: profile,
-                  size: 28,
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+                // Top Row: Icon + Name + Status Badge + Actions (SSH & Delete)
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    DeviceProfileIcon(
+                      iconKey: profile,
+                      size: 28,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(
-                            child: Text(
-                              name,
-                              style: GoogleFonts.exo2(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: isConnected
-                                  ? const Color(0xFF00E676).withAlpha(30)
-                                  : Colors.white.withAlpha(15),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              isConnected ? 'Connected' : 'Saved',
-                              style: GoogleFonts.exo2(
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                color: isConnected
-                                    ? const Color(0xFF00E676)
-                                    : AppTheme.textMuted,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'ID: $id',
-                        style: GoogleFonts.exo2(
-                          fontSize: 12,
-                          color: AppTheme.textMuted,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.wifi,
-                            size: 13,
-                            color: AppTheme.primaryOrange.withAlpha(180),
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            '$address:$port',
-                            style: GoogleFonts.exo2(
-                              fontSize: 12,
-                              color: AppTheme.primaryOrange,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          if (hasPsk)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.amber.withAlpha(25),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(
-                                    Icons.key,
-                                    size: 10,
-                                    color: Colors.amber,
-                                  ),
-                                  const SizedBox(width: 3),
-                                  Text(
-                                    'PSK Saved',
-                                    style: GoogleFonts.exo2(
-                                      fontSize: 10,
-                                      color: Colors.amber,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      InkWell(
-                        onTap: () => _showSshCredentialsDialog(id, name),
-                        borderRadius: BorderRadius.circular(6),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 7,
-                            vertical: 3,
-                          ),
-                          decoration: BoxDecoration(
-                            color: hasSsh
-                                ? AppTheme.primaryOrange.withAlpha(25)
-                                : Colors.white.withAlpha(12),
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(
-                              color: hasSsh
-                                  ? AppTheme.primaryOrange.withAlpha(120)
-                                  : AppTheme.darkBorder,
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
+                          Row(
                             children: [
-                              Icon(
-                                Icons.terminal,
-                                size: 12,
-                                color: hasSsh
-                                    ? AppTheme.primaryOrange
-                                    : AppTheme.textMuted,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                hasSsh ? 'SSH: $sshUser' : 'Set SSH Credentials',
-                                style: GoogleFonts.exo2(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                  color: hasSsh
-                                      ? AppTheme.primaryOrange
-                                      : AppTheme.textMuted,
+                              Flexible(
+                                child: Text(
+                                  name,
+                                  style: GoogleFonts.exo2(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                              const SizedBox(width: 3),
-                              Icon(
-                                Icons.edit,
-                                size: 10,
-                                color: hasSsh
-                                    ? AppTheme.primaryOrange
-                                    : AppTheme.textMuted,
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 7,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: isConnected
+                                      ? const Color(0xFF00E676).withAlpha(30)
+                                      : Colors.white.withAlpha(15),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                    color: isConnected
+                                        ? const Color(0xFF00E676).withAlpha(80)
+                                        : Colors.white.withAlpha(20),
+                                  ),
+                                ),
+                                child: Text(
+                                  isConnected ? 'Connected' : 'Saved',
+                                  style: GoogleFonts.exo2(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: isConnected
+                                        ? const Color(0xFF00E676)
+                                        : AppTheme.textMuted,
+                                  ),
+                                ),
                               ),
                             ],
                           ),
-                        ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'ID: $id',
+                            style: GoogleFonts.exo2(
+                              fontSize: 11,
+                              color: AppTheme.textMuted,
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
+                    ),
+                    // Action Buttons
                     IconButton(
                       tooltip: 'Manage SSH credentials',
+                      padding: const EdgeInsets.all(6),
+                      constraints: const BoxConstraints(),
                       icon: Icon(
                         Icons.terminal,
+                        size: 22,
                         color: hasSsh ? AppTheme.primaryOrange : AppTheme.textMuted,
                       ),
                       onPressed: () => _showSshCredentialsDialog(id, name),
                     ),
+                    const SizedBox(width: 6),
                     IconButton(
                       tooltip: 'Delete credentials',
+                      padding: const EdgeInsets.all(6),
+                      constraints: const BoxConstraints(),
                       icon: const Icon(
                         Icons.delete_outline,
+                        size: 22,
                         color: Colors.redAccent,
                       ),
                       onPressed: () => _confirmDeleteDevice(id, name),
                     ),
                   ],
+                ),
+
+                const SizedBox(height: 10),
+                const Divider(height: 1, color: AppTheme.darkBorder),
+                const SizedBox(height: 10),
+
+                // Middle Row: IP & PSK badge
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.wifi,
+                          size: 13,
+                          color: AppTheme.primaryOrange.withAlpha(180),
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          '$address:$port',
+                          style: GoogleFonts.exo2(
+                            fontSize: 12,
+                            color: AppTheme.primaryOrange,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (hasPsk)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.amber.withAlpha(25),
+                          borderRadius: BorderRadius.circular(5),
+                          border: Border.all(color: Colors.amber.withAlpha(80)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.key,
+                              size: 11,
+                              color: Colors.amber,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'PSK Saved',
+                              style: GoogleFonts.exo2(
+                                fontSize: 10,
+                                color: Colors.amber,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+
+                const SizedBox(height: 8),
+
+                // Bottom Row: SSH Credentials button / pill
+                InkWell(
+                  onTap: () => _showSshCredentialsDialog(id, name),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 9,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: hasSsh
+                          ? AppTheme.primaryOrange.withAlpha(20)
+                          : Colors.white.withAlpha(8),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: hasSsh
+                            ? AppTheme.primaryOrange.withAlpha(100)
+                            : AppTheme.darkBorder,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.vpn_key_outlined,
+                          size: 13,
+                          color: hasSsh
+                              ? AppTheme.primaryOrange
+                              : AppTheme.textMuted,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          hasSsh ? 'SSH: $sshUser (Saved)' : 'Set SSH Credentials',
+                          style: GoogleFonts.exo2(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: hasSsh
+                                ? AppTheme.primaryOrange
+                                : AppTheme.textMuted,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Icon(
+                          hasSsh ? Icons.edit : Icons.add_circle_outline,
+                          size: 12,
+                          color: hasSsh
+                              ? AppTheme.primaryOrange
+                              : AppTheme.textMuted,
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ],
             ),

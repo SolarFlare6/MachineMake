@@ -196,6 +196,12 @@ class DcpSession {
     return DcpExecuteResponse.fromPayload(response.payload);
   }
 
+  /// Alias for executeTool
+  Future<DcpExecuteResponse> execute(
+    String toolName,
+    Map<String, dynamic> params,
+  ) => executeTool(toolName, params);
+
   /// Sends a DCP ping to verify remote device liveness.
   Future<bool> ping({Duration timeout = const Duration(seconds: 4)}) async {
     try {

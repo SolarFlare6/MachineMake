@@ -1,16 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../core/connection/device_connection.dart';
 import '../../theme/app_theme.dart';
 
-/// Simplified configuration tab for quadruped robot:
-/// Retains only IMU Active Stabilizer toggle and Autonomy switch.
-/// Power profiles and dynamics sliders removed.
+/// Configuration tab for the quadruped robot:
+/// Control & Safety switches (IMU Active Stabilizer, Autonomy Switch).
 class RobotConfigTab extends StatefulWidget {
   final Function(String param, dynamic value) onParamChanged;
+  final DeviceConnection? conn;
 
   const RobotConfigTab({
     super.key,
     required this.onParamChanged,
+    this.conn,
   });
 
   @override
@@ -25,24 +27,31 @@ class _RobotConfigTabState extends State<RobotConfigTab> {
   Widget build(BuildContext context) {
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            'Control & Safety Configuration',
-            style: GoogleFonts.exo2(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
+          Row(
+            children: [
+              const Icon(Icons.shield, color: AppTheme.primaryOrange, size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Control & Safety',
+                  style: GoogleFonts.exo2(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 16),
-
-          // 1. IMU Active Stabilizer
+          const SizedBox(height: 12),
           _buildSwitchCard(
             title: 'IMU Active Stabilizer',
-            subtitle: 'Uses MPU6050 pitch & roll to dynamically level robot legs on uneven terrain',
+            subtitle: 'Uses MPU6050 pitch & roll to dynamically level legs on uneven terrain',
             icon: Icons.screen_rotation,
             value: _stabilizerEnabled,
             onChanged: (val) {
@@ -50,13 +59,10 @@ class _RobotConfigTabState extends State<RobotConfigTab> {
               widget.onParamChanged('active_stabilizer', val);
             },
           ),
-
-          const SizedBox(height: 14),
-
-          // 2. Autonomy Switch
+          const SizedBox(height: 12),
           _buildSwitchCard(
             title: 'Autonomy Switch',
-            subtitle: 'Enable autonomous navigation, local Needle AI perception, and self-balancing',
+            subtitle: 'Enable autonomous navigation, Needle AI perception and self-balancing',
             icon: Icons.smart_toy,
             value: _autonomyEnabled,
             onChanged: (val) {
@@ -64,6 +70,7 @@ class _RobotConfigTabState extends State<RobotConfigTab> {
               widget.onParamChanged('autonomy_enabled', val);
             },
           ),
+          const SizedBox(height: 24),
         ],
       ),
     );
@@ -80,7 +87,7 @@ class _RobotConfigTabState extends State<RobotConfigTab> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppTheme.darkCard,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: value ? AppTheme.primaryOrange.withAlpha(120) : AppTheme.darkBorder,
           width: 1.2,
@@ -98,7 +105,7 @@ class _RobotConfigTabState extends State<RobotConfigTab> {
             child: Icon(
               icon,
               color: value ? AppTheme.primaryOrange : AppTheme.textMuted,
-              size: 24,
+              size: 22,
             ),
           ),
           const SizedBox(width: 14),
@@ -111,7 +118,7 @@ class _RobotConfigTabState extends State<RobotConfigTab> {
                   style: GoogleFonts.exo2(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
-                    fontSize: 15,
+                    fontSize: 14,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -119,8 +126,8 @@ class _RobotConfigTabState extends State<RobotConfigTab> {
                   subtitle,
                   style: GoogleFonts.exo2(
                     color: AppTheme.textMuted,
-                    fontSize: 12,
-                    height: 1.3,
+                    fontSize: 11,
+                    height: 1.4,
                   ),
                 ),
               ],
