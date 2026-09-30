@@ -31,6 +31,8 @@ class _RobotConfigTabState extends State<RobotConfigTab> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+
+
           Row(
             children: [
               const Icon(Icons.shield, color: AppTheme.primaryOrange, size: 18),
@@ -48,7 +50,9 @@ class _RobotConfigTabState extends State<RobotConfigTab> {
               ),
             ],
           ),
+
           const SizedBox(height: 12),
+
           _buildSwitchCard(
             title: 'IMU Active Stabilizer',
             subtitle: 'Uses MPU6050 pitch & roll to dynamically level legs on uneven terrain',
@@ -59,7 +63,9 @@ class _RobotConfigTabState extends State<RobotConfigTab> {
               widget.onParamChanged('active_stabilizer', val);
             },
           ),
+
           const SizedBox(height: 12),
+
           _buildSwitchCard(
             title: 'Autonomy Switch',
             subtitle: 'Enable autonomous navigation, Needle AI perception and self-balancing',
@@ -70,8 +76,37 @@ class _RobotConfigTabState extends State<RobotConfigTab> {
               widget.onParamChanged('autonomy_enabled', val);
             },
           ),
-          const SizedBox(height: 24),
-        ],
+
+          const SizedBox(height: 20),
+
+          // audio section title
+          Row(
+            children: [
+              const Icon(Icons.speaker, color: AppTheme.primaryOrange, size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Audio control',
+                  style: GoogleFonts.exo2(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+
+          // spacer
+          const SizedBox(height: 12,),
+
+          // audio widgets here
+
+
+          // this is the end of the audio widgets section
+
+        ], // end of the children in the screen
       ),
     );
   }

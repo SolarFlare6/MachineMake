@@ -244,17 +244,6 @@ class _RobotSensorsTabState extends State<RobotSensorsTab> {
           ),
 
           const SizedBox(height: 16),
-
-          // ── Audio & Buzzer Accordion (Clean, no overlap) ──────────
-          _buildAccordionCard(
-            title: 'Audio & Buzzer',
-            icon: Icons.volume_up,
-            isExpanded: _isAudioExpanded,
-            onToggle: () => setState(() => _isAudioExpanded = !_isAudioExpanded),
-            child: _buildAudioBuzzerContent(),
-          ),
-
-          const SizedBox(height: 24),
         ],
       ),
     );
