@@ -8,8 +8,12 @@ import '../../theme/app_theme.dart';
 import '../../widgets/ssh_dialog.dart';
 import '../../widgets/telemetry_gauge.dart';
 import '../ssh_terminal_screen.dart';
+import 'computer_mapping_tab.dart';
 
 /// Specialized dashboard for computer / SBC profiles (Raspberry Pi, PC, Laptop).
+/// Features:
+/// - Tab 0 (System): Telemetry gauges (CPU, RAM, GPU, Temp), system operations (Reboot, Shutdown), SSH terminal.
+/// - Tab 1 (Mapping): Remote mouse trackpad, virtual keyboard typing & shortcuts, workstation lock, media control.
 class ComputerDashboardScreen extends StatefulWidget {
   final DeviceItem device;
   final DeviceConnection? conn;
@@ -28,6 +32,7 @@ class ComputerDashboardScreen extends StatefulWidget {
 
 class _ComputerDashboardScreenState extends State<ComputerDashboardScreen> {
   final DeviceManager _deviceManager = DeviceManager();
+  int _currentTabIndex = 0;
 
   void _openSsh() {
     final cfg = _deviceManager.getSSHConfig(widget.device.id);
@@ -98,8 +103,6 @@ class _ComputerDashboardScreenState extends State<ComputerDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final telemetry = _deviceManager.getTelemetry(widget.device.id);
-
     return Scaffold(
       backgroundColor: AppTheme.darkBackground,
       appBar: AppBar(
@@ -120,93 +123,165 @@ class _ComputerDashboardScreenState extends State<ComputerDashboardScreen> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      body: IndexedStack(
+        index: _currentTabIndex,
+        children: [
+          _buildSystemTab(),
+          ComputerMappingTab(
+            device: widget.device,
+            conn: widget.conn,
+          ),
+        ],
+      ),
+      bottomNavigationBar: _buildBottomNav(),
+    );
+  }
+
+  // ── Tab 0: System & Telemetry Tab ─────────────────────────────────
+  Widget _buildSystemTab() {
+    final telemetry = _deviceManager.getTelemetry(widget.device.id);
+
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Device Info Header Card
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppTheme.darkCard,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: AppTheme.darkBorder),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryOrange.withAlpha(35),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(Icons.computer, color: AppTheme.primaryOrange, size: 28),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.device.deviceType,
+                        style: GoogleFonts.exo2(color: AppTheme.textMuted, fontSize: 13),
+                      ),
+                      Text(
+                        widget.device.ipAddress != null
+                            ? 'IP: ${widget.device.ipAddress}'
+                            : 'Connected over ${widget.device.selectedTransport.toUpperCase()}',
+                        style: GoogleFonts.exo2(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF00E676).withAlpha(30),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFF00E676).withAlpha(120)),
+                  ),
+                  child: Text('Online', style: GoogleFonts.exo2(color: const Color(0xFF00E676), fontWeight: FontWeight.bold, fontSize: 12)),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 20),
+          Text('System Telemetry', style: GoogleFonts.exo2(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+          const SizedBox(height: 14),
+
+          // Gauges (CPU, RAM, GPU, Temp)
+          Row(
+            children: [
+              Expanded(child: TelemetryGauge(value: telemetry.cpuUsage, label: 'CPU', displayValue: '${telemetry.cpuUsage.toStringAsFixed(0)}%', color: AppTheme.cpuOrange)),
+              const SizedBox(width: 14),
+              Expanded(child: TelemetryGauge(value: telemetry.ramUsage, label: 'RAM', displayValue: '${telemetry.ramUsage.toStringAsFixed(0)}%', color: AppTheme.ramPink)),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(child: TelemetryGauge(value: telemetry.gpuUsage, label: 'GPU', displayValue: '${telemetry.gpuUsage.toStringAsFixed(0)}%', color: AppTheme.gpuCyan)),
+              const SizedBox(width: 14),
+              Expanded(child: TelemetryGauge(value: telemetry.temperature, label: 'Temp', displayValue: '${telemetry.temperature.toStringAsFixed(0)}°C', color: AppTheme.tempBlue)),
+            ],
+          ),
+
+          const SizedBox(height: 24),
+          Text('System Operations', style: GoogleFonts.exo2(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+          const SizedBox(height: 14),
+
+          // Quick Operations
+          _buildActionTile(icon: Icons.terminal, title: 'Open SSH Terminal', subtitle: 'Launch remote command line interface', color: AppTheme.primaryOrange, onTap: _openSsh),
+          const SizedBox(height: 10),
+          _buildActionTile(icon: Icons.restart_alt, title: 'Reboot System', subtitle: 'Soft reboot the operating system', color: Colors.amberAccent, onTap: () => _confirmSystemAction('Reboot System', 'system_reboot')),
+          const SizedBox(height: 10),
+          _buildActionTile(icon: Icons.power_settings_new, title: 'Shutdown Host', subtitle: 'Safely halt and power down the device', color: Colors.redAccent, onTap: () => _confirmSystemAction('Shutdown Host', 'system_shutdown')),
+        ],
+      ),
+    );
+  }
+
+  // ── Bottom Navigation Bar ─────────────────────────────────────────
+  Widget _buildBottomNav() {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF1B1C21),
+        border: Border(
+          top: BorderSide(color: AppTheme.darkBorder, width: 1.5),
+        ),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildNavItem(0, Icons.computer, 'System'),
+              _buildNavItem(1, Icons.tune, 'Mapping'),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavItem(int index, IconData icon, String label) {
+    final isSelected = _currentTabIndex == index;
+    return InkWell(
+      onTap: () => setState(() => _currentTabIndex = index),
+      borderRadius: BorderRadius.circular(10),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 5),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            // Device Info Header Card
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppTheme.darkCard,
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: AppTheme.darkBorder),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: AppTheme.primaryOrange.withAlpha(35),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: const Icon(Icons.computer, color: AppTheme.primaryOrange, size: 28),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          widget.device.deviceType,
-                          style: GoogleFonts.exo2(color: AppTheme.textMuted, fontSize: 13),
-                        ),
-                        Text(
-                          widget.device.ipAddress != null
-                              ? 'IP: ${widget.device.ipAddress}'
-                              : 'Connected over ${widget.device.selectedTransport.toUpperCase()}',
-                          style: GoogleFonts.exo2(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF00E676).withAlpha(30),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: const Color(0xFF00E676).withAlpha(120)),
-                    ),
-                    child: Text('Online', style: GoogleFonts.exo2(color: const Color(0xFF00E676), fontWeight: FontWeight.bold, fontSize: 12)),
-                  ),
-                ],
+            Icon(
+              icon,
+              color: isSelected ? AppTheme.primaryOrange : AppTheme.textMuted,
+              size: 22,
+            ),
+            const SizedBox(height: 3),
+            Text(
+              label,
+              style: GoogleFonts.exo2(
+                color: isSelected ? AppTheme.primaryOrange : AppTheme.textMuted,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                fontSize: 11,
               ),
             ),
-
-            const SizedBox(height: 20),
-            Text('System Telemetry', style: GoogleFonts.exo2(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
-            const SizedBox(height: 14),
-
-            // Gauges (CPU, RAM, GPU, Temp)
-            Row(
-              children: [
-                Expanded(child: TelemetryGauge(value: telemetry.cpuUsage, label: 'CPU', displayValue: '${telemetry.cpuUsage.toStringAsFixed(0)}%', color: AppTheme.cpuOrange)),
-                const SizedBox(width: 14),
-                Expanded(child: TelemetryGauge(value: telemetry.ramUsage, label: 'RAM', displayValue: '${telemetry.ramUsage.toStringAsFixed(0)}%', color: AppTheme.ramPink)),
-              ],
-            ),
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(child: TelemetryGauge(value: telemetry.gpuUsage, label: 'GPU', displayValue: '${telemetry.gpuUsage.toStringAsFixed(0)}%', color: AppTheme.gpuCyan)),
-                const SizedBox(width: 14),
-                Expanded(child: TelemetryGauge(value: telemetry.temperature, label: 'Temp', displayValue: '${telemetry.temperature.toStringAsFixed(0)}°C', color: AppTheme.tempBlue)),
-              ],
-            ),
-
-            const SizedBox(height: 24),
-            Text('System Operations', style: GoogleFonts.exo2(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
-            const SizedBox(height: 14),
-
-            // Quick Operations
-            _buildActionTile(icon: Icons.terminal, title: 'Open SSH Terminal', subtitle: 'Launch remote command line interface', color: AppTheme.primaryOrange, onTap: _openSsh),
-            const SizedBox(height: 10),
-            _buildActionTile(icon: Icons.restart_alt, title: 'Reboot System', subtitle: 'Soft reboot the operating system', color: Colors.amberAccent, onTap: () => _confirmSystemAction('Reboot System', 'system_reboot')),
-            const SizedBox(height: 10),
-            _buildActionTile(icon: Icons.power_settings_new, title: 'Shutdown Host', subtitle: 'Safely halt and power down the device', color: Colors.redAccent, onTap: () => _confirmSystemAction('Shutdown Host', 'system_shutdown')),
           ],
         ),
       ),
