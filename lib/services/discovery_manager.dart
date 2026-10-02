@@ -1,10 +1,14 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:uuid/uuid.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../core/discovery/discovered_device.dart';
 import '../core/discovery/mdns_discoverer.dart';
 import '../core/discovery/ble_discoverer.dart';
+import '../core/dcp/dcp_message.dart';
 import 'permission_service.dart';
 
 export '../core/discovery/discovered_device.dart';
@@ -95,12 +99,57 @@ class DiscoveryManager extends ChangeNotifier {
 
   Future<void> probeHost(String host, {int port = 8765}) async {
     try {
-      final socket = await Socket.connect(host, port, timeout: const Duration(seconds: 1));
+      final socket = await Socket.connect(host, port, timeout: const Duration(milliseconds: 800));
       socket.destroy();
+
+      // Port is open! Query device identity via DCP WebSocket hello
+      String devId = 'device-${host.replaceAll('.', '-')}-$port';
+      String devName = 'Device ($host)';
+      String devType = 'computer';
+
+      try {
+        final uri = Uri.parse('ws://$host:$port/dcp');
+        final channel = WebSocketChannel.connect(uri);
+
+        final helloMsg = DcpMessage.hello(
+          appVersion: '2.0.0',
+          protocolVersion: '1.0',
+          clientId: 'discovery_probe',
+        );
+        channel.sink.add(jsonEncode(helloMsg.toJson()));
+
+        final raw = await channel.stream.first.timeout(const Duration(milliseconds: 1800));
+        channel.sink.close();
+
+        if (raw is String) {
+          final data = jsonDecode(raw) as Map<String, dynamic>;
+          final payload = (data['data'] as Map<String, dynamic>?) ??
+              (data['payload'] as Map<String, dynamic>?) ??
+              data;
+          final parsedId = payload['device_id'] ?? data['device_id'];
+          final parsedName = payload['name'] ?? payload['device_name'] ?? data['device_name'];
+          final parsedType = payload['profile'] ?? payload['type'] ?? payload['device_type'] ?? data['profile'] ?? data['type'];
+
+          if (parsedName != null && parsedName.toString().isNotEmpty) {
+            devName = parsedName.toString();
+          }
+          if (parsedId != null && parsedId.toString().isNotEmpty) {
+            devId = parsedId.toString();
+          } else if (parsedName != null && parsedName.toString().isNotEmpty) {
+            devId = 'device-${parsedName.toString().replaceAll(RegExp(r'[^a-zA-Z0-9\-]'), '-').toLowerCase()}';
+          }
+          if (parsedType != null && parsedType.toString().isNotEmpty) {
+            devType = parsedType.toString();
+          }
+        }
+      } catch (_) {
+        // Fallback: If WebSocket hello didn't reply in time, preserve generic computer classification
+      }
+
       _addDevice(DiscoveredDevice(
-        deviceId: 'quadruped-9d3271',
-        name: 'Quadruped Robot ($host)',
-        type: 'quadruped',
+        deviceId: devId,
+        name: devName,
+        type: devType,
         transports: const {'wifi'},
         ipAddress: host,
         port: port,
@@ -123,9 +172,69 @@ class DiscoveryManager extends ChangeNotifier {
 
   /// Called by real discoverers and mock injector.
   void _addDevice(DiscoveredDevice device) {
-    final existing = _byId[device.deviceId];
-    _byId[device.deviceId] =
-        existing != null ? existing.mergeWith(device) : device;
+    // 1. Direct match by deviceId
+    String? existingKey = _byId.containsKey(device.deviceId) ? device.deviceId : null;
+
+    // 2. Name + type match (e.g. same PC reached via 10.0.2.2 emulator alias AND 10.80.166.248 LAN IP)
+    if (existingKey == null) {
+      for (final entry in _byId.entries) {
+        if (entry.value.name == device.name &&
+            entry.value.type == device.type &&
+            !device.name.startsWith('Device (')) {
+          existingKey = entry.key;
+          break;
+        }
+      }
+    }
+
+    // 3. Match emulator host alias (10.0.2.2 on port P matches local IP on same port P)
+    if (existingKey == null && device.ipAddress != null && device.port != null) {
+      for (final entry in _byId.entries) {
+        final other = entry.value;
+        if (other.port == device.port) {
+          final isOneEmulator = (device.ipAddress == '10.0.2.2' || other.ipAddress == '10.0.2.2');
+          final isBothLocal = (device.ipAddress?.startsWith('10.') == true || device.ipAddress?.startsWith('192.168.') == true) &&
+                              (other.ipAddress?.startsWith('10.') == true || other.ipAddress?.startsWith('192.168.') == true);
+          if (isOneEmulator && isBothLocal) {
+            existingKey = entry.key;
+            break;
+          }
+        }
+      }
+    }
+
+    if (existingKey != null) {
+      final existing = _byId[existingKey]!;
+      final useNewIp = (device.ipAddress != null &&
+          device.ipAddress != '127.0.0.1' &&
+          device.ipAddress != '10.0.2.2');
+      final useNewName = !device.name.startsWith('Device (') &&
+          existing.name.startsWith('Device (');
+      final useNewType = device.type != 'computer' && existing.type == 'computer';
+      final useNewId = !device.deviceId.startsWith('device-') &&
+          existing.deviceId.startsWith('device-');
+      final finalId = useNewId ? device.deviceId : existing.deviceId;
+
+      final merged = existing.mergeWith(DiscoveredDevice(
+        deviceId: finalId,
+        name: useNewName ? device.name : existing.name,
+        type: useNewType ? device.type : existing.type,
+        transports: {...existing.transports, ...device.transports},
+        ipAddress: useNewIp ? device.ipAddress : existing.ipAddress,
+        port: device.port ?? existing.port,
+        bleAddress: device.bleAddress ?? existing.bleAddress,
+        rssi: device.rssi ?? existing.rssi,
+      ));
+
+      if (useNewId && finalId != existingKey) {
+        _byId.remove(existingKey);
+        _byId[finalId] = merged;
+      } else {
+        _byId[existingKey] = merged;
+      }
+    } else {
+      _byId[device.deviceId] = device;
+    }
     notifyListeners();
   }
 

@@ -40,12 +40,17 @@ class DiscoveredDevice {
 
   /// Merge another scan hit for the same device — accumulates transports
   /// and refreshes addresses / RSSI without overwriting existing values.
-  DiscoveredDevice mergeWith(DiscoveredDevice other) {
-    assert(deviceId == other.deviceId);
+  DiscoveredDevice mergeWith(DiscoveredDevice other, {String? targetDeviceId}) {
+    final finalId = targetDeviceId ??
+        (!other.deviceId.startsWith('device-') ? other.deviceId : deviceId);
     return DiscoveredDevice(
-      deviceId: deviceId,
-      name: other.name.isNotEmpty ? other.name : name,
-      type: other.type.isNotEmpty ? other.type : type,
+      deviceId: finalId,
+      name: other.name.isNotEmpty && !other.name.startsWith('Device (')
+          ? other.name
+          : (name.isNotEmpty ? name : other.name),
+      type: other.type.isNotEmpty && other.type != 'computer'
+          ? other.type
+          : (type.isNotEmpty ? type : other.type),
       transports: {...transports, ...other.transports},
       ipAddress: other.ipAddress ?? ipAddress,
       port: other.port ?? port,

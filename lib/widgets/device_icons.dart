@@ -57,6 +57,21 @@ class DeviceProfileIcon extends StatelessWidget {
         );
         break;
 
+      case 'computer':
+      case 'pc':
+      case 'laptop':
+      case 'desktop':
+      case 'workstation':
+      case 'macos':
+      case 'windows':
+      case 'linux':
+        child = Icon(
+          Icons.computer,
+          size: size,
+          color: color,
+        );
+        break;
+
       default:
         child = Icon(
           Icons.developer_board,

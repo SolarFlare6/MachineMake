@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:machmake2/main.dart';
 import 'package:machmake2/models/dcp_models.dart';
 import 'package:machmake2/services/app_startup_service.dart';
+import 'package:machmake2/services/discovery_manager.dart';
 import 'package:machmake2/widgets/ssh_dialog.dart';
 import 'package:machmake2/screens/ssh_terminal_screen.dart';
 import 'package:machmake2/widgets/voice_cmd_dialog.dart';
@@ -328,6 +329,37 @@ void main() {
       expect(find.text('Ctrl+C'), findsOneWidget);
       expect(find.text('▲'), findsOneWidget);
       expect(find.text('▼'), findsOneWidget);
+    });
+  });
+
+  group('DiscoveryManager Device Deduplication', () {
+    test('DiscoveryManager deduplicates emulator 10.0.2.2 alias with LAN IP', () {
+      final manager = DiscoveryManager();
+
+      // Inject device on emulator gateway (placeholder before response)
+      manager.addDiscoveredDevice(DiscoveredDevice(
+        deviceId: 'device-10-0-2-2-8765',
+        name: 'Device (10.0.2.2)',
+        type: 'computer',
+        transports: const {'wifi'},
+        ipAddress: '10.0.2.2',
+        port: 8765,
+      ));
+
+      // Inject device with real info from LAN IP probe
+      manager.addDiscoveredDevice(DiscoveredDevice(
+        deviceId: 'DESKTOP-2EF22FF',
+        name: 'DESKTOP-2EF22FF',
+        type: 'computer',
+        transports: const {'wifi'},
+        ipAddress: '10.80.166.248',
+        port: 8765,
+      ));
+
+      final matched = manager.discovered.where((d) => d.port == 8765).toList();
+      expect(matched.length, equals(1));
+      expect(matched.first.name, equals('DESKTOP-2EF22FF'));
+      expect(matched.first.ipAddress, equals('10.80.166.248'));
     });
   });
 }

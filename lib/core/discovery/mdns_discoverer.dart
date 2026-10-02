@@ -92,7 +92,7 @@ class MdnsDiscoverer {
         final ipStr = ip.address.address;
         final deviceId = txtValues['device_id'] ?? _deriveId(serviceName);
         final name = txtValues['name'] ?? serviceName.split('.').first;
-        final type = txtValues['type'] ?? 'custom';
+        final type = txtValues['profile'] ?? txtValues['type'] ?? 'generic';
 
         _controller.add(DiscoveredDevice(
           deviceId: deviceId,
@@ -107,13 +107,15 @@ class MdnsDiscoverer {
     } catch (_) {}
   }
 
-  /// Parses "key=value\nkey2=value2" style TXT record text.
+  /// Parses "key=value" style TXT record text, supporting null-bytes, commas, and newlines.
   Map<String, String> _parseTxt(String text) {
     final result = <String, String>{};
-    for (final line in text.split(RegExp(r'[\n\r]+'))) {
+    for (final line in text.split(RegExp(r'[\n\r\x00,]+'))) {
       final eq = line.indexOf('=');
       if (eq > 0) {
-        result[line.substring(0, eq).trim()] = line.substring(eq + 1).trim();
+        final key = line.substring(0, eq).trim().toLowerCase();
+        final value = line.substring(eq + 1).trim();
+        result[key] = value;
       }
     }
     return result;

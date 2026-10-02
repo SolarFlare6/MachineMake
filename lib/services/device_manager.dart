@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 import '../core/connection/device_connection.dart';
 import '../core/dcp/dcp_message.dart';
 import '../core/models/device_event.dart';
+import '../core/models/device_profile.dart';
 import '../core/models/task_model.dart';
 import '../models/dcp_models.dart';
 import 'app_startup_service.dart';
@@ -40,19 +41,33 @@ class DeviceManager extends ChangeNotifier {
         );
       }
       if (!_devices.any((d) => d.id == known.deviceId)) {
+        final p = DeviceProfile.fromString(known.type);
         final t = known.type.toLowerCase();
-        final isQuad = t.contains('quad') || t.contains('robot');
         final isRpi = t.contains('raspberry');
+        final profileKey = p.isRobot
+            ? 'quadruped'
+            : (p.isComputer
+                ? (isRpi ? 'raspberry_pi' : 'computer')
+                : (p == DeviceProfile.microcontroller ? 'pico' : 'generic'));
+        final typeLabel = p.isRobot
+            ? (p == DeviceProfile.quadruped ? 'Quadruped Robot' : 'Robot')
+            : (p.isComputer
+                ? (isRpi ? 'Raspberry Pi' : 'Computer / PC')
+                : (p == DeviceProfile.microcontroller ? 'Microcontroller' : 'Generic Device'));
+        final icon = p.isRobot
+            ? 'quadruped'
+            : (p.isComputer ? (isRpi ? 'rpi' : 'computer') : (p == DeviceProfile.microcontroller ? 'pico' : 'generic'));
+
         _devices.add(DeviceItem(
           id: known.deviceId,
           name: known.name,
-          profile: isQuad ? 'quadruped' : (isRpi ? 'raspberry_pi' : 'pico'),
-          deviceType: isQuad ? 'Quadruped Robot' : (isRpi ? 'Raspberry Pi' : 'Microcontroller'),
+          profile: profileKey,
+          deviceType: typeLabel,
           availableTransports: [known.lastBleAddress != null ? 'bluetooth' : 'wifi'],
           selectedTransport: known.lastBleAddress != null ? 'bluetooth' : 'wifi',
           isPaired: known.isTrusted,
           isConnected: false,
-          iconKey: isQuad ? 'quadruped' : (isRpi ? 'rpi' : 'pico'),
+          iconKey: icon,
           ipAddress: known.lastIp,
           port: known.lastPort ?? 8765,
           macAddress: known.lastBleAddress,
@@ -147,21 +162,36 @@ class DeviceManager extends ChangeNotifier {
   // Discovered Nearby Devices (for Discovery screen — only real detected devices)
   List<DeviceItem> get nearbyDevices {
     return discovery.discovered.map((d) {
+      final p = DeviceProfile.fromString(d.type);
       final t = d.type.toLowerCase();
-      final isQuad = t.contains('quad');
-      final isRobot = t.contains('robot') || isQuad;
-      final isRpi = t.contains('raspberry') || t == 'computer' || t == 'sbc';
+      final isRpi = t.contains('raspberry');
+
+      final profileKey = p.isRobot
+          ? 'quadruped'
+          : (p.isComputer
+              ? (isRpi ? 'raspberry_pi' : 'computer')
+              : (p == DeviceProfile.microcontroller ? 'pico' : 'generic'));
+
+      final typeLabel = p.isRobot
+          ? (p == DeviceProfile.quadruped ? 'Quadruped Robot' : 'Robot')
+          : (p.isComputer
+              ? (isRpi ? 'Raspberry Pi' : 'Computer / PC')
+              : (p == DeviceProfile.microcontroller ? 'Microcontroller' : 'Generic Device'));
+
+      final icon = p.isRobot
+          ? 'quadruped'
+          : (p.isComputer ? (isRpi ? 'rpi' : 'computer') : (p == DeviceProfile.microcontroller ? 'pico' : 'generic'));
 
       return DeviceItem(
         id: d.deviceId,
         name: d.name,
-        profile: isQuad ? 'quadruped' : (isRobot ? 'quadruped' : (isRpi ? 'raspberry_pi' : 'pico')),
-        deviceType: isQuad ? 'Quadruped Robot' : (isRobot ? 'Robot' : (isRpi ? 'Raspberry Pi' : 'Microcontroller')),
+        profile: profileKey,
+        deviceType: typeLabel,
         availableTransports: d.transports.toList(),
         selectedTransport: d.primaryTransport,
         isPaired: false,
         isConnected: false,
-        iconKey: (isQuad || isRobot) ? 'quadruped' : (isRpi ? 'rpi' : 'pico'),
+        iconKey: icon,
         ipAddress: d.ipAddress,
         port: d.port ?? 8765,
         macAddress: d.bleAddress,

@@ -103,6 +103,8 @@ class _ComputerDashboardScreenState extends State<ComputerDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isKeyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0;
+
     return Scaffold(
       backgroundColor: AppTheme.darkBackground,
       appBar: AppBar(
@@ -133,7 +135,7 @@ class _ComputerDashboardScreenState extends State<ComputerDashboardScreen> {
           ),
         ],
       ),
-      bottomNavigationBar: _buildBottomNav(),
+      bottomNavigationBar: isKeyboardOpen ? null : _buildBottomNav(),
     );
   }
 

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/connection/device_connection.dart';
 import '../../models/dcp_models.dart';
@@ -43,6 +44,7 @@ class _ComputerMappingTabState extends State<ComputerMappingTab> {
   // ── Keyboard State ─────────────────────────────────────────────────
   final TextEditingController _keyboardTextCtrl = TextEditingController();
   bool _autoClearText = true;
+  String? _lastSentKey;
 
   // ── Lock Device State ──────────────────────────────────────────────
   String _selectedOs = 'windows'; // 'windows', 'macos', 'linux'
@@ -108,7 +110,10 @@ class _ComputerMappingTabState extends State<ComputerMappingTab> {
     if (text.isEmpty) return;
 
     _exec('keyboard_type', {'text': text});
-    _showFeedback('Sent: "$text"');
+    HapticFeedback.lightImpact();
+    setState(() {
+      _lastSentKey = 'Text: "$text"';
+    });
 
     if (_autoClearText) {
       _keyboardTextCtrl.clear();
@@ -117,7 +122,10 @@ class _ComputerMappingTabState extends State<ComputerMappingTab> {
 
   void _sendKeyPress(String key) {
     _exec('keyboard_press', {'key': key});
-    _showFeedback('Key: $key');
+    HapticFeedback.lightImpact();
+    setState(() {
+      _lastSentKey = key;
+    });
   }
 
   // ── Lock Device Actions ────────────────────────────────────────────
@@ -619,6 +627,7 @@ class _ComputerMappingTabState extends State<ComputerMappingTab> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // Top Row: Title + Last Sent Key Chip
               Row(
                 children: [
                   const Icon(Icons.keyboard, color: AppTheme.primaryOrange, size: 18),
@@ -633,33 +642,90 @@ class _ComputerMappingTabState extends State<ComputerMappingTab> {
                       ),
                     ),
                   ),
-                  Row(
-                    children: [
-                      Text(
-                        'Clear after send',
-                        style: GoogleFonts.exo2(color: AppTheme.textMuted, fontSize: 10),
+                  if (_lastSentKey != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryOrange.withAlpha(25),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: AppTheme.primaryOrange.withAlpha(80)),
                       ),
-                      const SizedBox(width: 4),
-                      Switch(
-                        value: _autoClearText,
-                        activeThumbColor: AppTheme.primaryOrange,
-                        activeTrackColor: AppTheme.primaryOrange.withAlpha(80),
-                        onChanged: (v) => setState(() => _autoClearText = v),
+                      child: Text(
+                        _lastSentKey!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.firaCode(
+                          color: AppTheme.primaryOrange,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    ],
+                    ),
+                ],
+              ),
+              const SizedBox(height: 8),
+
+              // Sub-row: instruction + auto-clear toggle chip
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Direct input to host machine',
+                      style: GoogleFonts.exo2(color: AppTheme.textMuted, fontSize: 11),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  InkWell(
+                    borderRadius: BorderRadius.circular(6),
+                    onTap: () => setState(() => _autoClearText = !_autoClearText),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            _autoClearText ? Icons.check_box : Icons.check_box_outline_blank,
+                            size: 15,
+                            color: _autoClearText ? AppTheme.primaryOrange : AppTheme.textMuted,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Clear after send',
+                            style: GoogleFonts.exo2(
+                              color: _autoClearText ? AppTheme.primaryOrange : AppTheme.textMuted,
+                              fontSize: 10,
+                              fontWeight: _autoClearText ? FontWeight.bold : FontWeight.normal,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ],
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 12),
+
+              // Text Field with clear icon
               TextField(
                 controller: _keyboardTextCtrl,
                 style: GoogleFonts.firaCode(color: Colors.white, fontSize: 13),
+                textInputAction: TextInputAction.send,
                 decoration: InputDecoration(
                   hintText: 'Type text to send to host...',
                   hintStyle: GoogleFonts.exo2(color: AppTheme.textMuted, fontSize: 12),
                   filled: true,
                   fillColor: AppTheme.darkSurface,
                   contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  suffixIcon: ValueListenableBuilder<TextEditingValue>(
+                    valueListenable: _keyboardTextCtrl,
+                    builder: (_, value, __) {
+                      if (value.text.isEmpty) return const SizedBox.shrink();
+                      return IconButton(
+                        icon: const Icon(Icons.clear, size: 16, color: AppTheme.textMuted),
+                        onPressed: () => _keyboardTextCtrl.clear(),
+                      );
+                    },
+                  ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: const BorderSide(color: AppTheme.darkBorder),
@@ -672,18 +738,23 @@ class _ComputerMappingTabState extends State<ComputerMappingTab> {
                 onSubmitted: (_) => _sendTypedText(),
               ),
               const SizedBox(height: 12),
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.primaryOrange,
-                  foregroundColor: Colors.black,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-                onPressed: _sendTypedText,
-                icon: const Icon(Icons.send, size: 16),
-                label: Text(
-                  'Send Text to Device',
-                  style: GoogleFonts.exo2(fontWeight: FontWeight.bold, fontSize: 13),
+
+              // Send button
+              SizedBox(
+                height: 44,
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryOrange,
+                    foregroundColor: Colors.black,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  onPressed: _sendTypedText,
+                  icon: const Icon(Icons.send, size: 16),
+                  label: Text(
+                    'Send Text to Device',
+                    style: GoogleFonts.exo2(fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
                 ),
               ),
             ],
@@ -713,7 +784,7 @@ class _ComputerMappingTabState extends State<ComputerMappingTab> {
               ),
               const SizedBox(height: 12),
 
-              // Essential row
+              // Essential editing row
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
@@ -723,6 +794,7 @@ class _ComputerMappingTabState extends State<ComputerMappingTab> {
                   _keyButton('Space', 'space', icon: Icons.space_bar),
                   _keyButton('Tab', 'tab', icon: Icons.keyboard_tab),
                   _keyButton('Esc', 'escape'),
+                  _keyButton('Del', 'delete'),
                 ],
               ),
 
@@ -750,6 +822,7 @@ class _ComputerMappingTabState extends State<ComputerMappingTab> {
                   _keyButton('Ctrl + A', 'ctrl+a'),
                   _keyButton('Alt + Tab', 'alt+tab'),
                   _keyButton('Win / Super', 'win'),
+                  _keyButton('Alt + F4', 'alt+f4'),
                 ],
               ),
 
@@ -757,7 +830,7 @@ class _ComputerMappingTabState extends State<ComputerMappingTab> {
               const Divider(color: AppTheme.darkBorder, height: 1),
               const SizedBox(height: 14),
 
-              // Arrow Keys row
+              // Navigation Keys section (Proper Inverted-T layout!)
               Text(
                 'Navigation Keys',
                 style: GoogleFonts.exo2(
@@ -766,23 +839,25 @@ class _ComputerMappingTabState extends State<ComputerMappingTab> {
                   fontSize: 12,
                 ),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 12),
 
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _keyButton('←', 'left'),
-                  const SizedBox(width: 8),
-                  Column(
-                    children: [
-                      _keyButton('↑', 'up'),
-                      const SizedBox(height: 8),
-                      _keyButton('↓', 'down'),
-                    ],
-                  ),
-                  const SizedBox(width: 8),
-                  _keyButton('→', 'right'),
-                ],
+              Center(
+                child: Column(
+                  children: [
+                    _navButton('▲', 'up', label: 'UP'),
+                    const SizedBox(height: 6),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _navButton('◀', 'left', label: 'LEFT'),
+                        const SizedBox(width: 8),
+                        _navButton('▼', 'down', label: 'DOWN'),
+                        const SizedBox(width: 8),
+                        _navButton('▶', 'right', label: 'RIGHT'),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -791,34 +866,71 @@ class _ComputerMappingTabState extends State<ComputerMappingTab> {
     );
   }
 
-  Widget _keyButton(String label, String keyParam, {IconData? icon}) {
-    return ElevatedButton(
-      style: ElevatedButton.styleFrom(
-        backgroundColor: AppTheme.darkSurface,
-        foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-          side: const BorderSide(color: AppTheme.darkBorder),
-        ),
-        elevation: 0,
-      ),
-      onPressed: () => _sendKeyPress(keyParam),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (icon != null) ...[
-            Icon(icon, size: 14, color: AppTheme.primaryOrange),
-            const SizedBox(width: 5),
-          ],
-          Text(
-            label,
-            style: GoogleFonts.firaCode(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
+  Widget _navButton(String symbol, String keyParam, {String? label}) {
+    return SizedBox(
+      width: 58,
+      height: 48,
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppTheme.darkSurface,
+          foregroundColor: Colors.white,
+          padding: EdgeInsets.zero,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+            side: const BorderSide(color: AppTheme.darkBorder),
           ),
-        ],
+          elevation: 0,
+        ),
+        onPressed: () => _sendKeyPress(keyParam),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              symbol,
+              style: const TextStyle(fontSize: 16, color: AppTheme.primaryOrange, fontWeight: FontWeight.bold),
+            ),
+            if (label != null)
+              Text(
+                label,
+                style: GoogleFonts.exo2(fontSize: 8, color: AppTheme.textMuted, fontWeight: FontWeight.bold),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _keyButton(String label, String keyParam, {IconData? icon}) {
+    return SizedBox(
+      height: 38,
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppTheme.darkSurface,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+            side: const BorderSide(color: AppTheme.darkBorder),
+          ),
+          elevation: 0,
+        ),
+        onPressed: () => _sendKeyPress(keyParam),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: 14, color: AppTheme.primaryOrange),
+              const SizedBox(width: 5),
+            ],
+            Text(
+              label,
+              style: GoogleFonts.firaCode(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
