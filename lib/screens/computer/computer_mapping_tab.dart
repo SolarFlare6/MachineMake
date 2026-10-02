@@ -36,9 +36,8 @@ class _ComputerMappingTabState extends State<ComputerMappingTab> {
   ComputerMappingAction _selectedAction = ComputerMappingAction.mouse;
 
   // ── Mouse / Trackpad State ─────────────────────────────────────────
-  double _mouseSensitivity = 1.2;
-  double _lastDx = 0.0;
-  double _lastDy = 0.0;
+  double _mouseSensitivity = 1.5;
+  final ValueNotifier<Offset> _deltaNotifier = ValueNotifier<Offset>(Offset.zero);
   bool _isDragging = false;
 
   // ── Keyboard State ─────────────────────────────────────────────────
@@ -57,12 +56,13 @@ class _ComputerMappingTabState extends State<ComputerMappingTab> {
   @override
   void dispose() {
     _keyboardTextCtrl.dispose();
+    _deltaNotifier.dispose();
     super.dispose();
   }
 
   // ── DCP Helper ─────────────────────────────────────────────────────
-  void _exec(String tool, Map<String, dynamic> params) {
-    widget.conn?.session?.executeTool(tool, params);
+  void _exec(String tool, Map<String, dynamic> params, {bool fireAndForget = false}) {
+    widget.conn?.session?.executeTool(tool, params, fireAndForget: fireAndForget);
   }
 
   void _showFeedback(String message, {Color color = AppTheme.primaryOrange}) {
@@ -83,13 +83,11 @@ class _ComputerMappingTabState extends State<ComputerMappingTab> {
 
   // ── Mouse Actions ──────────────────────────────────────────────────
   void _sendMouseMove(double dx, double dy) {
-    final scaledDx = dx * _mouseSensitivity;
-    final scaledDy = dy * _mouseSensitivity;
-    setState(() {
-      _lastDx = scaledDx;
-      _lastDy = scaledDy;
-    });
-    _exec('mouse_move', {'dx': scaledDx, 'dy': scaledDy});
+    // 2.5x base multiplier provides natural 1:1 feel on high-DPI desktop displays
+    final scaledDx = dx * _mouseSensitivity * 2.5;
+    final scaledDy = dy * _mouseSensitivity * 2.5;
+    _deltaNotifier.value = Offset(scaledDx, scaledDy);
+    _exec('mouse_move', {'dx': scaledDx, 'dy': scaledDy}, fireAndForget: true);
   }
 
   void _sendMouseClick(String button, {bool isDouble = false}) {
@@ -101,7 +99,7 @@ class _ComputerMappingTabState extends State<ComputerMappingTab> {
   }
 
   void _sendMouseScroll(double dy) {
-    _exec('mouse_scroll', {'dy': dy});
+    _exec('mouse_scroll', {'dy': dy * 1.5}, fireAndForget: true);
   }
 
   // ── Keyboard Actions ───────────────────────────────────────────────
@@ -462,21 +460,26 @@ class _ComputerMappingTabState extends State<ComputerMappingTab> {
                 Positioned(
                   left: 12,
                   bottom: 12,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: AppTheme.darkCard.withAlpha(200),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: AppTheme.primaryOrange.withAlpha(80)),
-                    ),
-                    child: Text(
-                      'ΔX: ${_lastDx.toStringAsFixed(1)}  ΔY: ${_lastDy.toStringAsFixed(1)}',
-                      style: GoogleFonts.firaCode(
-                        color: AppTheme.primaryOrange,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                  child: ValueListenableBuilder<Offset>(
+                    valueListenable: _deltaNotifier,
+                    builder: (context, delta, _) {
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppTheme.darkCard.withAlpha(200),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: AppTheme.primaryOrange.withAlpha(80)),
+                        ),
+                        child: Text(
+                          'ΔX: ${delta.dx.toStringAsFixed(1)}  ΔY: ${delta.dy.toStringAsFixed(1)}',
+                          style: GoogleFonts.firaCode(
+                            color: AppTheme.primaryOrange,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ),
             ],
@@ -588,8 +591,8 @@ class _ComputerMappingTabState extends State<ComputerMappingTab> {
                   child: Slider(
                     value: _mouseSensitivity,
                     min: 0.5,
-                    max: 3.0,
-                    divisions: 25,
+                    max: 4.0,
+                    divisions: 35,
                     onChanged: (v) => setState(() => _mouseSensitivity = v),
                   ),
                 ),

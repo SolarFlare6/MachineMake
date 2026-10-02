@@ -186,12 +186,26 @@ class DcpSession {
     );
   }
 
+  /// Sends a DCP message without waiting for a response (fire-and-forget).
+  Future<void> sendFireAndForget(DcpMessage message) async {
+    try {
+      final jsonStr = jsonEncode(message.toJson());
+      await transport.send(jsonStr);
+    } catch (_) {}
+  }
+
   /// Executes a remote tool on the device.
+  /// If [fireAndForget] is true, dispatches immediately without registering a pending response Completer.
   Future<DcpExecuteResponse> executeTool(
     String toolName,
-    Map<String, dynamic> params,
-  ) async {
+    Map<String, dynamic> params, {
+    bool fireAndForget = false,
+  }) async {
     final msg = DcpMessage.execute(toolName: toolName, params: params);
+    if (fireAndForget) {
+      await sendFireAndForget(msg);
+      return const DcpExecuteResponse(success: true);
+    }
     final response = await sendRequest(msg);
     return DcpExecuteResponse.fromPayload(response.payload);
   }
@@ -199,8 +213,10 @@ class DcpSession {
   /// Alias for executeTool
   Future<DcpExecuteResponse> execute(
     String toolName,
-    Map<String, dynamic> params,
-  ) => executeTool(toolName, params);
+    Map<String, dynamic> params, {
+    bool fireAndForget = false,
+  }) =>
+      executeTool(toolName, params, fireAndForget: fireAndForget);
 
   /// Sends a DCP ping to verify remote device liveness.
   Future<bool> ping({Duration timeout = const Duration(seconds: 4)}) async {
