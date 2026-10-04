@@ -475,6 +475,30 @@ class DeviceManager extends ChangeNotifier {
     if (conn.manifest != null) {
       capability.updateCapabilities(deviceId, conn.manifest!.capabilities);
       tool.updateTools(deviceId, conn.manifest!.tools);
+
+      final manifestType = conn.manifest!.type.toLowerCase();
+      final p = DeviceProfile.fromString(manifestType);
+      final devIdx = _devices.indexWhere((d) => d.id == deviceId);
+      if (devIdx != -1) {
+        final currentDev = _devices[devIdx];
+        if (p.isComputer && currentDev.profile != 'computer') {
+          _devices[devIdx] = DeviceItem(
+            id: currentDev.id,
+            name: currentDev.name,
+            profile: 'computer',
+            deviceType: 'Computer / PC',
+            availableTransports: currentDev.availableTransports,
+            selectedTransport: currentDev.selectedTransport,
+            isPaired: currentDev.isPaired,
+            isConnected: currentDev.isConnected,
+            ipAddress: currentDev.ipAddress,
+            port: currentDev.port,
+            macAddress: currentDev.macAddress,
+            iconKey: 'computer',
+          );
+          notifyListeners();
+        }
+      }
     }
   }
 

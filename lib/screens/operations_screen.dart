@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
-import '../core/models/device_capability.dart';
 import '../core/models/device_profile.dart';
 import '../models/dcp_models.dart';
-import '../services/capability_manager.dart';
 import '../services/device_manager.dart';
-import '../services/tool_manager.dart';
 import '../theme/app_theme.dart';
 import '../widgets/machine_make_logo.dart';
 import '../widgets/ssh_dialog.dart';
@@ -42,36 +39,13 @@ class _OperationsScreenState extends State<OperationsScreen> {
   bool _hasUniqueHardware(DeviceItem? dev) {
     if (dev == null) return false;
     final profile = DeviceProfile.fromString(dev.profile);
-    if (!profile.isComputer) return true; // Non-computers (robots/MCU) show hardware control
+    // Computers (PC, Mac, Laptop, Desktop) do not have a hardware control screen;
+    // their power options (shutdown, restart, sleep) and media/keyboard/mouse controls
+    // are accessed directly from the Operations and Device views.
+    if (profile.isComputer) return false;
 
-    // Check if the server scanned and detected unique hardware
-    final conn = _deviceManager.getConnection(dev.id);
-    final caps = CapabilityManager().getCapabilities(dev.id);
-    final manifestCaps = conn?.manifest?.capabilities ?? [];
-    final allCaps = <DeviceCapability>[...caps, ...manifestCaps];
-
-    final hasGpio = allCaps.any((c) =>
-        c.type == CapabilityType.gpio &&
-        (c.params['pins'] as List?)?.isNotEmpty == true);
-    final hasPwm = allCaps.any((c) =>
-        c.type == CapabilityType.pwm &&
-        ((c.params['channels'] as num?)?.toInt() ?? 0) > 0);
-    final hasRobotics = allCaps.any((c) => c.type == CapabilityType.robotics);
-    final hasCustomHw = allCaps.any((c) =>
-        c.type == CapabilityType.custom ||
-        c.type == CapabilityType.i2c ||
-        c.type == CapabilityType.spi);
-
-    final tools = ToolManager().getTools(dev.id);
-    final hasHwTools = tools.any((t) => [
-          'gpio_write',
-          'gpio_read',
-          'pwm_set',
-          'set_servo_angle',
-          'turn_on_strip_with_color'
-        ].contains(t.name));
-
-    return hasGpio || hasPwm || hasRobotics || hasCustomHw || hasHwTools;
+    // For non-computers (robots, microcontrollers, SBCs), hardware control is available
+    return true;
   }
 
   void _openPowerOptionsModal(BuildContext context) {

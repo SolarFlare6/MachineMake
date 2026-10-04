@@ -63,8 +63,9 @@ class DcpSession {
         .toString();
     final deviceType = (helloAck.payload['profile'] ??
             helloAck.payload['type'] ??
+            helloAck.payload['deviceType'] ??
             helloAck.payload['device_type'] ??
-            (transport.transportType == 'mock' ? 'robot' : 'quadruped'))
+            (transport.transportType == 'mock' ? 'robot' : 'computer'))
         .toString();
     final firmware = (helloAck.payload['firmware_version'] ?? '1.0').toString();
 

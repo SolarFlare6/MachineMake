@@ -147,7 +147,7 @@ class _OverviewScreenState extends State<OverviewScreen> {
                             border: Border.all(
                               color: isExpanded
                                   ? AppTheme.darkBorder
-                                  : AppTheme.darkBorder.withOpacity(0.6),
+                                  : AppTheme.darkBorder.withValues(alpha: 0.6),
                               width: 1.5,
                             ),
                           ),
@@ -268,7 +268,7 @@ class _OverviewScreenState extends State<OverviewScreen> {
                                       const SizedBox(height: 12),
 
                                       // Operation Buttons
-                                      if (hasCamera) ...[
+                                      if (hasCamera && !profile.isComputer) ...[
                                         _buildQuickOpButton(
                                           'Camera feed',
                                           () {
@@ -417,6 +417,18 @@ class _OverviewScreenState extends State<OverviewScreen> {
   }
 
   bool _deviceHasCamera(DeviceItem device) {
+    final profile = DeviceProfile.fromString(device.profile);
+    if (profile.isComputer) {
+      return false;
+    }
+    final nameLower = device.name.toLowerCase();
+    if (nameLower.contains('pc') ||
+        nameLower.contains('mac') ||
+        nameLower.contains('desktop') ||
+        nameLower.contains('windows') ||
+        nameLower.contains('laptop')) {
+      return false;
+    }
     if (device.profile == 'quadruped' || device.profile == 'robot') {
       return true;
     }
