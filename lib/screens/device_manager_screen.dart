@@ -157,7 +157,7 @@ class _DeviceManagerScreenState extends State<DeviceManagerScreen> {
                           color: AppTheme.primaryOrange.withAlpha(30),
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        child: const Icon(Icons.terminal, color: AppTheme.primaryOrange, size: 22),
+                        child: Icon(Icons.terminal, color: AppTheme.primaryOrange, size: 22),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -220,7 +220,7 @@ class _DeviceManagerScreenState extends State<DeviceManagerScreen> {
                                 ),
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(10),
-                                  borderSide: const BorderSide(color: AppTheme.primaryOrange),
+                                  borderSide: BorderSide(color: AppTheme.primaryOrange),
                                 ),
                               ),
                             ),
@@ -258,7 +258,7 @@ class _DeviceManagerScreenState extends State<DeviceManagerScreen> {
                                 ),
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(10),
-                                  borderSide: const BorderSide(color: AppTheme.primaryOrange),
+                                  borderSide: BorderSide(color: AppTheme.primaryOrange),
                                 ),
                               ),
                             ),
@@ -294,7 +294,7 @@ class _DeviceManagerScreenState extends State<DeviceManagerScreen> {
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
-                        borderSide: const BorderSide(color: AppTheme.primaryOrange),
+                        borderSide: BorderSide(color: AppTheme.primaryOrange),
                       ),
                     ),
                   ),
@@ -334,7 +334,7 @@ class _DeviceManagerScreenState extends State<DeviceManagerScreen> {
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
-                        borderSide: const BorderSide(color: AppTheme.primaryOrange),
+                        borderSide: BorderSide(color: AppTheme.primaryOrange),
                       ),
                     ),
                   ),
@@ -484,8 +484,8 @@ class _DeviceManagerScreenState extends State<DeviceManagerScreen> {
               _deviceManager.clearAllDevices();
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('All device credentials removed.'),
+                  SnackBar(
+                    content: const Text('All device credentials removed.'),
                     backgroundColor: AppTheme.primaryOrange,
                   ),
                 );
@@ -553,7 +553,7 @@ class _DeviceManagerScreenState extends State<DeviceManagerScreen> {
                 color: AppTheme.primaryOrange.withAlpha(25),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.devices_other,
                 size: 40,
                 color: AppTheme.primaryOrange,

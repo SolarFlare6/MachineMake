@@ -148,8 +148,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   void _showLaunchError() {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Could not open https://github.com/SolarFlare6/MachineMake in browser'),
+      SnackBar(
+        content: const Text('Could not open https://github.com/SolarFlare6/MachineMake in browser'),
         backgroundColor: AppTheme.primaryOrange,
       ),
     );
@@ -206,8 +206,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   (route) => false,
                 );
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('App data cleared. Reset to initial setup.'),
+                  SnackBar(
+                    content: const Text('App data cleared. Reset to initial setup.'),
                     backgroundColor: AppTheme.primaryOrange,
                   ),
                 );
@@ -330,7 +330,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               title: 'Check device connection',
               subtitle: 'Sends a DCP ping to verify if connected devices are still alive',
               trailing: _isCheckingConnections
-                  ? const SizedBox(
+                  ? SizedBox(
                       width: 20,
                       height: 20,
                       child: CircularProgressIndicator(
@@ -338,7 +338,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         color: AppTheme.primaryOrange,
                       ),
                     )
-                  : const Icon(
+                  : Icon(
                       Icons.sync,
                       color: AppTheme.primaryOrange,
                       size: 22,
@@ -357,6 +357,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               onTap: _sendTestNotification,
             ),
+
+            // Appearance Section
+            const SizedBox(height: 28),
+            Text(
+              'Appearance',
+              style: GoogleFonts.exo2(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 14),
+
+            _buildAccentColorPickerCard(),
 
             // Control Section
             const SizedBox(height: 28),
@@ -454,8 +468,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               trailing: const SizedBox.shrink(),
               onTap: () {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Backup created successfully'),
+                  SnackBar(
+                    content: const Text('Backup created successfully'),
                     backgroundColor: AppTheme.primaryOrange,
                   ),
                 );
@@ -468,8 +482,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               trailing: const SizedBox.shrink(),
               onTap: () {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Backup restored'),
+                  SnackBar(
+                    content: const Text('Backup restored'),
                     backgroundColor: AppTheme.primaryOrange,
                   ),
                 );
@@ -550,7 +564,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     color: AppTheme.primaryOrange.withAlpha(30),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.code,
                     color: AppTheme.primaryOrange,
                     size: 24,
@@ -584,6 +598,130 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildAccentColorPickerCard() {
+    return ValueListenableBuilder<Color>(
+      valueListenable: AppTheme.accentColorNotifier,
+      builder: (context, currentAccent, _) {
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+          decoration: BoxDecoration(
+            color: AppTheme.darkSurface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: AppTheme.darkBorder,
+              width: 1.2,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: currentAccent.withAlpha(35),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: currentAccent, width: 2),
+                    ),
+                    child: Center(
+                      child: Container(
+                        width: 14,
+                        height: 14,
+                        decoration: BoxDecoration(
+                          color: currentAccent,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Accent color',
+                          style: GoogleFonts.exo2(
+                            fontSize: 17,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Select primary UI highlight color (default: Orange)',
+                          style: GoogleFonts.exo2(
+                            fontSize: 12,
+                            color: AppTheme.textMuted,
+                            height: 1.3,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              const Divider(color: AppTheme.darkBorder, height: 1),
+              const SizedBox(height: 14),
+              // Preset Colors Palette Row
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                child: Row(
+                  children: AppTheme.presetAccentColors.map((preset) {
+                    final isSelected =
+                        preset.color.toARGB32() == currentAccent.toARGB32();
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 12),
+                      child: Tooltip(
+                        message: preset.name,
+                        child: GestureDetector(
+                          onTap: () => AppTheme.setAccentColor(preset.color),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: preset.color,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: isSelected ? Colors.white : Colors.transparent,
+                                width: isSelected ? 2.5 : 0,
+                              ),
+                              boxShadow: isSelected
+                                  ? [
+                                      BoxShadow(
+                                        color: preset.color.withAlpha(140),
+                                        blurRadius: 8,
+                                        spreadRadius: 2,
+                                      ),
+                                    ]
+                                  : null,
+                            ),
+                            child: isSelected
+                                ? const Icon(
+                                    Icons.check,
+                                    size: 18,
+                                    color: Colors.white,
+                                  )
+                                : null,
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 

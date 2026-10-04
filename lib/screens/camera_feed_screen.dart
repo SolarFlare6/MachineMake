@@ -16,7 +16,7 @@ class CameraFeedScreen extends StatelessWidget {
       appBar: AppBar(
         title: Text('$deviceName Camera'),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppTheme.primaryOrange),
+          icon: Icon(Icons.arrow_back, color: AppTheme.primaryOrange),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
@@ -107,8 +107,8 @@ class CameraFeedScreen extends StatelessWidget {
                     icon: const Icon(Icons.camera_alt, color: Colors.white, size: 32),
                     onPressed: () {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Snapshot saved'),
+                        SnackBar(
+                          content: const Text('Snapshot saved'),
                           backgroundColor: AppTheme.primaryOrange,
                         ),
                       );

@@ -187,7 +187,7 @@ class _SshTerminalScreenState extends State<SshTerminalScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: AppTheme.primaryOrange, width: 1.5),
+          side: BorderSide(color: AppTheme.primaryOrange, width: 1.5),
         ),
         duration: const Duration(seconds: 4),
         content: Row(
@@ -317,7 +317,7 @@ class _SshTerminalScreenState extends State<SshTerminalScreen> {
           if (!_isConnected && !_isConnecting)
             IconButton(
               tooltip: 'Reconnect',
-              icon: const Icon(Icons.refresh, color: AppTheme.primaryOrange),
+              icon: Icon(Icons.refresh, color: AppTheme.primaryOrange),
               onPressed: _connect,
             ),
           const SizedBox(width: 8),
@@ -352,7 +352,7 @@ class _SshTerminalScreenState extends State<SshTerminalScreen> {
                     }
                     return KeyEventResult.ignored;
                   },
-                  theme: const TerminalTheme(
+                  theme: TerminalTheme(
                     cursor: AppTheme.primaryOrange,
                     selection: Color(0x66F37032),
                     foreground: Color(0xFFE6E6E6),

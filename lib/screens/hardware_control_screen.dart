@@ -64,9 +64,11 @@ class _HardwareControlScreenState extends State<HardwareControlScreen> {
     final rawPins = gpioCap?.params['pins'];
     if (rawPins is List && rawPins.isNotEmpty) {
       _detectedPins = rawPins.map((p) => int.tryParse(p.toString()) ?? 0).toList();
-    } else {
-      // Default common digital GPIO pins for SBC / microcontrollers
+    } else if (gpioCap != null) {
+      // Default common digital GPIO pins for SBC / microcontrollers only if capability declared
       _detectedPins = [2, 3, 4, 14, 15, 17, 18, 27, 22, 23, 24, 25, 5, 6, 12, 13, 16, 19, 20, 21, 26];
+    } else {
+      _detectedPins = [];
     }
 
     for (final pin in _detectedPins) {
@@ -209,7 +211,7 @@ class _HardwareControlScreenState extends State<HardwareControlScreen> {
                       color: AppTheme.primaryOrange.withAlpha(30),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Icon(Icons.memory, color: AppTheme.primaryOrange, size: 24),
+                    child: Icon(Icons.memory, color: AppTheme.primaryOrange, size: 24),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
@@ -217,7 +219,11 @@ class _HardwareControlScreenState extends State<HardwareControlScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Hardware Map: ${_detectedPins.length} GPIO Pins',
+                          _detectedPins.isNotEmpty
+                              ? 'Hardware Map: ${_detectedPins.length} GPIO Pins'
+                              : (_hasPwmCapability
+                                  ? 'Hardware Map: PWM Channels'
+                                  : 'Hardware Map: System Overview'),
                           style: GoogleFonts.exo2(
                             fontSize: 15,
                             fontWeight: FontWeight.bold,
@@ -226,7 +232,9 @@ class _HardwareControlScreenState extends State<HardwareControlScreen> {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          '$highCount pins HIGH  •  Target: ${widget.deviceName}',
+                          _detectedPins.isNotEmpty
+                              ? '$highCount pins HIGH  •  Target: ${widget.deviceName}'
+                              : 'Target: ${widget.deviceName}',
                           style: GoogleFonts.exo2(
                             fontSize: 12,
                             color: AppTheme.textMuted,
@@ -240,42 +248,78 @@ class _HardwareControlScreenState extends State<HardwareControlScreen> {
             ),
             const SizedBox(height: 20),
 
-            // GPIO Controls Header & Quick Actions
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'GPIO Digital Pins',
-                  style: GoogleFonts.exo2(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
+            if (_detectedPins.isEmpty && (!_hasPwmCapability || _servoAngles.isEmpty)) ...[
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: AppTheme.darkCard,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppTheme.darkBorder),
                 ),
-                Row(
+                child: Column(
                   children: [
-                    TextButton(
-                      onPressed: () => _setAllPins(false),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        visualDensity: VisualDensity.compact,
+                    const Icon(Icons.developer_board_off, color: AppTheme.textMuted, size: 48),
+                    const SizedBox(height: 12),
+                    Text(
+                      'No Configurable Hardware Detected',
+                      style: GoogleFonts.exo2(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
                       ),
-                      child: Text('All LOW', style: GoogleFonts.exo2(color: AppTheme.textMuted, fontSize: 12)),
                     ),
-                    const SizedBox(width: 4),
-                    TextButton(
-                      onPressed: () => _setAllPins(true),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        visualDensity: VisualDensity.compact,
+                    const SizedBox(height: 8),
+                    Text(
+                      'This device does not expose digital GPIO pins or PWM servo channels. Hardware capabilities like digital pins, PWM controllers, and sensors will automatically appear here once detected by the hardware scanner.',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.exo2(
+                        fontSize: 13,
+                        color: AppTheme.textMuted,
+                        height: 1.4,
                       ),
-                      child: Text('All HIGH', style: GoogleFonts.exo2(color: AppTheme.primaryOrange, fontSize: 12, fontWeight: FontWeight.bold)),
                     ),
                   ],
                 ),
-              ],
-            ),
-            const SizedBox(height: 10),
+              ),
+            ],
+
+            if (_detectedPins.isNotEmpty) ...[
+              // GPIO Controls Header & Quick Actions
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'GPIO Digital Pins',
+                    style: GoogleFonts.exo2(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      TextButton(
+                        onPressed: () => _setAllPins(false),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        child: Text('All LOW', style: GoogleFonts.exo2(color: AppTheme.textMuted, fontSize: 12)),
+                      ),
+                      const SizedBox(width: 4),
+                      TextButton(
+                        onPressed: () => _setAllPins(true),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        child: Text('All HIGH', style: GoogleFonts.exo2(color: AppTheme.primaryOrange, fontSize: 12, fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
 
             // GPIO Pin Grid
             Wrap(
@@ -334,8 +378,9 @@ class _HardwareControlScreenState extends State<HardwareControlScreen> {
                 );
               }).toList(),
             ),
+          ],
 
-            // PWM Servo Section (shown if hardware map includes PWM/Servos)
+          // PWM Servo Section (shown if hardware map includes PWM/Servos)
             if (_hasPwmCapability && _servoAngles.isNotEmpty) ...[
               const SizedBox(height: 28),
               Text(

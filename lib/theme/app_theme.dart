@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AppTheme {
   // Brand Color Palette
@@ -9,32 +10,71 @@ class AppTheme {
   static const Color darkBorder = Color(0xFF33353D);
   static const Color modalBackground = Color(0xFF1F1F22);
 
-  // Vibrant Accents
-  static const Color primaryOrange = Color(0xFFF37032);
-  static const Color accentOrange = Color(0xFFFF6B35);
+  // Vibrant Accents (Dynamic with fallback to default MachineMake orange)
+  static const Color defaultOrange = Color(0xFFF37032);
+  static Color _currentAccentColor = defaultOrange;
+  static final ValueNotifier<Color> accentColorNotifier =
+      ValueNotifier<Color>(defaultOrange);
+
+  static Color get primaryOrange => _currentAccentColor;
+  static Color get accentOrange => _currentAccentColor;
+  static Color get borderOrange => _currentAccentColor;
+  static Color get cpuOrange => _currentAccentColor;
+  static Color get currentAccentColor => _currentAccentColor;
+
   static const Color textDarkButton = Color(0xFF1E1F23); // Button text on filled orange
   static const Color textWhite = Color(0xFFFFFFFF);
   static const Color textMuted = Color(0xFF9E9EA3);
-  static const Color borderOrange = Color(0xFFF37032);
   static const Color borderLavender = Color(0xFFD4CBE5);
 
   // Telemetry Colors
-  static const Color cpuOrange = Color(0xFFF37032);
   static const Color ramPink = Color(0xFFE02484);
   static const Color gpuCyan = Color(0xFF00E5FF);
   static const Color tempBlue = Color(0xFF00A8FF);
 
+  static const List<({String name, Color color})> presetAccentColors = [
+    (name: 'Electric Orange', color: Color(0xFFF37032)),
+    (name: 'Cyber Cyan', color: Color(0xFF00E5FF)),
+    (name: 'Neon Green', color: Color(0xFF00E676)),
+    (name: 'Ultra Violet', color: Color(0xFF9D4EDD)),
+    (name: 'Crimson Red', color: Color(0xFFFF1744)),
+    (name: 'Electric Blue', color: Color(0xFF2979FF)),
+    (name: 'Amber Gold', color: Color(0xFFFFAB00)),
+    (name: 'Hot Pink', color: Color(0xFFFF4081)),
+  ];
+
+  static Future<void> init() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final colorVal = prefs.getInt('app_accent_color');
+      if (colorVal != null) {
+        _currentAccentColor = Color(colorVal);
+        accentColorNotifier.value = _currentAccentColor;
+      }
+    } catch (_) {}
+  }
+
+  static Future<void> setAccentColor(Color color) async {
+    _currentAccentColor = color;
+    accentColorNotifier.value = color;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt('app_accent_color', color.toARGB32());
+    } catch (_) {}
+  }
+
   static ThemeData get darkTheme {
     final baseTheme = ThemeData.dark();
     final exo2TextTheme = GoogleFonts.exo2TextTheme(baseTheme.textTheme);
+    final accent = _currentAccentColor;
 
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
       scaffoldBackgroundColor: darkBackground,
-      primaryColor: primaryOrange,
-      colorScheme: const ColorScheme.dark(
-        primary: primaryOrange,
+      primaryColor: accent,
+      colorScheme: ColorScheme.dark(
+        primary: accent,
         surface: darkSurface,
         onSurface: textWhite,
       ),
@@ -81,7 +121,7 @@ class AppTheme {
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: primaryOrange,
+          backgroundColor: accent,
           foregroundColor: textDarkButton,
           minimumSize: const Size(double.infinity, 50),
           elevation: 0,
@@ -96,8 +136,8 @@ class AppTheme {
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: primaryOrange,
-          side: const BorderSide(color: borderOrange, width: 1.8),
+          foregroundColor: accent,
+          side: BorderSide(color: accent, width: 1.8),
           minimumSize: const Size(double.infinity, 50),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
@@ -113,18 +153,19 @@ class AppTheme {
 }
 
 class GridBackgroundPainter extends CustomPainter {
-  final Color gridColor;
+  final Color? gridColor;
   final double step;
 
   GridBackgroundPainter({
-    this.gridColor = const Color(0x1AF37032),
+    this.gridColor,
     this.step = 40.0,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
+    final effectiveColor = gridColor ?? AppTheme.primaryOrange.withAlpha(26);
     final paint = Paint()
-      ..color = gridColor
+      ..color = effectiveColor
       ..strokeWidth = 0.8;
 
     for (double x = 0; x < size.width; x += step) {
@@ -137,5 +178,5 @@ class GridBackgroundPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }

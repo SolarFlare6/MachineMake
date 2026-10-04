@@ -395,7 +395,7 @@ class _OverviewScreenState extends State<OverviewScreen> {
       onPressed: onPressed,
       style: OutlinedButton.styleFrom(
         foregroundColor: AppTheme.primaryOrange,
-        side: const BorderSide(
+        side: BorderSide(
           color: AppTheme.primaryOrange,
           width: 1.8,
         ),

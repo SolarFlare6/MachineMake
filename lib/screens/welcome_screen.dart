@@ -102,8 +102,8 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                               fontWeight: FontWeight.bold,
                               height: 1.2,
                             ),
-                            children: const [
-                              TextSpan(
+                            children: [
+                              const TextSpan(
                                 text: 'Welcome to the\n',
                                 style: TextStyle(color: Colors.white),
                               ),
@@ -132,7 +132,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                             return Row(
                               children: [
                                 if (_discovery.isScanning)
-                                  const SizedBox(
+                                  SizedBox(
                                     width: 16,
                                     height: 16,
                                     child: CircularProgressIndicator(

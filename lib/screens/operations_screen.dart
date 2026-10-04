@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
+import '../core/models/device_capability.dart';
+import '../core/models/device_profile.dart';
+import '../models/dcp_models.dart';
+import '../services/capability_manager.dart';
 import '../services/device_manager.dart';
+import '../services/tool_manager.dart';
 import '../theme/app_theme.dart';
 import '../widgets/machine_make_logo.dart';
 import '../widgets/ssh_dialog.dart';
@@ -34,7 +39,46 @@ class _OperationsScreenState extends State<OperationsScreen> {
     if (mounted) setState(() {});
   }
 
+  bool _hasUniqueHardware(DeviceItem? dev) {
+    if (dev == null) return false;
+    final profile = DeviceProfile.fromString(dev.profile);
+    if (!profile.isComputer) return true; // Non-computers (robots/MCU) show hardware control
+
+    // Check if the server scanned and detected unique hardware
+    final conn = _deviceManager.getConnection(dev.id);
+    final caps = CapabilityManager().getCapabilities(dev.id);
+    final manifestCaps = conn?.manifest?.capabilities ?? [];
+    final allCaps = <DeviceCapability>[...caps, ...manifestCaps];
+
+    final hasGpio = allCaps.any((c) =>
+        c.type == CapabilityType.gpio &&
+        (c.params['pins'] as List?)?.isNotEmpty == true);
+    final hasPwm = allCaps.any((c) =>
+        c.type == CapabilityType.pwm &&
+        ((c.params['channels'] as num?)?.toInt() ?? 0) > 0);
+    final hasRobotics = allCaps.any((c) => c.type == CapabilityType.robotics);
+    final hasCustomHw = allCaps.any((c) =>
+        c.type == CapabilityType.custom ||
+        c.type == CapabilityType.i2c ||
+        c.type == CapabilityType.spi);
+
+    final tools = ToolManager().getTools(dev.id);
+    final hasHwTools = tools.any((t) => [
+          'gpio_write',
+          'gpio_read',
+          'pwm_set',
+          'set_servo_angle',
+          'turn_on_strip_with_color'
+        ].contains(t.name));
+
+    return hasGpio || hasPwm || hasRobotics || hasCustomHw || hasHwTools;
+  }
+
   void _openPowerOptionsModal(BuildContext context) {
+    final selectedDev = _deviceManager.selectedDevice;
+    final isComputer = selectedDev != null &&
+        DeviceProfile.fromString(selectedDev.profile).isComputer;
+
     showDialog(
       context: context,
       builder: (context) {
@@ -61,7 +105,7 @@ class _OperationsScreenState extends State<OperationsScreen> {
                 const SizedBox(height: 20),
                 _buildPowerOptionTile(
                   icon: Icons.power_settings_new,
-                  title: 'Shutdown Device',
+                  title: isComputer ? 'Shutdown' : 'Shutdown Device',
                   color: Colors.redAccent,
                   onTap: () {
                     final selectedId = _deviceManager.selectedDeviceId;
@@ -80,7 +124,7 @@ class _OperationsScreenState extends State<OperationsScreen> {
                 const SizedBox(height: 10),
                 _buildPowerOptionTile(
                   icon: Icons.restart_alt,
-                  title: 'Reboot Device',
+                  title: isComputer ? 'Restart' : 'Reboot Device',
                   color: AppTheme.primaryOrange,
                   onTap: () {
                     final selectedId = _deviceManager.selectedDeviceId;
@@ -89,33 +133,53 @@ class _OperationsScreenState extends State<OperationsScreen> {
                     }
                     Navigator.of(context).pop();
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Reboot command sent to device'),
+                      SnackBar(
+                        content: const Text('Restart command sent to device'),
                         backgroundColor: AppTheme.primaryOrange,
                       ),
                     );
                   },
                 ),
                 const SizedBox(height: 10),
-                _buildPowerOptionTile(
-                  icon: Icons.front_hand,
-                  title: 'Halt (Release Servos)',
-                  color: Colors.amberAccent,
-                  onTap: () {
-                    final selectedId = _deviceManager.selectedDeviceId;
-                    if (selectedId.isNotEmpty) {
-                      _deviceManager.executeTool(selectedId, 'cleanup_servos', {});
-                      _deviceManager.executeTool(selectedId, 'emergency_stop', {});
-                    }
-                    Navigator.of(context).pop();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Halt command sent: All servos de-energized and released'),
-                        backgroundColor: Colors.amber,
-                      ),
-                    );
-                  },
-                ),
+                if (isComputer)
+                  _buildPowerOptionTile(
+                    icon: Icons.bedtime,
+                    title: 'Sleep',
+                    color: const Color(0xFF00E5FF),
+                    onTap: () {
+                      final selectedId = _deviceManager.selectedDeviceId;
+                      if (selectedId.isNotEmpty) {
+                        _deviceManager.executeTool(selectedId, 'sleep', {});
+                      }
+                      Navigator.of(context).pop();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Sleep command sent to device'),
+                          backgroundColor: Color(0xFF00E5FF),
+                        ),
+                      );
+                    },
+                  )
+                else
+                  _buildPowerOptionTile(
+                    icon: Icons.front_hand,
+                    title: 'Halt (Release Servos)',
+                    color: Colors.amberAccent,
+                    onTap: () {
+                      final selectedId = _deviceManager.selectedDeviceId;
+                      if (selectedId.isNotEmpty) {
+                        _deviceManager.executeTool(selectedId, 'cleanup_servos', {});
+                        _deviceManager.executeTool(selectedId, 'emergency_stop', {});
+                      }
+                      Navigator.of(context).pop();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Halt command sent: All servos de-energized and released'),
+                          backgroundColor: Colors.amber,
+                        ),
+                      );
+                    },
+                  ),
                 const SizedBox(height: 20),
                 OutlinedButton(
                   onPressed: () => Navigator.of(context).pop(),
@@ -160,6 +224,10 @@ class _OperationsScreenState extends State<OperationsScreen> {
   Widget build(BuildContext context) {
     final devices = _deviceManager.devices;
     final selectedId = _deviceManager.selectedDeviceId;
+    final selectedDev = _deviceManager.selectedDevice;
+    final isComputer = selectedDev != null &&
+        DeviceProfile.fromString(selectedDev.profile).isComputer;
+    final showHardwareControl = !isComputer || _hasUniqueHardware(selectedDev);
 
     return Scaffold(
       backgroundColor: AppTheme.darkBackground,
@@ -172,7 +240,7 @@ class _OperationsScreenState extends State<OperationsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Device',
               style: TextStyle(
                 fontSize: 22,
@@ -226,7 +294,7 @@ class _OperationsScreenState extends State<OperationsScreen> {
                             : devices.first.id,
                         isExpanded: true,
                         dropdownColor: AppTheme.darkCard,
-                        icon: const Icon(
+                        icon: Icon(
                           Icons.arrow_drop_down,
                           color: AppTheme.primaryOrange,
                           size: 32,
@@ -314,21 +382,22 @@ class _OperationsScreenState extends State<OperationsScreen> {
                     )
                   : ListView(
                 children: [
-                  _buildOpCard(
-                    icon: Icons.gamepad,
-                    title: 'Controls',
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => ControlsScreen(
-                            deviceName:
-                                _deviceManager.selectedDevice?.name ?? 'Robot',
-                            deviceId: _deviceManager.selectedDeviceId,
+                  if (!isComputer)
+                    _buildOpCard(
+                      icon: Icons.gamepad,
+                      title: 'Controls',
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => ControlsScreen(
+                              deviceName:
+                                  _deviceManager.selectedDevice?.name ?? 'Robot',
+                              deviceId: _deviceManager.selectedDeviceId,
+                            ),
                           ),
-                        ),
-                      );
-                    },
-                  ),
+                        );
+                      },
+                    ),
                   _buildOpCard(
                     icon: Icons.article_outlined,
                     title: 'Log/Voice',
@@ -431,22 +500,23 @@ class _OperationsScreenState extends State<OperationsScreen> {
                       }
                     },
                   ),
-                  _buildOpCard(
-                    icon: Icons.build_outlined,
-                    title: 'Hardware control',
-                    onTap: () {
-                      final dev = _deviceManager.selectedDevice;
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => HardwareControlScreen(
-                            deviceName: dev?.name ?? 'Device',
-                            deviceId: dev?.id,
-                            conn: dev != null ? _deviceManager.getConnection(dev.id) : null,
+                  if (showHardwareControl)
+                    _buildOpCard(
+                      icon: Icons.build_outlined,
+                      title: 'Hardware control',
+                      onTap: () {
+                        final dev = _deviceManager.selectedDevice;
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => HardwareControlScreen(
+                              deviceName: dev?.name ?? 'Device',
+                              deviceId: dev?.id,
+                              conn: dev != null ? _deviceManager.getConnection(dev.id) : null,
+                            ),
                           ),
-                        ),
-                      );
-                    },
-                  ),
+                        );
+                      },
+                    ),
                   _buildOpCard(
                     icon: Icons.power_settings_new,
                     title: 'Power options',
@@ -486,7 +556,7 @@ class _OperationsScreenState extends State<OperationsScreen> {
           width: 48,
           height: 48,
           decoration: BoxDecoration(
-            color: const Color(0x26F37032),
+            color: AppTheme.primaryOrange.withAlpha(38),
             borderRadius: BorderRadius.circular(12),
           ),
           alignment: Alignment.center,

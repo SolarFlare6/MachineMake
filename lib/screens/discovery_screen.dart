@@ -53,7 +53,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
           ),
           title: Row(
             children: [
-              const Icon(Icons.settings_ethernet, color: AppTheme.primaryOrange, size: 26),
+              Icon(Icons.settings_ethernet, color: AppTheme.primaryOrange, size: 26),
               const SizedBox(width: 10),
               Text(
                 'Direct IP Connect',
@@ -410,7 +410,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                                 const SizedBox(height: 18),
                                 OutlinedButton.icon(
                                   onPressed: _showDirectConnectDialog,
-                                  icon: const Icon(Icons.settings_ethernet, color: AppTheme.primaryOrange, size: 20),
+                                  icon: Icon(Icons.settings_ethernet, color: AppTheme.primaryOrange, size: 20),
                                   label: Text(
                                     'Direct IP Connect',
                                     style: GoogleFonts.exo2(
@@ -419,7 +419,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                                     ),
                                   ),
                                   style: OutlinedButton.styleFrom(
-                                    side: const BorderSide(color: AppTheme.primaryOrange, width: 1.5),
+                                    side: BorderSide(color: AppTheme.primaryOrange, width: 1.5),
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                                   ),
@@ -550,7 +550,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                       ),
                     ),
                     child: IconButton(
-                      icon: const Icon(
+                      icon: Icon(
                         Icons.qr_code_scanner,
                         color: AppTheme.primaryOrange,
                         size: 28,

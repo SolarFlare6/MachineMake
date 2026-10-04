@@ -5,19 +5,21 @@ import '../theme/app_theme.dart';
 class DeviceProfileIcon extends StatelessWidget {
   final String iconKey; // 'quadruped', 'rpi', 'pico', 'generic'
   final double size;
-  final Color color;
-  final Color backgroundColor;
+  final Color? color;
+  final Color? backgroundColor;
 
   const DeviceProfileIcon({
     super.key,
     required this.iconKey,
     this.size = 28,
-    this.color = AppTheme.primaryOrange,
-    this.backgroundColor = const Color(0x26F37032),
+    this.color,
+    this.backgroundColor,
   });
 
   @override
   Widget build(BuildContext context) {
+    final effectiveColor = color ?? AppTheme.primaryOrange;
+    final effectiveBg = backgroundColor ?? effectiveColor.withAlpha(38);
     Widget child;
 
     switch (iconKey.toLowerCase()) {
@@ -52,7 +54,7 @@ class DeviceProfileIcon extends StatelessWidget {
           fit: BoxFit.contain,
           placeholderBuilder: (_) => CustomPaint(
             size: Size(size, size),
-            painter: QuadrupedIconPainter(color: color),
+            painter: QuadrupedIconPainter(color: effectiveColor),
           ),
         );
         break;
@@ -68,7 +70,7 @@ class DeviceProfileIcon extends StatelessWidget {
         child = Icon(
           Icons.computer,
           size: size,
-          color: color,
+          color: effectiveColor,
         );
         break;
 
@@ -76,7 +78,7 @@ class DeviceProfileIcon extends StatelessWidget {
         child = Icon(
           Icons.developer_board,
           size: size,
-          color: color,
+          color: effectiveColor,
         );
         break;
     }
@@ -86,7 +88,7 @@ class DeviceProfileIcon extends StatelessWidget {
       height: size * 1.6,
       padding: EdgeInsets.all(size * 0.2),
       decoration: BoxDecoration(
-        color: backgroundColor,
+        color: effectiveBg,
         borderRadius: BorderRadius.circular(12),
       ),
       alignment: Alignment.center,

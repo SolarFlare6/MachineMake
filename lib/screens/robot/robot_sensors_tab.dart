@@ -118,7 +118,7 @@ class _RobotSensorsTabState extends State<RobotSensorsTab> {
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.refresh, color: AppTheme.primaryOrange, size: 20),
+                  icon: Icon(Icons.refresh, color: AppTheme.primaryOrange, size: 20),
                   onPressed: _refreshSensors,
                   tooltip: 'Refresh MPU6050',
                 ),

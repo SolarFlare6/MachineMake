@@ -125,7 +125,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(
+                  icon: Icon(
                     Icons.add,
                     color: AppTheme.primaryOrange,
                     size: 32,
@@ -371,7 +371,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
                     onPressed: _openShell,
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppTheme.primaryOrange,
-                      side: const BorderSide(
+                      side: BorderSide(
                         color: AppTheme.primaryOrange,
                         width: 1.8,
                       ),
@@ -383,17 +383,17 @@ class _DevicesScreenState extends State<DevicesScreen> {
                         borderRadius: BorderRadius.circular(14),
                       ),
                     ),
-                    child: const Row(
+                    child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text(
+                        const Text(
                           'Open shell',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        SizedBox(width: 8),
+                        const SizedBox(width: 8),
                         Icon(
                           Icons.terminal,
                           size: 22,
@@ -409,7 +409,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
                     onPressed: _openVoiceCmd,
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppTheme.primaryOrange,
-                      side: const BorderSide(
+                      side: BorderSide(
                         color: AppTheme.primaryOrange,
                         width: 1.8,
                       ),
@@ -421,17 +421,17 @@ class _DevicesScreenState extends State<DevicesScreen> {
                         borderRadius: BorderRadius.circular(14),
                       ),
                     ),
-                    child: const Row(
+                    child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text(
+                        const Text(
                           'Voice cmd',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        SizedBox(width: 8),
+                        const SizedBox(width: 8),
                         Icon(
                           Icons.mic_none,
                           size: 22,

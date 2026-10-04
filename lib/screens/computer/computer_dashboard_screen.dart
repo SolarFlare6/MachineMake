@@ -119,7 +119,7 @@ class _ComputerDashboardScreenState extends State<ComputerDashboardScreen> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.terminal, color: AppTheme.primaryOrange),
+            icon: Icon(Icons.terminal, color: AppTheme.primaryOrange),
             tooltip: 'Open SSH Shell',
             onPressed: _openSsh,
           ),
@@ -166,7 +166,7 @@ class _ComputerDashboardScreenState extends State<ComputerDashboardScreen> {
                     color: AppTheme.primaryOrange.withAlpha(35),
                     borderRadius: BorderRadius.circular(14),
                   ),
-                  child: const Icon(Icons.computer, color: AppTheme.primaryOrange, size: 28),
+                  child: Icon(Icons.computer, color: AppTheme.primaryOrange, size: 28),
                 ),
                 const SizedBox(width: 14),
                 Expanded(

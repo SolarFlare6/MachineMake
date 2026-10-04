@@ -124,7 +124,7 @@ class _ToolInvokeCardState extends State<ToolInvokeCard> {
               color: AppTheme.primaryOrange.withAlpha(30),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: const Icon(Icons.build_circle_outlined, color: AppTheme.primaryOrange, size: 20),
+            child: Icon(Icons.build_circle_outlined, color: AppTheme.primaryOrange, size: 20),
           ),
           title: Text(
             widget.tool.name,
@@ -277,7 +277,7 @@ class _ToolInvokeCardState extends State<ToolInvokeCard> {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: AppTheme.primaryOrange),
+                borderSide: BorderSide(color: AppTheme.primaryOrange),
               ),
               contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             ),

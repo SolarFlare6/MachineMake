@@ -110,7 +110,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const SizedBox(
+                  SizedBox(
                     width: 48,
                     height: 48,
                     child: CircularProgressIndicator(
@@ -228,7 +228,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
         children: [
           Row(
             children: [
-              const Icon(Icons.info_outline, color: AppTheme.primaryOrange, size: 18),
+              Icon(Icons.info_outline, color: AppTheme.primaryOrange, size: 18),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -256,7 +256,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
   }
 
   Widget _buildCornerDecor() {
-    const color = AppTheme.primaryOrange;
+    final color = AppTheme.primaryOrange;
     const size = 24.0;
     const thickness = 3.0;
     return Center(

@@ -29,7 +29,7 @@ class RobotImuDisplay extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.explore, color: AppTheme.primaryOrange, size: 20),
+              Icon(Icons.explore, color: AppTheme.primaryOrange, size: 20),
               const SizedBox(width: 8),
               Text(
                 'IMU Orientation',

@@ -175,7 +175,7 @@ class _StatusCard extends StatelessWidget {
               color: AppTheme.primaryOrange.withAlpha(35),
               borderRadius: BorderRadius.circular(14),
             ),
-            child: const Icon(Icons.devices, color: AppTheme.primaryOrange, size: 28),
+            child: Icon(Icons.devices, color: AppTheme.primaryOrange, size: 28),
           ),
           const SizedBox(width: 14),
           Expanded(

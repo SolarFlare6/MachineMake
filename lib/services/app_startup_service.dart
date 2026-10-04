@@ -6,6 +6,7 @@ import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
+import '../theme/app_theme.dart';
 import 'device_manager.dart';
 import 'device_registry.dart';
 import 'notification_service.dart';
@@ -51,8 +52,9 @@ class AppStartupService {
     await DeviceRegistry().load();
     dm.initFromStartup(clientId: clientId);
 
-    // ── Initialize Notifications ──────────────────────────────────────────
+    // ── Initialize Notifications & Theme ─────────────────────────────────
     await NotificationService.instance.init();
+    await AppTheme.init();
 
     // ── Restore setup state ───────────────────────────────────────────────
     isFirstSetupDone = prefs.getBool(_keyFirstSetupDone) ?? false;

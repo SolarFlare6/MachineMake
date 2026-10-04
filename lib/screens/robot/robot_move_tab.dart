@@ -553,7 +553,7 @@ class _RobotMoveTabState extends State<RobotMoveTab> {
                     value: _selectedServo,
                     isExpanded: true,
                     dropdownColor: AppTheme.modalBackground,
-                    icon: const Icon(Icons.arrow_drop_down, color: AppTheme.primaryOrange),
+                    icon: Icon(Icons.arrow_drop_down, color: AppTheme.primaryOrange),
                     items: List.generate(16, (i) {
                       String label = 'Servo $i';
                       if (i == 2) label = 'Servo 2 (FL Hip)';

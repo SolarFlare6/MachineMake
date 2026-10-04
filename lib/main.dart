@@ -16,14 +16,19 @@ class MachineMakeApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'MachineMake',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.darkTheme,
-      home: home ??
-          (AppStartupService.isFirstSetupDone
-              ? const MainLayout()
-              : const WelcomeScreen()),
+    return ValueListenableBuilder<Color>(
+      valueListenable: AppTheme.accentColorNotifier,
+      builder: (context, _, __) {
+        return MaterialApp(
+          title: 'MachineMake',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.darkTheme,
+          home: home ??
+              (AppStartupService.isFirstSetupDone
+                  ? const MainLayout()
+                  : const WelcomeScreen()),
+        );
+      },
     );
   }
 }

@@ -36,8 +36,8 @@ class MachineMakeLogo extends StatelessWidget {
           fontWeight: FontWeight.bold,
           letterSpacing: 0.5,
         ),
-        children: const [
-          TextSpan(
+        children: [
+          const TextSpan(
             text: 'Machine',
             style: TextStyle(color: AppTheme.textWhite),
           ),

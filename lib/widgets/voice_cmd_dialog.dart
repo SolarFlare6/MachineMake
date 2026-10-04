@@ -350,7 +350,7 @@ class _VoiceCmdDialogState extends State<VoiceCmdDialog> {
               shape: BoxShape.circle,
               border: Border.all(color: AppTheme.primaryOrange.withAlpha(80)),
             ),
-            child: const Icon(
+            child: Icon(
               Icons.sensors_off,
               color: AppTheme.primaryOrange,
               size: 32,
@@ -471,7 +471,7 @@ class _VoiceCmdDialogState extends State<VoiceCmdDialog> {
               value: _currentDeviceId,
               isExpanded: true,
               dropdownColor: AppTheme.darkCard,
-              icon: const Icon(
+              icon: Icon(
                 Icons.arrow_drop_down,
                 color: AppTheme.primaryOrange,
                 size: 32,
@@ -593,7 +593,7 @@ class _VoiceCmdDialogState extends State<VoiceCmdDialog> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.devices, color: AppTheme.primaryOrange, size: 14),
+                  Icon(Icons.devices, color: AppTheme.primaryOrange, size: 14),
                   const SizedBox(width: 6),
                   Text(
                     dev?.name ?? 'Connected Device',
@@ -691,7 +691,7 @@ class _VoiceCmdDialogState extends State<VoiceCmdDialog> {
               ),
               const SizedBox(width: 8),
               IconButton(
-                icon: const Icon(Icons.send, color: AppTheme.primaryOrange),
+                icon: Icon(Icons.send, color: AppTheme.primaryOrange),
                 onPressed: () {
                   if (_fallbackTextController.text.trim().isNotEmpty) {
                     _submitCommand(_fallbackTextController.text.trim());
@@ -756,7 +756,7 @@ class _VoiceCmdDialogState extends State<VoiceCmdDialog> {
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppTheme.primaryOrange,
                     padding: const EdgeInsets.symmetric(vertical: 12),
-                    side: const BorderSide(color: AppTheme.primaryOrange),
+                    side: BorderSide(color: AppTheme.primaryOrange),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   ),
                   onPressed: _startSpeechListening,

@@ -55,7 +55,7 @@ class _RobotCameraTabState extends State<RobotCameraTab> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(
+                            Icon(
                               Icons.videocam,
                               color: AppTheme.primaryOrange,
                               size: 48,
@@ -134,7 +134,7 @@ class _RobotCameraTabState extends State<RobotCameraTab> {
                                     width: 1.5,
                                   ),
                                 ),
-                                child: const Center(
+                                child: Center(
                                   child: Icon(
                                     Icons.add,
                                     color: AppTheme.primaryOrange,

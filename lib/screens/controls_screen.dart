@@ -93,7 +93,7 @@ class _ControlsScreenState extends State<ControlsScreen> {
           style: GoogleFonts.exo2(fontWeight: FontWeight.bold),
         ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppTheme.primaryOrange),
+          icon: Icon(Icons.arrow_back, color: AppTheme.primaryOrange),
           onPressed: () => Navigator.of(context).pop(),
         ),
         actions: [
@@ -318,7 +318,7 @@ class _ControlsScreenState extends State<ControlsScreen> {
                     child: OutlinedButton(
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppTheme.primaryOrange,
-                        side: const BorderSide(color: AppTheme.primaryOrange),
+                        side: BorderSide(color: AppTheme.primaryOrange),
                       ),
                       onPressed: () => _sendTool('stand', {}, 'Standing'),
                       child: Text('Stand', style: GoogleFonts.exo2(fontWeight: FontWeight.bold)),

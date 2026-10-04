@@ -159,7 +159,7 @@ class _RobotPoseTabState extends State<RobotPoseTab> {
               widget.onPoseSelected('stand');
             },
             style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: AppTheme.primaryOrange),
+              side: BorderSide(color: AppTheme.primaryOrange),
               foregroundColor: AppTheme.primaryOrange,
               padding: const EdgeInsets.symmetric(vertical: 14),
               shape: RoundedRectangleBorder(

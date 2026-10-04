@@ -50,7 +50,7 @@ class _GpioPinGridState extends State<GpioPinGrid> {
         children: [
           Row(
             children: [
-              const Icon(Icons.developer_board, color: AppTheme.primaryOrange, size: 20),
+              Icon(Icons.developer_board, color: AppTheme.primaryOrange, size: 20),
               const SizedBox(width: 8),
               Text(
                 widget.capability.name,

@@ -127,7 +127,7 @@ class _SSHDialogState extends State<SSHDialog> {
                       color: AppTheme.primaryOrange.withAlpha(35),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.terminal, color: AppTheme.primaryOrange, size: 24),
+                    child: Icon(Icons.terminal, color: AppTheme.primaryOrange, size: 24),
                   ),
                   const SizedBox(width: 10),
                   Text(
@@ -171,11 +171,11 @@ class _SSHDialogState extends State<SSHDialog> {
                             contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: AppTheme.primaryOrange, width: 1.5),
+                              borderSide: BorderSide(color: AppTheme.primaryOrange, width: 1.5),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: AppTheme.accentOrange, width: 2),
+                              borderSide: BorderSide(color: AppTheme.accentOrange, width: 2),
                             ),
                           ),
                         ),
@@ -209,11 +209,11 @@ class _SSHDialogState extends State<SSHDialog> {
                             contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: AppTheme.primaryOrange, width: 1.5),
+                              borderSide: BorderSide(color: AppTheme.primaryOrange, width: 1.5),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: AppTheme.accentOrange, width: 2),
+                              borderSide: BorderSide(color: AppTheme.accentOrange, width: 2),
                             ),
                           ),
                         ),
@@ -245,11 +245,11 @@ class _SSHDialogState extends State<SSHDialog> {
                   contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppTheme.primaryOrange, width: 1.5),
+                    borderSide: BorderSide(color: AppTheme.primaryOrange, width: 1.5),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppTheme.accentOrange, width: 2),
+                    borderSide: BorderSide(color: AppTheme.accentOrange, width: 2),
                   ),
                 ),
               ),
@@ -285,11 +285,11 @@ class _SSHDialogState extends State<SSHDialog> {
                   contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppTheme.primaryOrange, width: 1.5),
+                    borderSide: BorderSide(color: AppTheme.primaryOrange, width: 1.5),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppTheme.accentOrange, width: 2),
+                    borderSide: BorderSide(color: AppTheme.accentOrange, width: 2),
                   ),
                 ),
               ),

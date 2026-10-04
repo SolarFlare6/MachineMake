@@ -81,7 +81,7 @@ class _MicrocontrollerDashboardScreenState extends State<MicrocontrollerDashboar
                       color: AppTheme.primaryOrange.withAlpha(35),
                       borderRadius: BorderRadius.circular(14),
                     ),
-                    child: const Icon(Icons.memory, color: AppTheme.primaryOrange, size: 28),
+                    child: Icon(Icons.memory, color: AppTheme.primaryOrange, size: 28),
                   ),
                   const SizedBox(width: 14),
                   Expanded(

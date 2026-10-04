@@ -170,7 +170,7 @@ class RobotDashboardHeader extends StatelessWidget {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.wifi, size: 13, color: AppTheme.primaryOrange),
+                    Icon(Icons.wifi, size: 13, color: AppTheme.primaryOrange),
                     const SizedBox(width: 6),
                     Text(
                       'Wi-Fi 8765',

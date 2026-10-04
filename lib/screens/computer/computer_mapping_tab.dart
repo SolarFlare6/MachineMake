@@ -50,7 +50,6 @@ class _ComputerMappingTabState extends State<ComputerMappingTab> {
   bool _confirmBeforeLock = false;
 
   // ── Media State ────────────────────────────────────────────────────
-  bool _isPlaying = false;
   double _mediaVolume = 0.7;
 
   @override
@@ -65,16 +64,17 @@ class _ComputerMappingTabState extends State<ComputerMappingTab> {
     widget.conn?.session?.executeTool(tool, params, fireAndForget: fireAndForget);
   }
 
-  void _showFeedback(String message, {Color color = AppTheme.primaryOrange}) {
+  void _showFeedback(String message, {Color? color}) {
     if (!mounted) return;
     final messenger = ScaffoldMessenger.maybeOf(context);
     if (messenger == null) return;
+    final effectiveColor = color ?? AppTheme.primaryOrange;
     messenger
       ..clearSnackBars()
       ..showSnackBar(
         SnackBar(
           content: Text(message, style: GoogleFonts.exo2(fontWeight: FontWeight.w600)),
-          backgroundColor: color,
+          backgroundColor: effectiveColor,
           duration: const Duration(milliseconds: 500),
           behavior: SnackBarBehavior.floating,
         ),
@@ -185,9 +185,6 @@ class _ComputerMappingTabState extends State<ComputerMappingTab> {
 
   // ── Media Actions ──────────────────────────────────────────────────
   void _sendMediaAction(String action) {
-    if (action == 'play_pause') {
-      setState(() => _isPlaying = !_isPlaying);
-    }
     _exec('media_control', {'action': action});
     _showFeedback('Media: ${action.replaceAll('_', ' ').toUpperCase()}');
   }
@@ -238,7 +235,7 @@ class _ComputerMappingTabState extends State<ComputerMappingTab> {
               color: AppTheme.primaryOrange.withAlpha(30),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(Icons.tune, color: AppTheme.primaryOrange, size: 22),
+            child: Icon(Icons.tune, color: AppTheme.primaryOrange, size: 22),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -445,9 +442,9 @@ class _ComputerMappingTabState extends State<ComputerMappingTab> {
                     ),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: const [
+                      children: [
                         Icon(Icons.keyboard_arrow_up, color: AppTheme.primaryOrange, size: 16),
-                        Icon(Icons.swap_vert, color: AppTheme.textMuted, size: 14),
+                        const Icon(Icons.swap_vert, color: AppTheme.textMuted, size: 14),
                         Icon(Icons.keyboard_arrow_down, color: AppTheme.primaryOrange, size: 16),
                       ],
                     ),
@@ -504,7 +501,7 @@ class _ComputerMappingTabState extends State<ComputerMappingTab> {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                   onPressed: () => _sendMouseClick('left'),
-                  icon: const Icon(Icons.mouse, color: AppTheme.primaryOrange, size: 18),
+                  icon: Icon(Icons.mouse, color: AppTheme.primaryOrange, size: 18),
                   label: Text(
                     'Left Click',
                     style: GoogleFonts.exo2(fontWeight: FontWeight.bold, fontSize: 13),
@@ -529,7 +526,7 @@ class _ComputerMappingTabState extends State<ComputerMappingTab> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.circle, size: 12, color: AppTheme.primaryOrange),
+                    Icon(Icons.circle, size: 12, color: AppTheme.primaryOrange),
                     const SizedBox(height: 2),
                     Text('Mid', style: GoogleFonts.exo2(fontSize: 10, fontWeight: FontWeight.bold)),
                   ],
@@ -574,7 +571,7 @@ class _ComputerMappingTabState extends State<ComputerMappingTab> {
           ),
           child: Row(
             children: [
-              const Icon(Icons.speed, color: AppTheme.primaryOrange, size: 18),
+              Icon(Icons.speed, color: AppTheme.primaryOrange, size: 18),
               const SizedBox(width: 10),
               Text(
                 'Speed',
@@ -633,7 +630,7 @@ class _ComputerMappingTabState extends State<ComputerMappingTab> {
               // Top Row: Title + Last Sent Key Chip
               Row(
                 children: [
-                  const Icon(Icons.keyboard, color: AppTheme.primaryOrange, size: 18),
+                  Icon(Icons.keyboard, color: AppTheme.primaryOrange, size: 18),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -735,7 +732,7 @@ class _ComputerMappingTabState extends State<ComputerMappingTab> {
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppTheme.primaryOrange, width: 1.5),
+                    borderSide: BorderSide(color: AppTheme.primaryOrange, width: 1.5),
                   ),
                 ),
                 onSubmitted: (_) => _sendTypedText(),
@@ -890,7 +887,7 @@ class _ComputerMappingTabState extends State<ComputerMappingTab> {
           children: [
             Text(
               symbol,
-              style: const TextStyle(fontSize: 16, color: AppTheme.primaryOrange, fontWeight: FontWeight.bold),
+              style: TextStyle(fontSize: 16, color: AppTheme.primaryOrange, fontWeight: FontWeight.bold),
             ),
             if (label != null)
               Text(
@@ -1020,7 +1017,7 @@ class _ComputerMappingTabState extends State<ComputerMappingTab> {
             ),
             child: Row(
               children: [
-                const Icon(Icons.security, color: AppTheme.primaryOrange, size: 18),
+                Icon(Icons.security, color: AppTheme.primaryOrange, size: 18),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
@@ -1201,10 +1198,21 @@ class _ComputerMappingTabState extends State<ComputerMappingTab> {
                       ),
                     ],
                   ),
-                  child: Icon(
-                    _isPlaying ? Icons.pause : Icons.play_arrow,
-                    color: Colors.black,
-                    size: 36,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: const [
+                      Icon(
+                        Icons.play_arrow,
+                        color: Colors.black,
+                        size: 26,
+                      ),
+                      SizedBox(width: 1),
+                      Icon(
+                        Icons.pause,
+                        color: Colors.black,
+                        size: 20,
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -1227,10 +1235,7 @@ class _ComputerMappingTabState extends State<ComputerMappingTab> {
                   padding: const EdgeInsets.all(14),
                 ),
                 icon: const Icon(Icons.stop, color: Colors.redAccent, size: 26),
-                onPressed: () {
-                  setState(() => _isPlaying = false);
-                  _sendMediaAction('stop');
-                },
+                onPressed: () => _sendMediaAction('stop'),
                 tooltip: 'Stop Playback',
               ),
             ],
@@ -1254,7 +1259,7 @@ class _ComputerMappingTabState extends State<ComputerMappingTab> {
           Row(
             children: [
               IconButton(
-                icon: const Icon(Icons.volume_down, color: AppTheme.primaryOrange),
+                icon: Icon(Icons.volume_down, color: AppTheme.primaryOrange),
                 onPressed: () => _sendMediaAction('volume_down'),
                 tooltip: 'Volume Down',
               ),
@@ -1278,7 +1283,7 @@ class _ComputerMappingTabState extends State<ComputerMappingTab> {
                 ),
               ),
               IconButton(
-                icon: const Icon(Icons.volume_up, color: AppTheme.primaryOrange),
+                icon: Icon(Icons.volume_up, color: AppTheme.primaryOrange),
                 onPressed: () => _sendMediaAction('volume_up'),
                 tooltip: 'Volume Up',
               ),

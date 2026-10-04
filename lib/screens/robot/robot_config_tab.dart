@@ -34,7 +34,7 @@ class _RobotConfigTabState extends State<RobotConfigTab> {
 
           Row(
             children: [
-              const Icon(Icons.shield, color: AppTheme.primaryOrange, size: 18),
+              Icon(Icons.shield, color: AppTheme.primaryOrange, size: 18),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -81,7 +81,7 @@ class _RobotConfigTabState extends State<RobotConfigTab> {
           // audio section title
           Row(
             children: [
-              const Icon(Icons.speaker, color: AppTheme.primaryOrange, size: 18),
+              Icon(Icons.speaker, color: AppTheme.primaryOrange, size: 18),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -315,7 +315,7 @@ class _AudioControlSectionState extends State<_AudioControlSection> {
         children: [
           // Header
           Row(children: [
-            const Icon(Icons.piano, color: AppTheme.primaryOrange, size: 18),
+            Icon(Icons.piano, color: AppTheme.primaryOrange, size: 18),
             const SizedBox(width: 8),
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -388,7 +388,7 @@ class _AudioControlSectionState extends State<_AudioControlSection> {
 
           // Frequency slider
           Row(children: [
-            const Icon(Icons.waves, color: AppTheme.primaryOrange, size: 15),
+            Icon(Icons.waves, color: AppTheme.primaryOrange, size: 15),
             const SizedBox(width: 6),
             Expanded(
               child: Text('Frequency',
@@ -416,7 +416,7 @@ class _AudioControlSectionState extends State<_AudioControlSection> {
 
           // Duration slider
           Row(children: [
-            const Icon(Icons.timer_outlined, color: AppTheme.primaryOrange, size: 15),
+            Icon(Icons.timer_outlined, color: AppTheme.primaryOrange, size: 15),
             const SizedBox(width: 6),
             Expanded(
               child: Text('Duration',

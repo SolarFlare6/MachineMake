@@ -161,7 +161,7 @@ class _RobotServoSimTabState extends State<RobotServoSimTab> {
           color: const Color(0xFF16161A),
           child: Row(
             children: [
-              const Icon(Icons.view_in_ar, color: AppTheme.primaryOrange, size: 18),
+              Icon(Icons.view_in_ar, color: AppTheme.primaryOrange, size: 18),
               const SizedBox(width: 6),
               Text(
                 '3D Sim',
