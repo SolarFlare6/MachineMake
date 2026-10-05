@@ -31,13 +31,13 @@ class DeviceItem {
 class TelemetryData {
   final double cpuUsage; // e.g. 75.0
   final double ramUsage; // e.g. 75.0
-  final double gpuUsage; // e.g. 75.0
+  final double? gpuUsage; // e.g. 75.0, null if not available
   final double temperature; // e.g. 30.0 °C
 
   TelemetryData({
     this.cpuUsage = 75.0,
     this.ramUsage = 75.0,
-    this.gpuUsage = 75.0,
+    this.gpuUsage,
     this.temperature = 30.0,
   });
 
@@ -45,12 +45,13 @@ class TelemetryData {
     double? cpuUsage,
     double? ramUsage,
     double? gpuUsage,
+    bool clearGpu = false,
     double? temperature,
   }) {
     return TelemetryData(
       cpuUsage: cpuUsage ?? this.cpuUsage,
       ramUsage: ramUsage ?? this.ramUsage,
-      gpuUsage: gpuUsage ?? this.gpuUsage,
+      gpuUsage: clearGpu ? null : (gpuUsage ?? this.gpuUsage),
       temperature: temperature ?? this.temperature,
     );
   }

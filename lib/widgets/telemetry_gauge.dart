@@ -2,15 +2,15 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 
 class TelemetryGauge extends StatelessWidget {
-  final double value; // 0.0 to 100.0 (or temp value)
+  final double? value; // 0.0 to 100.0 (or temp value), null if not available
   final String label; // "CPU", "RAM", "GPU", "TMP"
-  final String displayValue; // "75%", "30°C"
+  final String displayValue; // "75%", "30°C", "N/A"
   final Color color;
   final double size;
 
   const TelemetryGauge({
     super.key,
-    required this.value,
+    this.value,
     required this.label,
     required this.displayValue,
     required this.color,
@@ -19,7 +19,7 @@ class TelemetryGauge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final percent = (value / 100.0).clamp(0.0, 1.0);
+    final percent = value != null ? (value! / 100.0).clamp(0.0, 1.0) : 0.0;
 
     return SizedBox(
       width: size,
@@ -32,7 +32,7 @@ class TelemetryGauge extends StatelessWidget {
             painter: GaugeRingPainter(
               percent: percent,
               color: color,
-              trackColor: color.withOpacity(0.15),
+              trackColor: color.withValues(alpha: 0.15),
             ),
           ),
           Column(

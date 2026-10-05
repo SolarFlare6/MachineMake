@@ -242,8 +242,9 @@ class _OverviewScreenState extends State<OverviewScreen> {
                                             TelemetryGauge(
                                               value: telemetry.gpuUsage,
                                               label: 'GPU',
-                                              displayValue:
-                                                  '${telemetry.gpuUsage.toInt()}%',
+                                              displayValue: telemetry.gpuUsage != null
+                                                  ? '${telemetry.gpuUsage!.toInt()}%'
+                                                  : 'N/A',
                                               color: AppTheme.gpuCyan,
                                             ),
                                             TelemetryGauge(

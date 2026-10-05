@@ -602,7 +602,7 @@ class DeviceManager extends ChangeNotifier {
         final d = e.data;
         final cpu = (d['cpu'] as num?)?.toDouble() ?? 0.0;
         final ram = (d['ram'] as num?)?.toDouble() ?? 0.0;
-        final gpu = (d['gpu'] as num?)?.toDouble() ?? 0.0;
+        final gpu = (d['gpu'] as num?)?.toDouble();
         final tmp = (d['temp'] as num?)?.toDouble() ?? 0.0;
 
         _telemetryMap[e.deviceId] = TelemetryData(

@@ -34,6 +34,23 @@ class _ComputerDashboardScreenState extends State<ComputerDashboardScreen> {
   final DeviceManager _deviceManager = DeviceManager();
   int _currentTabIndex = 0;
 
+  @override
+  void initState() {
+    super.initState();
+    // Rebuild whenever DeviceManager receives new telemetry events.
+    _deviceManager.addListener(_onManagerChange);
+  }
+
+  @override
+  void dispose() {
+    _deviceManager.removeListener(_onManagerChange);
+    super.dispose();
+  }
+
+  void _onManagerChange() {
+    if (mounted) setState(() {});
+  }
+
   void _openSsh() {
     final cfg = _deviceManager.getSSHConfig(widget.device.id);
     final defaultHost = cfg.hostname.isNotEmpty
@@ -214,9 +231,25 @@ class _ComputerDashboardScreenState extends State<ComputerDashboardScreen> {
           const SizedBox(height: 14),
           Row(
             children: [
-              Expanded(child: TelemetryGauge(value: telemetry.gpuUsage, label: 'GPU', displayValue: '${telemetry.gpuUsage.toStringAsFixed(0)}%', color: AppTheme.gpuCyan)),
+              Expanded(
+                child: TelemetryGauge(
+                  value: telemetry.gpuUsage,
+                  label: 'GPU',
+                  displayValue: telemetry.gpuUsage != null
+                      ? '${telemetry.gpuUsage!.toStringAsFixed(0)}%'
+                      : 'N/A',
+                  color: AppTheme.gpuCyan,
+                ),
+              ),
               const SizedBox(width: 14),
-              Expanded(child: TelemetryGauge(value: telemetry.temperature, label: 'Temp', displayValue: '${telemetry.temperature.toStringAsFixed(0)}°C', color: AppTheme.tempBlue)),
+              Expanded(
+                child: TelemetryGauge(
+                  value: telemetry.temperature,
+                  label: 'Temp',
+                  displayValue: '${telemetry.temperature.toStringAsFixed(0)}°C',
+                  color: AppTheme.tempBlue,
+                ),
+              ),
             ],
           ),
 
