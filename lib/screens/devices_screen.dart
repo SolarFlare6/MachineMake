@@ -29,10 +29,12 @@ class _DevicesScreenState extends State<DevicesScreen> {
   void initState() {
     super.initState();
     _deviceManager.addListener(_onManagerChange);
+    AppTheme.accentColorNotifier.addListener(_onManagerChange);
   }
 
   @override
   void dispose() {
+    AppTheme.accentColorNotifier.removeListener(_onManagerChange);
     _deviceManager.removeListener(_onManagerChange);
     super.dispose();
   }

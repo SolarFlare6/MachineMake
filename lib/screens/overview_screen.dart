@@ -6,7 +6,6 @@ import '../models/dcp_models.dart';
 import '../services/capability_manager.dart';
 import '../services/device_manager.dart';
 import '../services/task_manager.dart';
-import '../services/tool_manager.dart';
 import '../theme/app_theme.dart';
 import '../widgets/device_icons.dart';
 import '../widgets/event_log_widget.dart';
@@ -36,10 +35,12 @@ class _OverviewScreenState extends State<OverviewScreen> {
   void initState() {
     super.initState();
     _deviceManager.addListener(_onManagerChange);
+    AppTheme.accentColorNotifier.addListener(_onManagerChange);
   }
 
   @override
   void dispose() {
+    AppTheme.accentColorNotifier.removeListener(_onManagerChange);
     _deviceManager.removeListener(_onManagerChange);
     super.dispose();
   }
@@ -268,7 +269,7 @@ class _OverviewScreenState extends State<OverviewScreen> {
                                       const SizedBox(height: 12),
 
                                       // Operation Buttons
-                                      if (hasCamera && !profile.isComputer) ...[
+                                      if (hasCamera) ...[
                                         _buildQuickOpButton(
                                           'Camera feed',
                                           () {
@@ -417,31 +418,48 @@ class _OverviewScreenState extends State<OverviewScreen> {
   }
 
   bool _deviceHasCamera(DeviceItem device) {
-    final profile = DeviceProfile.fromString(device.profile);
-    if (profile.isComputer) {
-      return false;
-    }
-    final nameLower = device.name.toLowerCase();
-    if (nameLower.contains('pc') ||
-        nameLower.contains('mac') ||
-        nameLower.contains('desktop') ||
-        nameLower.contains('windows') ||
-        nameLower.contains('laptop')) {
-      return false;
-    }
-    if (device.profile == 'quadruped' || device.profile == 'robot') {
-      return true;
-    }
-    if (CapabilityManager().hasCapability(device.id, CapabilityType.camera)) {
-      return true;
-    }
     final conn = _deviceManager.getConnection(device.id);
-    if (conn?.manifest?.capabilities.any((c) => c.type == CapabilityType.camera) ?? false) {
+    final caps = [
+      ...CapabilityManager().getCapabilities(device.id),
+      ...?conn?.manifest?.capabilities,
+    ];
+
+    // 1. Check system_hardware scan results (for PCs, Macs, and host machines)
+    for (final c in caps) {
+      if (c.id == 'system_hardware' ||
+          (c.type == CapabilityType.custom && c.id.contains('hardware'))) {
+        final count = (c.params['cameras_count'] as num?)?.toInt();
+        final camerasList = c.params['cameras'] as List?;
+        final available = c.params['camera_available'] as bool?;
+
+        if (count != null && count > 0) return true;
+        if (camerasList != null && camerasList.isNotEmpty) return true;
+        if (available == true) return true;
+        if (count != null && count == 0) return false;
+      }
+    }
+
+    // 2. Check dedicated camera capability detected by the hardware scan
+    final hasDedicatedCamera = caps.any((c) {
+      if (c.type == CapabilityType.camera ||
+          c.id.toLowerCase() == 'camera' ||
+          c.id.toLowerCase() == 'cameras') {
+        if (c.params.containsKey('available') && c.params['available'] == false) {
+          return false;
+        }
+        if (c.params.containsKey('cameras_count') &&
+            (c.params['cameras_count'] as num?)?.toInt() == 0) {
+          return false;
+        }
+        return c.enabled;
+      }
+      return false;
+    });
+
+    if (hasDedicatedCamera) {
       return true;
     }
-    if (ToolManager().getTools(device.id).any((t) => t.name.toLowerCase().contains('camera'))) {
-      return true;
-    }
+
     return false;
   }
 }

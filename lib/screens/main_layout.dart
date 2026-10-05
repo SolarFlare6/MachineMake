@@ -30,12 +30,18 @@ class _MainLayoutState extends State<MainLayout> {
     _currentIndex = widget.initialIndex;
     _notifSub =
         NotificationService.instance.inAppNotifications.listen(_showInAppBanner);
+    AppTheme.accentColorNotifier.addListener(_onAccentColorChanged);
   }
 
   @override
   void dispose() {
+    AppTheme.accentColorNotifier.removeListener(_onAccentColorChanged);
     _notifSub?.cancel();
     super.dispose();
+  }
+
+  void _onAccentColorChanged() {
+    if (mounted) setState(() {});
   }
 
   void _showInAppBanner(InAppNotification notif) {
@@ -121,8 +127,8 @@ class _MainLayoutState extends State<MainLayout> {
     final screens = [
       DevicesScreen(onNavigateTab: _onTabSelected),
       OverviewScreen(onNavigateTab: _onTabSelected),
-      const OperationsScreen(),
-      const SettingsScreen(),
+      OperationsScreen(),
+      SettingsScreen(),
     ];
 
     return Scaffold(

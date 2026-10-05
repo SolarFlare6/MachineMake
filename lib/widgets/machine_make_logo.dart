@@ -19,58 +19,63 @@ class MachineMakeLogo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final logoSvg = SvgPicture.asset(
-      'assets/Machine_Make_logo.svg',
-      height: logoHeight,
-      fit: BoxFit.contain,
-      placeholderBuilder: (context) => SizedBox(
-        height: logoHeight,
-        width: logoHeight * 1.2,
-      ),
-    );
-
-    final textWidget = RichText(
-      text: TextSpan(
-        style: GoogleFonts.exo2(
-          fontSize: fontSize,
-          fontWeight: FontWeight.bold,
-          letterSpacing: 0.5,
-        ),
-        children: [
-          const TextSpan(
-            text: 'Machine',
-            style: TextStyle(color: AppTheme.textWhite),
+    return ValueListenableBuilder<Color>(
+      valueListenable: AppTheme.accentColorNotifier,
+      builder: (context, accentColor, _) {
+        final logoSvg = SvgPicture.asset(
+          'assets/Machine_Make_logo.svg',
+          height: logoHeight,
+          fit: BoxFit.contain,
+          placeholderBuilder: (context) => SizedBox(
+            height: logoHeight,
+            width: logoHeight * 1.2,
           ),
-          TextSpan(
-            text: 'Make',
-            style: TextStyle(color: AppTheme.primaryOrange),
+        );
+
+        final textWidget = RichText(
+          text: TextSpan(
+            style: GoogleFonts.exo2(
+              fontSize: fontSize,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 0.5,
+            ),
+            children: [
+              const TextSpan(
+                text: 'Machine',
+                style: TextStyle(color: AppTheme.textWhite),
+              ),
+              TextSpan(
+                text: 'Make',
+                style: TextStyle(color: accentColor),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+
+        if (!showText) return logoSvg;
+
+        if (isHorizontal) {
+          return Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              logoSvg,
+              const SizedBox(width: 10),
+              textWidget,
+            ],
+          );
+        } else {
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              logoSvg,
+              const SizedBox(width: 0, height: 12),
+              textWidget,
+            ],
+          );
+        }
+      },
     );
-
-    if (!showText) return logoSvg;
-
-    if (isHorizontal) {
-      return Row(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          logoSvg,
-          const SizedBox(width: 10),
-          textWidget,
-        ],
-      );
-    } else {
-      return Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          logoSvg,
-          const SizedBox(width: 0, height: 12),
-          textWidget,
-        ],
-      );
-    }
   }
 }
