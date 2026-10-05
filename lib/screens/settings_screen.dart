@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/app_startup_service.dart';
+import '../services/backup_service.dart';
 import '../services/device_manager.dart';
 import '../services/notification_service.dart';
 import '../services/permission_service.dart';
@@ -228,6 +229,77 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _handleCreateBackup() async {
+    final result = await BackupService.instance.createBackup();
+    if (!mounted) return;
+
+    if (result.cancelled) {
+      return;
+    }
+
+    if (result.success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Backup saved to ${result.fileName} (${result.deviceCount} devices backed up)',
+            style: GoogleFonts.exo2(color: Colors.white, fontWeight: FontWeight.bold),
+          ),
+          backgroundColor: Colors.greenAccent.shade700,
+          duration: const Duration(seconds: 4),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Backup failed: ${result.error ?? "Unknown error"}',
+            style: GoogleFonts.exo2(color: Colors.white),
+          ),
+          backgroundColor: Colors.redAccent,
+          duration: const Duration(seconds: 4),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  Future<void> _handleRestoreBackup() async {
+    final result = await BackupService.instance.restoreBackup();
+    if (!mounted) return;
+
+    if (result.cancelled) {
+      return;
+    }
+
+    if (result.success) {
+      if (mounted) setState(() {});
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Backup restored from ${result.fileName}! (${result.devicesRestored} devices restored)',
+            style: GoogleFonts.exo2(color: Colors.white, fontWeight: FontWeight.bold),
+          ),
+          backgroundColor: Colors.greenAccent.shade700,
+          duration: const Duration(seconds: 4),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Restore failed: ${result.error ?? "Unknown error"}',
+            style: GoogleFonts.exo2(color: Colors.white),
+          ),
+          backgroundColor: Colors.redAccent,
+          duration: const Duration(seconds: 4),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   @override
@@ -465,29 +537,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
             _buildSettingCard(
               title: 'Create backup of the data',
-              trailing: const SizedBox.shrink(),
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: const Text('Backup created successfully'),
-                    backgroundColor: AppTheme.primaryOrange,
-                  ),
-                );
-              },
+              trailing: const Icon(Icons.file_download_outlined, color: AppTheme.textMuted, size: 20),
+              onTap: _handleCreateBackup,
             ),
             const SizedBox(height: 12),
 
             _buildSettingCard(
               title: 'Restore backup',
-              trailing: const SizedBox.shrink(),
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: const Text('Backup restored'),
-                    backgroundColor: AppTheme.primaryOrange,
-                  ),
-                );
-              },
+              trailing: const Icon(Icons.file_upload_outlined, color: AppTheme.textMuted, size: 20),
+              onTap: _handleRestoreBackup,
             ),
 
             // About Section

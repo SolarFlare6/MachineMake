@@ -64,7 +64,7 @@ class KnownDevice {
 
   factory KnownDevice.fromJson(Map<String, dynamic> json) {
     return KnownDevice(
-      deviceId: json['device_id'] as String? ?? '',
+      deviceId: (json['device_id'] ?? json['deviceId'] ?? json['id'] ?? '') as String,
       name: json['name'] as String? ?? '',
       type: json['type'] as String? ?? 'custom',
       psk: json['psk'] as String?,

@@ -28,6 +28,14 @@ class DeviceManager extends ChangeNotifier {
   factory DeviceManager() => _instance;
 
   String _clientId = const Uuid().v4();
+  String get clientId => _clientId;
+
+  Future<void> reloadFromStartup({String? clientId}) async {
+    _devices.clear();
+    _sshConfigs.clear();
+    await registry.load();
+    initFromStartup(clientId: clientId ?? _clientId);
+  }
 
   void initFromStartup({required String clientId}) {
     _clientId = clientId;
