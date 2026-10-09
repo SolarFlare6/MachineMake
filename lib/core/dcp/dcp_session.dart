@@ -110,23 +110,27 @@ class DcpSession {
     }
 
     // 4. Retrieve Capabilities
-    final capsMsg = DcpMessage.getCapabilities();
-    final capsAck = await sendRequest(capsMsg);
-    final capsList = (capsAck.payload['capabilities'] as List<dynamic>?) ?? [];
-    _capabilities = capsList.map((c) => DeviceCapability.fromAny(c)).toList();
+    try {
+      final capsMsg = DcpMessage.getCapabilities();
+      final capsAck = await sendRequest(capsMsg, timeout: const Duration(seconds: 4));
+      final capsList = (capsAck.payload['capabilities'] as List<dynamic>?) ?? [];
+      _capabilities = capsList.map((c) => DeviceCapability.fromAny(c)).toList();
+    } catch (_) {}
 
     // 5. Retrieve Tools
-    final toolsMsg = DcpMessage.getTools();
-    final toolsAck = await sendRequest(toolsMsg);
-    final toolsList = (toolsAck.payload['tools'] as List<dynamic>?) ?? [];
-    _tools = toolsList.map((t) {
-      if (t is Map<String, dynamic>) {
-        return ToolDefinition.fromJson(t);
-      } else if (t is Map) {
-        return ToolDefinition.fromJson(Map<String, dynamic>.from(t));
-      }
-      return ToolDefinition(name: t.toString(), description: '');
-    }).toList();
+    try {
+      final toolsMsg = DcpMessage.getTools();
+      final toolsAck = await sendRequest(toolsMsg, timeout: const Duration(seconds: 4));
+      final toolsList = (toolsAck.payload['tools'] as List<dynamic>?) ?? [];
+      _tools = toolsList.map((t) {
+        if (t is Map<String, dynamic>) {
+          return ToolDefinition.fromJson(t);
+        } else if (t is Map) {
+          return ToolDefinition.fromJson(Map<String, dynamic>.from(t));
+        }
+        return ToolDefinition(name: t.toString(), description: '');
+      }).toList();
+    } catch (_) {}
 
     // 6. Subscribe to asynchronous device events
     try {

@@ -844,16 +844,16 @@ class _ComputerMappingTabState extends State<ComputerMappingTab> {
               Center(
                 child: Column(
                   children: [
-                    _navButton('▲', 'up', label: 'UP'),
+                    _navButton('up', label: 'UP'),
                     const SizedBox(height: 6),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        _navButton('◀', 'left', label: 'LEFT'),
+                        _navButton('left', label: 'LEFT'),
                         const SizedBox(width: 8),
-                        _navButton('▼', 'down', label: 'DOWN'),
+                        _navButton('down', label: 'DOWN'),
                         const SizedBox(width: 8),
-                        _navButton('▶', 'right', label: 'RIGHT'),
+                        _navButton('right', label: 'RIGHT'),
                       ],
                     ),
                   ],
@@ -866,7 +866,7 @@ class _ComputerMappingTabState extends State<ComputerMappingTab> {
     );
   }
 
-  Widget _navButton(String symbol, String keyParam, {String? label}) {
+  Widget _navButton(String keyParam, {String? label}) {
     return SizedBox(
       width: 58,
       height: 48,
@@ -885,10 +885,10 @@ class _ComputerMappingTabState extends State<ComputerMappingTab> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(
+            /*Text(
               symbol,
               style: TextStyle(fontSize: 16, color: AppTheme.primaryOrange, fontWeight: FontWeight.bold),
-            ),
+            ),*/
             if (label != null)
               Text(
                 label,
@@ -1198,21 +1198,10 @@ class _ComputerMappingTabState extends State<ComputerMappingTab> {
                       ),
                     ],
                   ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: const [
-                      Icon(
-                        Icons.play_arrow,
-                        color: Colors.black,
-                        size: 26,
-                      ),
-                      SizedBox(width: 1),
-                      Icon(
-                        Icons.pause,
-                        color: Colors.black,
-                        size: 20,
-                      ),
-                    ],
+                  child: const Icon(
+                    Icons.play_arrow,
+                    color: Colors.black,
+                    size: 26,
                   ),
                 ),
               ),

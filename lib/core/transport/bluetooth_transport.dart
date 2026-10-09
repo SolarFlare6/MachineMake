@@ -20,9 +20,17 @@ import '../connection/connection_state_enum.dart';
 ///   [4..]  payload bytes
 class BluetoothTransport implements DeviceTransport {
   // ── GATT UUIDs ─────────────────────────────────────────────────────────
-  static const String serviceUuid  = '4fafc201-1fb5-459e-8fcc-c5c9c331914b';
-  static const String txCharUuid   = 'beb5483e-36e1-4688-b7f5-ea07361b26a8'; // app→device
-  static const String rxCharUuid   = 'beb5483e-36e1-4688-b7f5-ea07361b26a9'; // device→app
+  static const String dcpServiceUuid   = 'dcf00001-0000-1000-8000-00805f9b34fb';
+  static const String dcpTxCharUuid    = 'dcf00002-0000-1000-8000-00805f9b34fb'; // app→device (write)
+  static const String dcpRxCharUuid    = 'dcf00003-0000-1000-8000-00805f9b34fb'; // device→app (notify)
+
+  static const String legacyServiceUuid = '4fafc201-1fb5-459e-8fcc-c5c9c331914b';
+  static const String legacyTxCharUuid  = 'beb5483e-36e1-4688-b7f5-ea07361b26a8';
+  static const String legacyRxCharUuid  = 'beb5483e-36e1-4688-b7f5-ea07361b26a9';
+
+  static const String serviceUuid  = dcpServiceUuid;
+  static const String txCharUuid   = dcpTxCharUuid;
+  static const String rxCharUuid   = dcpRxCharUuid;
 
   static const int _headerBytes     = 4;
   static const int _mtu             = 512;
@@ -137,11 +145,23 @@ class BluetoothTransport implements DeviceTransport {
 
   void _findCharacteristics(List<BluetoothService> services) {
     for (final service in services) {
-      if (service.uuid != Guid(serviceUuid)) continue;
+      final sUuid = service.uuid.toString().toLowerCase();
+      final isDcp = sUuid.contains('dcf00001');
+      final isLegacy = sUuid.contains('4fafc201');
+      if (!isDcp && !isLegacy) continue;
+
       for (final char in service.characteristics) {
-        if (char.uuid == Guid(txCharUuid)) _txChar = char;
-        if (char.uuid == Guid(rxCharUuid)) _rxChar = char;
+        final cUuid = char.uuid.toString().toLowerCase();
+        // TX Characteristic (App -> Device: Write)
+        if (cUuid.contains('dcf00002') || cUuid.contains('beb5483e-36e1-4688-b7f5-ea07361b26a8')) {
+          _txChar = char;
+        }
+        // RX Characteristic (Device -> App: Notify)
+        if (cUuid.contains('dcf00003') || cUuid.contains('beb5483e-36e1-4688-b7f5-ea07361b26a9')) {
+          _rxChar = char;
+        }
       }
+      if (_txChar != null && _rxChar != null) break;
     }
   }
 

@@ -8,6 +8,7 @@ import '../core/discovery/discovered_device.dart';
 import '../core/discovery/mdns_discoverer.dart';
 import '../core/discovery/ble_discoverer.dart';
 import '../core/dcp/dcp_message.dart';
+import 'device_registry.dart';
 import 'permission_service.dart';
 
 export '../core/discovery/discovered_device.dart';
@@ -29,6 +30,8 @@ class DiscoveryManager extends ChangeNotifier {
 
   Timer? _scanTimer;
   Timer? _expiryTimer;
+
+  RawDatagramSocket? _udpSocket;
 
   StreamSubscription? _mDnsSub;
   StreamSubscription? _bleSub;
@@ -68,6 +71,9 @@ class DiscoveryManager extends ChangeNotifier {
       _ble.startScan(timeout: timeout);
     }
 
+    // ── UDP beacon discovery (receives Pico W & microcontroller broadcasts) ─
+    _startUdpDiscovery(port: 8766);
+
     // ── Direct LAN probe for DCP server on port 8765 ───────────────────────
     _probeKnownHosts(port: 8765);
 
@@ -81,14 +87,148 @@ class DiscoveryManager extends ChangeNotifier {
     _scanTimer = Timer(timeout + const Duration(seconds: 2), stopScan);
   }
 
+  Timer? _udpQueryTimer;
+
+  Future<void> _startUdpDiscovery({int port = 8766}) async {
+    try {
+      _udpSocket?.close();
+      try {
+        _udpSocket = await RawDatagramSocket.bind(
+          InternetAddress.anyIPv4,
+          port,
+          reuseAddress: true,
+        );
+      } catch (_) {
+        _udpSocket = await RawDatagramSocket.bind(
+          InternetAddress.anyIPv4,
+          0,
+        );
+      }
+      _udpSocket?.broadcastEnabled = true;
+
+      _udpSocket?.listen((event) {
+        if (event == RawSocketEvent.read) {
+          final dg = _udpSocket?.receive();
+          if (dg != null) {
+            _handleUdpDatagram(dg);
+          }
+        }
+      });
+
+      _sendUdpBroadcastQuery(port: port);
+      _udpQueryTimer?.cancel();
+      _udpQueryTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+        if (!_isScanning) {
+          _udpQueryTimer?.cancel();
+          return;
+        }
+        _sendUdpBroadcastQuery(port: port);
+      });
+    } catch (e) {
+      // ignore: avoid_print
+      print('[DiscoveryManager] UDP beacon listener: $e');
+    }
+  }
+
+  void _sendUdpBroadcastQuery({int port = 8766}) async {
+    if (_udpSocket == null) return;
+    try {
+      final queryMsg = utf8.encode(jsonEncode({
+        'dcp': '1.0',
+        'type': 'discover',
+        'command': 'discover',
+        'client': 'MachineMake App',
+      }));
+
+      // Broadcast globally
+      _udpSocket?.send(queryMsg, InternetAddress('255.255.255.255'), port);
+
+      // Also broadcast across specific interface broadcast addresses
+      try {
+        final interfaces = await NetworkInterface.list();
+        for (final iface in interfaces) {
+          for (final addr in iface.addresses) {
+            if (addr.type == InternetAddressType.IPv4 && !addr.isLoopback) {
+              final parts = addr.address.split('.');
+              if (parts.length == 4) {
+                final bcast = '${parts[0]}.${parts[1]}.${parts[2]}.255';
+                _udpSocket?.send(queryMsg, InternetAddress(bcast), port);
+              }
+            }
+          }
+        }
+      } catch (_) {}
+    } catch (_) {}
+  }
+
+  void _handleUdpDatagram(Datagram dg) {
+    try {
+      final text = utf8.decode(dg.data).trim();
+      final json = jsonDecode(text) as Map<String, dynamic>;
+
+      // 1. Ignore discovery queries (our own reflected broadcast or queries from other clients)
+      final type = json['type']?.toString().toLowerCase();
+      final cmd = json['command']?.toString().toLowerCase();
+      if (type == 'discover' || cmd == 'discover' || json.containsKey('client')) {
+        return;
+      }
+
+      // 2. Valid device beacons/responses must specify an explicit device ID
+      final rawDevId = json['device_id']?.toString() ?? json['deviceId']?.toString();
+      if (rawDevId == null || rawDevId.trim().isEmpty) {
+        return;
+      }
+
+      final host = json['host']?.toString() ?? json['ip']?.toString() ?? dg.address.address;
+      final port = (json['port'] as num?)?.toInt() ?? 8765;
+      final devId = rawDevId.trim();
+      final devName = json['name']?.toString() ?? json['device_name']?.toString() ?? 'Device ($host)';
+      final devType = json['profile']?.toString() ?? json['type']?.toString() ?? 'microcontroller';
+
+      _addDevice(DiscoveredDevice(
+        deviceId: devId,
+        name: devName,
+        type: devType,
+        transports: const {'wifi'},
+        ipAddress: host,
+        port: port,
+      ));
+    } catch (_) {}
+  }
+
   Future<void> _probeKnownHosts({int port = 8765}) async {
-    final candidates = [
+    final candidates = <String>[
       '10.80.166.248',
       '10.0.2.2',
       '127.0.0.1',
       '192.168.1.100',
       '192.168.1.102',
+      '192.168.4.1', // Microcontroller AP mode (Pico W / ESP32 fallback)
     ];
+
+    try {
+      final known = DeviceRegistry().devices;
+      for (final kd in known) {
+        if (kd.lastIp != null && kd.lastIp!.isNotEmpty && !candidates.contains(kd.lastIp)) {
+          candidates.add(kd.lastIp!);
+        }
+      }
+    } catch (_) {}
+
+    try {
+      final interfaces = await NetworkInterface.list();
+      for (final iface in interfaces) {
+        for (final addr in iface.addresses) {
+          if (addr.type == InternetAddressType.IPv4 && !addr.isLoopback) {
+            final parts = addr.address.split('.');
+            if (parts.length == 4) {
+              final gw = '${parts[0]}.${parts[1]}.${parts[2]}.1';
+              if (!candidates.contains(gw)) candidates.add(gw);
+            }
+          }
+        }
+      }
+    } catch (_) {}
 
     for (final host in candidates) {
       if (!_isScanning) break;
@@ -108,7 +248,7 @@ class DiscoveryManager extends ChangeNotifier {
 
       try {
         final uri = Uri.parse('ws://$host:$port/dcp');
-        final channel = WebSocketChannel.connect(uri);
+        final channel = WebSocketChannel.connect(uri, protocols: ['dcp']);
 
         final helloMsg = DcpMessage.hello(
           appVersion: '2.0.0',
@@ -125,9 +265,9 @@ class DiscoveryManager extends ChangeNotifier {
           final payload = (data['data'] as Map<String, dynamic>?) ??
               (data['payload'] as Map<String, dynamic>?) ??
               data;
-          final parsedId = payload['device_id'] ?? data['device_id'];
-          final parsedName = payload['name'] ?? payload['device_name'] ?? data['device_name'];
-          final parsedType = payload['profile'] ?? payload['type'] ?? payload['device_type'] ?? data['profile'] ?? data['type'];
+          final parsedId = payload['device_id'] ?? payload['deviceId'] ?? data['device_id'] ?? data['deviceId'];
+          final parsedName = payload['name'] ?? payload['device_name'] ?? data['name'] ?? data['device_name'];
+          final parsedType = payload['profile'] ?? payload['type'] ?? payload['device_type'] ?? payload['deviceType'] ?? data['profile'] ?? data['type'];
 
           if (parsedName != null && parsedName.toString().isNotEmpty) {
             devName = parsedName.toString();
@@ -162,6 +302,10 @@ class DiscoveryManager extends ChangeNotifier {
     _expiryTimer?.cancel();
     _mDnsSub?.cancel();
     _bleSub?.cancel();
+    _udpQueryTimer?.cancel();
+    _udpQueryTimer = null;
+    _udpSocket?.close();
+    _udpSocket = null;
     await _mdns.stopScan();
     await _ble.stopScan();
     notifyListeners();

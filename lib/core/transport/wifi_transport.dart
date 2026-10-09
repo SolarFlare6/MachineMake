@@ -48,7 +48,7 @@ class WifiTransport implements DeviceTransport {
 
     try {
       final uri = Uri.parse('ws://$host:$port/dcp');
-      _channel = WebSocketChannel.connect(uri);
+      _channel = WebSocketChannel.connect(uri, protocols: ['dcp']);
 
       // Listen for incoming messages
       _channel!.stream.listen(

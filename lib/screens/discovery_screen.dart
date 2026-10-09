@@ -47,6 +47,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
           backgroundColor: AppTheme.modalBackground,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
             side: const BorderSide(color: AppTheme.darkBorder, width: 1.5),
@@ -115,10 +116,14 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    _buildProfileChoice('computer', 'PC / Laptop', Icons.computer, selectedProfile, (p) {
+                    _buildProfileChoice('microcontroller', 'Pico / MCU', Icons.memory, selectedProfile, (p) {
                       setDialogState(() => selectedProfile = p);
                     }),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 5),
+                    _buildProfileChoice('computer', 'PC / SBC', Icons.computer, selectedProfile, (p) {
+                      setDialogState(() => selectedProfile = p);
+                    }),
+                    const SizedBox(width: 5),
                     _buildProfileChoice('quadruped', 'Robot', Icons.smart_toy, selectedProfile, (p) {
                       setDialogState(() => selectedProfile = p);
                     }),
@@ -142,12 +147,12 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                 final port = int.tryParse(portCtrl.text.trim()) ?? 8765;
                 if (host.isEmpty) return;
 
+                final isMcu = selectedProfile == 'microcontroller';
                 final isQuad = selectedProfile == 'quadruped';
-                final isComp = selectedProfile == 'computer';
                 final devId = 'direct-${host.replaceAll('.', '-')}-$port';
-                final devName = isQuad ? 'Quadruped Robot' : (isComp ? 'Workstation PC' : 'Microcontroller');
-                final devType = isQuad ? 'Quadruped Robot' : (isComp ? 'Computer / PC' : 'Microcontroller');
-                final icon = isQuad ? 'quadruped' : (isComp ? 'computer' : 'pico');
+                final devName = isMcu ? 'Raspberry Pi Pico W' : (isQuad ? 'Quadruped Robot' : 'Workstation PC');
+                final devType = isMcu ? 'Microcontroller' : (isQuad ? 'Quadruped Robot' : 'Computer / PC');
+                final icon = isMcu ? 'pico' : (isQuad ? 'quadruped' : 'computer');
 
                 final dev = DeviceItem(
                   id: devId,
@@ -189,7 +194,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
       child: GestureDetector(
         onTap: () => onSelect(id),
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
           decoration: BoxDecoration(
             color: isSelected ? AppTheme.primaryOrange.withAlpha(30) : AppTheme.darkSurface,
             borderRadius: BorderRadius.circular(10),
@@ -200,15 +205,22 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 16, color: isSelected ? AppTheme.primaryOrange : AppTheme.textMuted),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: GoogleFonts.exo2(
-                  color: isSelected ? Colors.white : AppTheme.textMuted,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 11,
+              Icon(icon, size: 14, color: isSelected ? AppTheme.primaryOrange : AppTheme.textMuted),
+              const SizedBox(width: 4),
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    style: GoogleFonts.exo2(
+                      color: isSelected ? Colors.white : AppTheme.textMuted,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 11,
+                    ),
+                  ),
                 ),
               ),
             ],
