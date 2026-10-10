@@ -4,6 +4,7 @@ import 'package:machmake2/core/routing/profile_router.dart';
 import 'package:machmake2/models/dcp_models.dart';
 import 'package:machmake2/screens/computer/computer_dashboard_screen.dart';
 import 'package:machmake2/screens/generic/generic_device_dashboard_screen.dart';
+import 'package:machmake2/screens/microcontroller/microcontroller_dashboard_screen.dart';
 import 'package:machmake2/screens/robot/quadruped_dashboard_screen.dart';
 import 'package:machmake2/services/device_manager.dart';
 import 'package:machmake2/services/device_registry.dart';
@@ -61,7 +62,7 @@ void main() {
       expect(widget, isA<ComputerDashboardScreen>());
     });
 
-    test('routes microcontroller to GenericDeviceDashboardScreen', () {
+    test('routes microcontroller to MicrocontrollerDashboardScreen', () {
       final dev = DeviceItem(
         id: 'pico-01',
         name: 'Raspberry Pi Pico',
@@ -74,7 +75,7 @@ void main() {
         iconKey: 'pico',
       );
       final widget = ProfileRouter.buildProfileUI(dev);
-      expect(widget, isA<GenericDeviceDashboardScreen>());
+      expect(widget, isA<MicrocontrollerDashboardScreen>());
     });
 
     test('routes generic / unknown devices to GenericDeviceDashboardScreen', () {

@@ -101,7 +101,9 @@ class _DevicesScreenState extends State<DevicesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final devices = _deviceManager.devices;
+    final devices = _deviceManager.allPairedDevices.isNotEmpty
+        ? _deviceManager.allPairedDevices
+        : _deviceManager.devices;
 
     return Scaffold(
       backgroundColor: AppTheme.darkBackground,

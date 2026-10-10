@@ -287,7 +287,18 @@ class _OverviewScreenState extends State<OverviewScreen> {
                                       ],
 
                                       if (profile.isGenericOrMcu) ...[
-                                        // For generic devices like microcontrollers, unify open device & hardware control
+                                        _buildQuickOpButton(
+                                          'Open device',
+                                          () {
+                                            _deviceManager.setSelectedDevice(device.id);
+                                            ProfileRouter.openDeviceDashboard(
+                                              context,
+                                              device,
+                                              conn: conn,
+                                            );
+                                          },
+                                        ),
+                                        const SizedBox(height: 10),
                                         _buildQuickOpButton(
                                           'Hardware control',
                                           () {
