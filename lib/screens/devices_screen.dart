@@ -273,11 +273,42 @@ class _DevicesScreenState extends State<DevicesScreen> {
                               ScaffoldMessenger.of(context).hideCurrentSnackBar();
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
-                                  content: Text(
-                                    '${device.name} is offline. Please connect the device first.',
+                                  behavior: SnackBarBehavior.floating,
+                                  backgroundColor: const Color(0xFF26272E),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                    side: const BorderSide(color: AppTheme.darkBorder, width: 1.2),
+                                  ),
+                                  elevation: 6,
+                                  margin: const EdgeInsets.only(bottom: 24, left: 16, right: 16),
+                                  content: Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(6),
+                                        decoration: BoxDecoration(
+                                          color: Colors.amber.withAlpha(30),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(
+                                          Icons.cloud_off,
+                                          color: Colors.amberAccent,
+                                          size: 18,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Text(
+                                          '${device.name} is offline. Connect it first.',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                   duration: const Duration(seconds: 2),
-                                  backgroundColor: AppTheme.darkCard,
                                 ),
                               );
                               return;

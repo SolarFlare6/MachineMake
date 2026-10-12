@@ -148,6 +148,20 @@ class AppTheme {
           ),
         ),
       ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: const Color(0xFF26272E),
+        contentTextStyle: GoogleFonts.exo2(
+          color: textWhite,
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: const BorderSide(color: darkBorder, width: 1.2),
+        ),
+        elevation: 6,
+      ),
     );
   }
 }
