@@ -409,6 +409,19 @@ class _OperationsScreenState extends State<OperationsScreen> {
                         return;
                       }
 
+                      if (DeviceProfile.fromString(selectedDev.profile) ==
+                          DeviceProfile.microcontroller) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              '${selectedDev.name} is a microcontroller and does not support SSH terminal.',
+                            ),
+                            backgroundColor: Colors.amber[800],
+                          ),
+                        );
+                        return;
+                      }
+
                       final deviceId = selectedDev.id;
                       final hasStored = _deviceManager.hasSavedSshCredentials(deviceId);
                       final cfg = _deviceManager.getSSHConfig(deviceId);

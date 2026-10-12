@@ -56,18 +56,55 @@ class DcpSession {
       clientId: clientId,
     );
     final helloAck = await sendRequest(helloMsg);
-    final deviceName = (helloAck.payload['name'] ??
+    final payloadMap = (helloAck.payload['data'] is Map)
+        ? Map<String, dynamic>.from(helloAck.payload['data'] as Map)
+        : ((helloAck.payload['payload'] is Map)
+            ? Map<String, dynamic>.from(helloAck.payload['payload'] as Map)
+            : helloAck.payload);
+
+    final deviceName = (payloadMap['name'] ??
+            payloadMap['device_name'] ??
+            payloadMap['device_id'] ??
+            payloadMap['id'] ??
+            helloAck.payload['name'] ??
             helloAck.payload['device_id'] ??
-            helloAck.payload['id'] ??
             'Device')
         .toString();
-    final deviceType = (helloAck.payload['profile'] ??
+
+    final rawType = (payloadMap['profile'] ??
+            payloadMap['type'] ??
+            payloadMap['device_type'] ??
+            payloadMap['deviceType'] ??
+            payloadMap['board'] ??
+            helloAck.payload['profile'] ??
             helloAck.payload['type'] ??
-            helloAck.payload['deviceType'] ??
             helloAck.payload['device_type'] ??
-            (transport.transportType == 'mock' ? 'robot' : 'computer'))
+            helloAck.payload['deviceType'] ??
+            '')
         .toString();
-    final firmware = (helloAck.payload['firmware_version'] ?? '1.0').toString();
+
+    // If type wasn't specified, check if name implies a microcontroller or robot
+    String resolvedType = rawType;
+    if (resolvedType.isEmpty || resolvedType == 'generic') {
+      final nameLower = deviceName.toLowerCase();
+      if (nameLower.contains('pico') ||
+          nameLower.contains('rp2040') ||
+          nameLower.contains('esp32') ||
+          nameLower.contains('arduino')) {
+        resolvedType = 'microcontroller';
+      } else if (transport.transportType == 'mock') {
+        resolvedType = 'robot';
+      } else {
+        resolvedType = 'computer';
+      }
+    }
+
+    final deviceType = resolvedType;
+    final firmware = (payloadMap['firmware_version'] ??
+            payloadMap['firmware'] ??
+            helloAck.payload['firmware_version'] ??
+            '1.0')
+        .toString();
 
     // 2. Optional: Negotiate Protocol Version (ignore if unsupported on server)
     _state = DeviceConnectionState.negotiating;
@@ -134,13 +171,25 @@ class DcpSession {
 
     // 6. Subscribe to asynchronous device events
     try {
+      // Send standard DCP subscribe
       await sendRequest(
         DcpMessage.subscribeEvents(
           ['telemetry', 'alert', 'imu_update', 'sensor_update', 'task_progress', 'task_completed'],
         ),
         timeout: const Duration(seconds: 3),
       );
-    } catch (_) {}
+    } catch (_) {
+      // Also try raw subscribe message in case server expects command: 'subscribe' or 'subscribe_events'
+      try {
+        await sendFireAndForget(DcpMessage.raw(
+          command: 'subscribe_events',
+          arguments: {
+            'events': ['telemetry', 'alert', 'imu_update', 'sensor_update'],
+            'event_types': ['telemetry', 'alert', 'imu_update', 'sensor_update'],
+          },
+        ));
+      } catch (_) {}
+    }
 
     // 7. Request control ownership
     try {
@@ -250,7 +299,13 @@ class DcpSession {
       }
 
       // Handle async event
-      if (json['type'] == 'event' || msg.type == DcpMessageType.event) {
+      if (json['type'] == 'event' ||
+          msg.type == DcpMessageType.event ||
+          json.containsKey('event') ||
+          json.containsKey('event_type') ||
+          (json['payload'] is Map &&
+              ((json['payload'] as Map).containsKey('event_type') ||
+                  (json['payload'] as Map).containsKey('event')))) {
         final event = DeviceEvent.fromJson(json, defaultDeviceId: transport.deviceId);
         _eventController.add(event);
       }

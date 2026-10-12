@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import '../core/connection/connection_state_enum.dart';
+import '../core/models/device_profile.dart';
 import '../core/routing/profile_router.dart';
 import '../services/device_manager.dart';
 import '../theme/app_theme.dart';
 import '../widgets/device_icons.dart';
+import '../widgets/direct_connect_dialog.dart';
 import '../widgets/machine_make_logo.dart';
 import '../widgets/ssh_dialog.dart';
 import '../widgets/voice_cmd_dialog.dart';
@@ -45,6 +47,20 @@ class _DevicesScreenState extends State<DevicesScreen> {
 
   void _openShell() {
     final selectedDev = _deviceManager.selectedDevice;
+    if (selectedDev != null &&
+        DeviceProfile.fromString(selectedDev.profile) ==
+            DeviceProfile.microcontroller) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '${selectedDev.name} is a microcontroller and does not support SSH terminal.',
+          ),
+          backgroundColor: Colors.amber[800],
+        ),
+      );
+      return;
+    }
+
     final deviceId = selectedDev?.id ??
         (_deviceManager.devices.isNotEmpty
             ? _deviceManager.devices.first.id
@@ -96,6 +112,15 @@ class _DevicesScreenState extends State<DevicesScreen> {
           _deviceManager.setSelectedDevice(deviceId);
         },
       ),
+    );
+  }
+
+  void _openDirectConnect() {
+    DirectConnectDialog.show(
+      context,
+      onConnected: () {
+        if (mounted) setState(() {});
+      },
     );
   }
 
@@ -242,6 +267,22 @@ class _DevicesScreenState extends State<DevicesScreen> {
                         return GestureDetector(
                           onTap: () {
                             _deviceManager.setSelectedDevice(device.id);
+                            final isOnline =
+                                conn?.isConnected == true || device.isConnected;
+                            if (!isOnline) {
+                              ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    '${device.name} is offline. Please connect the device first.',
+                                  ),
+                                  duration: const Duration(seconds: 2),
+                                  backgroundColor: AppTheme.darkCard,
+                                ),
+                              );
+                              return;
+                            }
+
                             ProfileRouter.openDeviceDashboard(
                               context,
                               device,
@@ -380,7 +421,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
                         width: 1.8,
                       ),
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
+                        horizontal: 8,
                         vertical: 14,
                       ),
                       shape: RoundedRectangleBorder(
@@ -390,24 +431,27 @@ class _DevicesScreenState extends State<DevicesScreen> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Text(
-                          'Open shell',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
+                        Flexible(
+                          child: Text(
+                            'Open shell',
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 4),
                         Icon(
                           Icons.terminal,
-                          size: 22,
+                          size: 20,
                           color: AppTheme.primaryOrange,
                         ),
                       ],
                     ),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 8),
                 Expanded(
                   child: OutlinedButton(
                     onPressed: _openVoiceCmd,
@@ -418,7 +462,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
                         width: 1.8,
                       ),
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
+                        horizontal: 8,
                         vertical: 14,
                       ),
                       shape: RoundedRectangleBorder(
@@ -428,17 +472,61 @@ class _DevicesScreenState extends State<DevicesScreen> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Text(
-                          'Voice cmd',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
+                        Flexible(
+                          child: Text(
+                            'Voice cmd',
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 4),
                         Icon(
                           Icons.mic_none,
-                          size: 22,
+                          size: 20,
+                          color: AppTheme.primaryOrange,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _openDirectConnect,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppTheme.primaryOrange,
+                      side: BorderSide(
+                        color: AppTheme.primaryOrange,
+                        width: 1.8,
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 14,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            'Direct conn',
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(
+                          Icons.settings_ethernet,
+                          size: 20,
                           color: AppTheme.primaryOrange,
                         ),
                       ],

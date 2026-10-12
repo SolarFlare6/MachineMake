@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../core/models/device_profile.dart';
 import '../services/device_manager.dart';
 import '../services/device_registry.dart';
 import '../theme/app_theme.dart';
@@ -734,18 +735,20 @@ class _DeviceManagerScreenState extends State<DeviceManagerScreen> {
                       ),
                     ),
                     // Action Buttons
-                    IconButton(
-                      tooltip: 'Manage SSH credentials',
-                      padding: const EdgeInsets.all(6),
-                      constraints: const BoxConstraints(),
-                      icon: Icon(
-                        Icons.terminal,
-                        size: 22,
-                        color: hasSsh ? AppTheme.primaryOrange : AppTheme.textMuted,
+                    if (DeviceProfile.fromString(profile) != DeviceProfile.microcontroller) ...[
+                      IconButton(
+                        tooltip: 'Manage SSH credentials',
+                        padding: const EdgeInsets.all(6),
+                        constraints: const BoxConstraints(),
+                        icon: Icon(
+                          Icons.terminal,
+                          size: 22,
+                          color: hasSsh ? AppTheme.primaryOrange : AppTheme.textMuted,
+                        ),
+                        onPressed: () => _showSshCredentialsDialog(id, name),
                       ),
-                      onPressed: () => _showSshCredentialsDialog(id, name),
-                    ),
-                    const SizedBox(width: 6),
+                      const SizedBox(width: 6),
+                    ],
                     IconButton(
                       tooltip: 'Delete credentials',
                       padding: const EdgeInsets.all(6),
@@ -823,61 +826,62 @@ class _DeviceManagerScreenState extends State<DeviceManagerScreen> {
                   ],
                 ),
 
-                const SizedBox(height: 8),
-
-                // Bottom Row: SSH Credentials button / pill
-                InkWell(
-                  onTap: () => _showSshCredentialsDialog(id, name),
-                  borderRadius: BorderRadius.circular(8),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 9,
-                      vertical: 5,
-                    ),
-                    decoration: BoxDecoration(
-                      color: hasSsh
-                          ? AppTheme.primaryOrange.withAlpha(20)
-                          : Colors.white.withAlpha(8),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: hasSsh
-                            ? AppTheme.primaryOrange.withAlpha(100)
-                            : AppTheme.darkBorder,
+                // Bottom Row: SSH Credentials button / pill (omitted for microcontrollers)
+                if (DeviceProfile.fromString(profile) != DeviceProfile.microcontroller) ...[
+                  const SizedBox(height: 8),
+                  InkWell(
+                    onTap: () => _showSshCredentialsDialog(id, name),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 9,
+                        vertical: 5,
                       ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.vpn_key_outlined,
-                          size: 13,
+                      decoration: BoxDecoration(
+                        color: hasSsh
+                            ? AppTheme.primaryOrange.withAlpha(20)
+                            : Colors.white.withAlpha(8),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
                           color: hasSsh
-                              ? AppTheme.primaryOrange
-                              : AppTheme.textMuted,
+                              ? AppTheme.primaryOrange.withAlpha(100)
+                              : AppTheme.darkBorder,
                         ),
-                        const SizedBox(width: 6),
-                        Text(
-                          hasSsh ? 'SSH: $sshUser (Saved)' : 'Set SSH Credentials',
-                          style: GoogleFonts.exo2(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.vpn_key_outlined,
+                            size: 13,
                             color: hasSsh
                                 ? AppTheme.primaryOrange
                                 : AppTheme.textMuted,
                           ),
-                        ),
-                        const SizedBox(width: 6),
-                        Icon(
-                          hasSsh ? Icons.edit : Icons.add_circle_outline,
-                          size: 12,
-                          color: hasSsh
-                              ? AppTheme.primaryOrange
-                              : AppTheme.textMuted,
-                        ),
-                      ],
+                          const SizedBox(width: 6),
+                          Text(
+                            hasSsh ? 'SSH: $sshUser (Saved)' : 'Set SSH Credentials',
+                            style: GoogleFonts.exo2(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: hasSsh
+                                  ? AppTheme.primaryOrange
+                                  : AppTheme.textMuted,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Icon(
+                            hasSsh ? Icons.edit : Icons.add_circle_outline,
+                            size: 12,
+                            color: hasSsh
+                                ? AppTheme.primaryOrange
+                                : AppTheme.textMuted,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
+                ],
               ],
             ),
           );

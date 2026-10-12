@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/connection/device_connection.dart';
@@ -33,16 +34,25 @@ class ComputerDashboardScreen extends StatefulWidget {
 class _ComputerDashboardScreenState extends State<ComputerDashboardScreen> {
   final DeviceManager _deviceManager = DeviceManager();
   int _currentTabIndex = 0;
+  Timer? _telemetryPollTimer;
 
   @override
   void initState() {
     super.initState();
     // Rebuild whenever DeviceManager receives new telemetry events.
     _deviceManager.addListener(_onManagerChange);
+    // Initial immediate poll and periodic fallback in case server does not broadcast events
+    _deviceManager.pollTelemetry(widget.device.id);
+    _telemetryPollTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+      if (mounted) {
+        _deviceManager.pollTelemetry(widget.device.id);
+      }
+    });
   }
 
   @override
   void dispose() {
+    _telemetryPollTimer?.cancel();
     _deviceManager.removeListener(_onManagerChange);
     super.dispose();
   }

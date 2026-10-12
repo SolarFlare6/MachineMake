@@ -40,7 +40,9 @@ class DeviceManager extends ChangeNotifier {
   void initFromStartup({required String clientId}) {
     _clientId = clientId;
     for (final known in registry.devices) {
-      if (known.sshUsername != null && known.sshPassword != null) {
+      final p = DeviceProfile.fromString(known.type);
+      final isMcu = p == DeviceProfile.microcontroller;
+      if (!isMcu && known.sshUsername != null && known.sshPassword != null) {
         _sshConfigs[known.deviceId] = SSHConfig(
           hostname: known.lastIp ?? '192.168.1.102',
           username: known.sshUsername!,
@@ -109,9 +111,50 @@ class DeviceManager extends ChangeNotifier {
   }
 
   DeviceManager._internal() {
-    discovery.addListener(notifyListeners);
+    discovery.addListener(_onDiscoveryUpdated);
     _startTelemetryLoop();
     _subscribeGlobalEvents();
+  }
+
+  void _onDiscoveryUpdated() {
+    _syncSavedDevicesWithDiscovery();
+    notifyListeners();
+  }
+
+  /// Cross-references saved devices from [DeviceRegistry] with actively discovered
+  /// network candidates. If a saved device appears on the network, update its IP/port/status
+  /// and automatically establish connection if appropriate.
+  void _syncSavedDevicesWithDiscovery() {
+    bool changed = false;
+    for (final disc in discovery.discovered) {
+      // Find matching saved device by ID or IP
+      final known = registry.findById(disc.deviceId) ??
+          (disc.ipAddress != null ? registry.findByIp(disc.ipAddress!) : null);
+      if (known != null) {
+        final targetId = known.deviceId;
+        final idx = _devices.indexWhere((d) => d.id == targetId);
+        if (idx >= 0) {
+          final dev = _devices[idx];
+          if (disc.ipAddress != null && dev.ipAddress != disc.ipAddress) {
+            dev.ipAddress = disc.ipAddress;
+            changed = true;
+          }
+          if (disc.port != null && dev.port != disc.port) {
+            dev.port = disc.port!;
+            changed = true;
+          }
+          final conn = _connections[targetId];
+          final isConn = conn?.isConnected ?? false;
+          if (isConn != dev.isConnected) {
+            dev.isConnected = isConn;
+            changed = true;
+          }
+        }
+      }
+    }
+    if (changed) {
+      notifyListeners();
+    }
   }
 
   // Registered / Connected Devices for UI
@@ -273,6 +316,12 @@ class DeviceManager extends ChangeNotifier {
     int port = 22,
   }) async {
     final known = registry.findById(deviceId);
+    final dev = _devices.where((d) => d.id == deviceId).firstOrNull;
+    final profile = DeviceProfile.fromString(dev?.profile ?? known?.type);
+    if (profile == DeviceProfile.microcontroller) {
+      return;
+    }
+
     if (known != null) {
       final updated = known.copyWith(
         sshUsername: username,
@@ -283,7 +332,6 @@ class DeviceManager extends ChangeNotifier {
       await registry.addOrUpdate(updated);
     }
 
-    final dev = _devices.where((d) => d.id == deviceId).firstOrNull;
     final host = (hostname != null && hostname.isNotEmpty)
         ? hostname
         : (known?.lastIp ?? dev?.ipAddress ?? '192.168.1.102');
@@ -489,12 +537,34 @@ class DeviceManager extends ChangeNotifier {
       final devIdx = _devices.indexWhere((d) => d.id == deviceId);
       if (devIdx != -1) {
         final currentDev = _devices[devIdx];
-        if (p.isComputer && currentDev.profile != 'computer') {
+        final isRpi = manifestType.contains('raspberry') || manifestType.contains('rpi');
+        final profileKey = p.isRobot
+            ? (p == DeviceProfile.quadruped ? 'quadruped' : 'robot')
+            : (p.isComputer
+                ? (isRpi ? 'raspberry_pi' : 'computer')
+                : (p == DeviceProfile.microcontroller ? 'pico' : 'generic'));
+
+        final typeLabel = p.isRobot
+            ? (p == DeviceProfile.quadruped ? 'Quadruped Robot' : 'Robot')
+            : (p.isComputer
+                ? (isRpi ? 'Raspberry Pi' : 'Computer / PC')
+                : (p == DeviceProfile.microcontroller ? 'Microcontroller' : 'Generic Device'));
+
+        final icon = p.isRobot
+            ? 'quadruped'
+            : (p.isComputer ? (isRpi ? 'rpi' : 'computer') : (p == DeviceProfile.microcontroller ? 'pico' : 'generic'));
+
+        final manifestName = conn.manifest!.name;
+        final updatedName = (manifestName.isNotEmpty && manifestName != 'Device')
+            ? manifestName
+            : currentDev.name;
+
+        if (currentDev.profile != profileKey || currentDev.name != updatedName) {
           _devices[devIdx] = DeviceItem(
             id: currentDev.id,
-            name: currentDev.name,
-            profile: 'computer',
-            deviceType: 'Computer / PC',
+            name: updatedName,
+            profile: profileKey,
+            deviceType: typeLabel,
             availableTransports: currentDev.availableTransports,
             selectedTransport: currentDev.selectedTransport,
             isPaired: currentDev.isPaired,
@@ -502,8 +572,18 @@ class DeviceManager extends ChangeNotifier {
             ipAddress: currentDev.ipAddress,
             port: currentDev.port,
             macAddress: currentDev.macAddress,
-            iconKey: 'computer',
+            iconKey: icon,
           );
+
+          // Update persisted registry device type and name as well
+          final known = registry.findById(deviceId);
+          if (known != null) {
+            registry.addOrUpdate(known.copyWith(
+              name: updatedName,
+              type: profileKey,
+            ));
+          }
+
           notifyListeners();
         }
       }
@@ -598,45 +678,122 @@ class DeviceManager extends ChangeNotifier {
 
   void _subscribeGlobalEvents() {
     event.events.listen((e) {
-      if (e.eventType == 'telemetry') {
-        final d = e.data;
-        final cpu = (d['cpu'] as num?)?.toDouble() ?? 0.0;
-        final ram = (d['ram'] as num?)?.toDouble() ?? 0.0;
-        final gpu = (d['gpu'] as num?)?.toDouble();
-        final tmp = (d['temp'] as num?)?.toDouble() ?? 0.0;
-
-        _telemetryMap[e.deviceId] = TelemetryData(
-          cpuUsage: cpu,
-          ramUsage: ram,
-          gpuUsage: gpu,
-          temperature: tmp,
-        );
-        notifyListeners();
+      if (e.eventType == 'telemetry' || e.eventType == 'sensor_update') {
+        updateTelemetryFromMap(e.deviceId, e.data);
       }
     });
   }
 
+  /// Parses and applies telemetry key-values directly into the device's TelemetryData.
+  void updateTelemetryFromMap(String deviceId, Map<String, dynamic> d) {
+    // Check if values might be nested inside 'telemetry', 'data', or 'system'
+    final map = (d['telemetry'] is Map)
+        ? Map<String, dynamic>.from(d['telemetry'] as Map)
+        : ((d['data'] is Map)
+            ? Map<String, dynamic>.from(d['data'] as Map)
+            : ((d['system'] is Map) ? Map<String, dynamic>.from(d['system'] as Map) : d));
+
+    // CPU: cpu, cpu_usage, cpu_percent, cpuUsage, processor, cpu_load
+    final rawCpu = map['cpu'] ?? map['cpu_usage'] ?? map['cpu_percent'] ?? map['cpuUsage'] ??
+        map['processor'] ?? map['cpu_load'];
+    final cpu = (rawCpu as num?)?.toDouble() ?? 0.0;
+
+    // RAM: ram, ram_usage, ram_percent, memory, memory_percent, ramUsage, mem
+    final rawRam = map['ram'] ?? map['ram_usage'] ?? map['ram_percent'] ?? map['ramUsage'] ??
+        map['memory'] ?? map['memory_percent'] ?? map['mem'];
+    final ram = (rawRam as num?)?.toDouble() ?? 0.0;
+
+    // GPU: gpu, gpu_usage, gpu_percent, gpuUsage
+    final rawGpu = map['gpu'] ?? map['gpu_usage'] ?? map['gpu_percent'] ?? map['gpuUsage'];
+    final gpu = (rawGpu as num?)?.toDouble();
+
+    // Temperature: temp, temperature, cpu_temp, cpu_temperature, thermal, core_temp
+    final rawTmp = map['temp'] ?? map['temperature'] ?? map['cpu_temp'] ?? map['cpu_temperature'] ??
+        map['thermal'] ?? map['core_temp'];
+    final tmp = (rawTmp as num?)?.toDouble() ?? 0.0;
+
+    _telemetryMap[deviceId] = TelemetryData(
+      cpuUsage: cpu,
+      ramUsage: ram,
+      gpuUsage: gpu,
+      temperature: tmp,
+    );
+    notifyListeners();
+  }
+
+  /// Explicitly query the device for telemetry via executeTool fallback if needed
+  Future<void> pollTelemetry(String deviceId) async {
+    final conn = _connections[deviceId];
+    if (conn == null || !conn.isConnected || conn.session == null) return;
+
+    try {
+      final res = await conn.session!.executeTool('get_telemetry', {});
+      if (res.result is Map) {
+        final resultMap = Map<String, dynamic>.from(res.result as Map);
+        updateTelemetryFromMap(deviceId, resultMap);
+      }
+    } catch (_) {
+      // In case the tool is named 'system_telemetry' or 'system_status'
+      try {
+        final res = await conn.session!.executeTool('system_status', {});
+        if (res.result is Map) {
+          final resultMap = Map<String, dynamic>.from(res.result as Map);
+          updateTelemetryFromMap(deviceId, resultMap);
+        }
+      } catch (_) {}
+    }
+  }
+
+
   Timer? _telemetryTimer;
+  Timer? _savedDevicesCheckTimer;
+
   void _startTelemetryLoop() {
     _telemetryTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
       for (final device in devices) {
-        final existing = _telemetryMap[device.id];
-        if (existing != null) {
-          _telemetryMap[device.id] = existing.copyWith(
-            cpuUsage: (existing.cpuUsage + ((timer.tick % 5) - 2) * 0.5).clamp(1.0, 100.0),
-            ramUsage: (existing.ramUsage + ((timer.tick % 3) - 1) * 0.3).clamp(1.0, 100.0),
-          );
+        final conn = _connections[device.id];
+        // Only synthesize jitter if there is no real hardware session or if running in mock mode
+        final isMock = conn?.session?.transport.transportType == 'mock';
+        if (isMock) {
+          final existing = _telemetryMap[device.id];
+          if (existing != null) {
+            _telemetryMap[device.id] = existing.copyWith(
+              cpuUsage: (existing.cpuUsage + ((timer.tick % 5) - 2) * 0.5).clamp(1.0, 100.0),
+              ramUsage: (existing.ramUsage + ((timer.tick % 3) - 1) * 0.3).clamp(1.0, 100.0),
+            );
+          }
         }
       }
       if (devices.isNotEmpty) {
         notifyListeners();
       }
     });
+
+    // Check reachability for saved devices every 15 seconds
+    _savedDevicesCheckTimer?.cancel();
+    _savedDevicesCheckTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+      _checkSavedDevicesReachability();
+    });
+    // Trigger initial check promptly
+    Future.delayed(const Duration(milliseconds: 500), _checkSavedDevicesReachability);
+  }
+
+  /// Probes network reachability for saved devices that are not currently connected
+  Future<void> _checkSavedDevicesReachability() async {
+    for (final dev in _devices) {
+      if (dev.isConnected) continue;
+      final ip = dev.ipAddress;
+      final port = dev.port;
+      if (ip != null && ip.isNotEmpty) {
+        discovery.probeHost(ip, port: port);
+      }
+    }
   }
 
   @override
   void dispose() {
     _telemetryTimer?.cancel();
+    _savedDevicesCheckTimer?.cancel();
     for (final conn in _connections.values) {
       conn.dispose();
     }

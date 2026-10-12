@@ -64,10 +64,50 @@ class DeviceEvent {
   }) : receivedAt = receivedAt ?? DateTime.now();
 
   factory DeviceEvent.fromJson(Map<String, dynamic> json, {String? defaultDeviceId}) {
+    // 1. Resolve payload map (could be in 'payload', 'data', or top-level)
+    Map<String, dynamic> payloadMap = {};
+    if (json['payload'] is Map<String, dynamic>) {
+      payloadMap = json['payload'] as Map<String, dynamic>;
+    } else if (json['payload'] is Map) {
+      payloadMap = Map<String, dynamic>.from(json['payload'] as Map);
+    } else if (json['data'] is Map<String, dynamic>) {
+      payloadMap = json['data'] as Map<String, dynamic>;
+    } else if (json['data'] is Map) {
+      payloadMap = Map<String, dynamic>.from(json['data'] as Map);
+    } else {
+      payloadMap = json;
+    }
+
+    // 2. Resolve eventType
+    final eventType = json['event_type']?.toString() ??
+        json['event']?.toString() ??
+        payloadMap['event_type']?.toString() ??
+        payloadMap['event']?.toString() ??
+        (json['type'] == 'event' ? null : json['type']?.toString()) ??
+        'custom';
+
+    // 3. Resolve deviceId
+    final deviceId = json['device_id']?.toString() ??
+        payloadMap['device_id']?.toString() ??
+        json['deviceId']?.toString() ??
+        payloadMap['deviceId']?.toString() ??
+        defaultDeviceId ??
+        '';
+
+    // 4. Resolve data payload
+    Map<String, dynamic> data = {};
+    if (payloadMap.containsKey('data') && payloadMap['data'] is Map) {
+      data = Map<String, dynamic>.from(payloadMap['data'] as Map);
+    } else if (json.containsKey('data') && json['data'] is Map) {
+      data = Map<String, dynamic>.from(json['data'] as Map);
+    } else {
+      data = Map<String, dynamic>.from(payloadMap);
+    }
+
     return DeviceEvent(
-      eventType: json['event'] as String? ?? json['event_type'] as String? ?? 'custom',
-      deviceId: json['device_id'] as String? ?? defaultDeviceId ?? '',
-      data: (json['data'] as Map<String, dynamic>?) ?? (json['payload'] as Map<String, dynamic>?) ?? {},
+      eventType: eventType,
+      deviceId: deviceId,
+      data: data,
       receivedAt: json['timestamp'] != null
           ? DateTime.tryParse(json['timestamp'].toString()) ?? DateTime.now()
           : DateTime.now(),

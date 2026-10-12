@@ -13,6 +13,7 @@ import 'package:machmake2/models/dcp_models.dart';
 import 'package:machmake2/services/app_startup_service.dart';
 import 'package:machmake2/services/discovery_manager.dart';
 import 'package:machmake2/widgets/ssh_dialog.dart';
+import 'package:machmake2/widgets/direct_connect_dialog.dart';
 import 'package:machmake2/screens/ssh_terminal_screen.dart';
 import 'package:machmake2/widgets/voice_cmd_dialog.dart';
 import 'package:machmake2/widgets/voice_sphere.dart';
@@ -329,6 +330,31 @@ void main() {
       expect(find.text('Ctrl+C'), findsOneWidget);
       expect(find.text('▲'), findsOneWidget);
       expect(find.text('▼'), findsOneWidget);
+    });
+
+    testWidgets('DirectConnectDialog renders and can be opened', (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => ElevatedButton(
+                onPressed: () => DirectConnectDialog.show(context),
+                child: const Text('Open Direct'),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Open Direct'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Direct IP Connect'), findsOneWidget);
+      expect(find.text('Host / IP Address'), findsOneWidget);
+      expect(find.text('Port'), findsOneWidget);
+      expect(find.text('Device Profile:'), findsOneWidget);
+      expect(find.text('Connect'), findsOneWidget);
+      expect(find.text('Cancel'), findsOneWidget);
     });
   });
 

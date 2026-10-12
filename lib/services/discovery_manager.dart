@@ -279,10 +279,25 @@ class DiscoveryManager extends ChangeNotifier {
           }
           if (parsedType != null && parsedType.toString().isNotEmpty) {
             devType = parsedType.toString();
+          } else {
+            final nameLower = devName.toLowerCase();
+            if (nameLower.contains('pico') ||
+                nameLower.contains('rp2040') ||
+                nameLower.contains('rp2350') ||
+                nameLower.contains('esp32') ||
+                nameLower.contains('arduino')) {
+              devType = 'microcontroller';
+            }
           }
         }
       } catch (_) {
-        // Fallback: If WebSocket hello didn't reply in time, preserve generic computer classification
+        // Fallback: If WebSocket hello didn't reply in time, check host or existing registration
+        final known = DeviceRegistry().findByIp(host);
+        if (known != null) {
+          devType = known.type;
+          devName = known.name;
+          devId = known.deviceId;
+        }
       }
 
       _addDevice(DiscoveredDevice(
