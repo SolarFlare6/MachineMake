@@ -1,6 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../core/routing/profile_router.dart';
+import '../services/device_manager.dart';
+import '../services/keep_alive_service.dart';
 import '../services/notification_service.dart';
 import '../theme/app_theme.dart';
 import 'devices_screen.dart';
@@ -23,6 +26,8 @@ class MainLayout extends StatefulWidget {
 class _MainLayoutState extends State<MainLayout> {
   late int _currentIndex;
   StreamSubscription<InAppNotification>? _notifSub;
+  StreamSubscription<String>? _openDeviceSub;
+  AppLifecycleListener? _lifecycleListener;
 
   @override
   void initState() {
@@ -30,14 +35,43 @@ class _MainLayoutState extends State<MainLayout> {
     _currentIndex = widget.initialIndex;
     _notifSub =
         NotificationService.instance.inAppNotifications.listen(_showInAppBanner);
+    _openDeviceSub =
+        KeepAliveService.instance.openDeviceStream.listen(_handleOpenDeviceFromNotification);
+    _lifecycleListener = AppLifecycleListener(
+      onResume: () => DeviceManager().setAppInBackground(false),
+      onPause: () => DeviceManager().setAppInBackground(true),
+      onHide: () => DeviceManager().setAppInBackground(true),
+      onInactive: () => DeviceManager().setAppInBackground(true),
+    );
     AppTheme.accentColorNotifier.addListener(_onAccentColorChanged);
   }
 
   @override
   void dispose() {
     AppTheme.accentColorNotifier.removeListener(_onAccentColorChanged);
+    _lifecycleListener?.dispose();
+    _openDeviceSub?.cancel();
     _notifSub?.cancel();
     super.dispose();
+  }
+
+  void _handleOpenDeviceFromNotification(String deviceId) {
+    if (!mounted) return;
+    final dm = DeviceManager();
+    final target = dm.allPairedDevices.where((d) => d.id == deviceId).firstOrNull;
+    if (target == null) return;
+
+    setState(() => _currentIndex = 0);
+    dm.setSelectedDevice(deviceId);
+    if (target.isConnected) {
+      final conn = dm.getConnection(deviceId);
+      ProfileRouter.openDeviceDashboard(
+        context,
+        target,
+        conn: conn,
+        manifest: conn?.manifest,
+      );
+    }
   }
 
   void _onAccentColorChanged() {

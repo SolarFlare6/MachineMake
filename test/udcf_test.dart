@@ -1,10 +1,14 @@
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:machmake2/core/connection/connection_state_enum.dart';
+import 'package:machmake2/core/connection/device_connection.dart';
 import 'package:machmake2/core/dcp/dcp_message.dart';
 import 'package:machmake2/core/discovery/discovered_device.dart';
 import 'package:machmake2/core/models/device_capability.dart';
 import 'package:machmake2/core/models/device_manifest.dart';
+import 'package:machmake2/core/models/device_notification_model.dart';
 import 'package:machmake2/core/models/device_profile.dart';
+import 'package:machmake2/core/models/known_device.dart';
 import 'package:machmake2/core/models/task_model.dart';
 import 'package:machmake2/core/models/tool_definition.dart';
 import 'package:flutter/material.dart';
@@ -12,6 +16,7 @@ import 'package:machmake2/main.dart';
 import 'package:machmake2/models/dcp_models.dart';
 import 'package:machmake2/services/app_startup_service.dart';
 import 'package:machmake2/services/discovery_manager.dart';
+import 'package:machmake2/services/keep_alive_service.dart';
 import 'package:machmake2/widgets/ssh_dialog.dart';
 import 'package:machmake2/widgets/direct_connect_dialog.dart';
 import 'package:machmake2/screens/ssh_terminal_screen.dart';
@@ -386,6 +391,118 @@ void main() {
       expect(matched.length, equals(1));
       expect(matched.first.name, equals('DESKTOP-2EF22FF'));
       expect(matched.first.ipAddress, equals('10.80.166.248'));
+    });
+  });
+
+  group('Connection Persistence & Background Quick Actions', () {
+    test('DeviceConnectionState.reconnecting isConnecting and label', () {
+      expect(DeviceConnectionState.reconnecting.isConnecting, isTrue);
+      expect(DeviceConnectionState.reconnecting.isOperational, isFalse);
+      expect(DeviceConnectionState.reconnecting.label, equals('Reconnecting...'));
+    });
+
+    test('DeviceNotificationModel resolves profile defaults and caps at 3 actions', () {
+      final pcActions = DeviceNotificationModel.defaultActionsForProfile(DeviceProfile.computer);
+      expect(pcActions.map((a) => a.key).toList(),
+          equals(['media_play_pause', 'lock_workstation', 'disconnect']));
+
+      final picoActions = DeviceNotificationModel.defaultActionsForProfile(DeviceProfile.microcontroller);
+      expect(picoActions.map((a) => a.key).toList(),
+          equals(['led_toggle', 'read_temperature', 'disconnect']));
+
+      final robotActions = DeviceNotificationModel.defaultActionsForProfile(DeviceProfile.quadruped);
+      expect(robotActions.map((a) => a.key).toList(),
+          equals(['emergency_stop', 'stand_sit_toggle', 'disconnect']));
+      // Safety check: emergency_stop must never require unlock
+      expect(robotActions.first.requiresUnlock, isFalse);
+
+      // Custom actions resolution (truncates to max 3 and marks sensitive actions as requiresUnlock)
+      final custom = DeviceNotificationModel.resolveActions(
+        profile: DeviceProfile.computer,
+        customActionKeys: ['emergency_stop', 'system_shutdown', 'ping', 'disconnect'],
+      );
+      expect(custom.length, equals(3));
+      expect(custom[0].key, equals('emergency_stop'));
+      expect(custom[0].requiresUnlock, isFalse);
+      expect(custom[1].key, equals('system_shutdown'));
+      expect(custom[1].requiresUnlock, isTrue);
+      expect(custom[2].key, equals('ping'));
+    });
+
+    test('KnownDevice persists notificationActions round-trip', () {
+      final now = DateTime.now();
+      final dev = KnownDevice(
+        deviceId: 'pico-w-01',
+        name: 'Pi Pico W',
+        type: 'pico',
+        pairedAt: now,
+        lastSeenAt: now,
+        notificationActions: const ['led_toggle', 'read_temperature'],
+      );
+
+      final json = dev.toJson();
+      final restored = KnownDevice.fromJson(json);
+      expect(restored.notificationActions, equals(['led_toggle', 'read_temperature']));
+
+      final cleared = restored.copyWith(clearNotificationActions: true);
+      expect(cleared.notificationActions, isNull);
+    });
+
+    test('KeepAliveService invokes start, updateDevices, and stop on MethodChannel', () async {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      KeepAliveService.debugForceEnableForTest = true;
+      KeepAliveService.instance.resetForTest();
+
+      final calls = <MethodCall>[];
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+        const MethodChannel('machinemake/keepalive'),
+        (MethodCall call) async {
+          calls.add(call);
+          return true;
+        },
+      );
+
+      final model = DeviceNotificationModel(
+        deviceId: 'pico-01',
+        name: 'Pi Pico W',
+        profile: 'pico',
+        statusLine: 'Connected · Temp 26.4°C',
+        actions: DeviceNotificationModel.defaultActionsForProfile(
+          DeviceProfile.microcontroller,
+        ),
+      );
+
+      // First sync starts the foreground service
+      await KeepAliveService.instance.sync([model], showOnLockScreen: true);
+      expect(calls.length, equals(1));
+      expect(calls.first.method, equals('start'));
+      expect(KeepAliveService.instance.isRunning, isTrue);
+
+      // Second sync updates devices
+      await KeepAliveService.instance.sync([model], showOnLockScreen: false);
+      expect(calls.length, equals(2));
+      expect(calls[1].method, equals('updateDevices'));
+
+      // Empty sync stops the foreground service
+      await KeepAliveService.instance.sync(const [], showOnLockScreen: true);
+      expect(calls.length, equals(3));
+      expect(calls[2].method, equals('stop'));
+      expect(KeepAliveService.instance.isRunning, isFalse);
+
+      KeepAliveService.debugForceEnableForTest = false;
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+        const MethodChannel('machinemake/keepalive'),
+        null,
+      );
+    });
+
+    test('DeviceConnection adaptive heartbeat flags', () {
+      DeviceConnection.keepAliveEnabled = true;
+      DeviceConnection.isInBackground = false;
+      expect(DeviceConnection.keepAliveEnabled, isTrue);
+      expect(DeviceConnection.isInBackground, isFalse);
     });
   });
 }

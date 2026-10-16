@@ -24,6 +24,9 @@ enum DeviceConnectionState {
   /// Fully connected and operational
   connected,
 
+  /// Temporarily lost connection, actively attempting to reconnect
+  reconnecting,
+
   /// An error occurred during communication
   error,
 
@@ -50,6 +53,8 @@ extension DeviceConnectionStateExtension on DeviceConnectionState {
         return 'Negotiating...';
       case DeviceConnectionState.connected:
         return 'Connected';
+      case DeviceConnectionState.reconnecting:
+        return 'Reconnecting...';
       case DeviceConnectionState.error:
         return 'Error';
       case DeviceConnectionState.disconnecting:
@@ -61,5 +66,6 @@ extension DeviceConnectionStateExtension on DeviceConnectionState {
   bool get isConnecting =>
       this == DeviceConnectionState.pairing ||
       this == DeviceConnectionState.authenticating ||
-      this == DeviceConnectionState.negotiating;
+      this == DeviceConnectionState.negotiating ||
+      this == DeviceConnectionState.reconnecting;
 }

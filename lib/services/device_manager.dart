@@ -2,9 +2,11 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
+import '../core/connection/connection_state_enum.dart';
 import '../core/connection/device_connection.dart';
 import '../core/dcp/dcp_message.dart';
 import '../core/models/device_event.dart';
+import '../core/models/device_notification_model.dart';
 import '../core/models/device_profile.dart';
 import '../core/models/task_model.dart';
 import '../models/dcp_models.dart';
@@ -13,6 +15,7 @@ import 'capability_manager.dart';
 import 'device_registry.dart';
 import 'discovery_manager.dart';
 import 'event_manager.dart';
+import 'keep_alive_service.dart';
 import 'notification_service.dart';
 import 'pairing_manager.dart';
 import 'task_manager.dart';
@@ -193,6 +196,7 @@ class DeviceManager extends ChangeNotifier {
       _selectedDeviceId = _devices.isNotEmpty ? _devices.first.id : '';
     }
     registry.removeDevice(deviceId);
+    syncKeepAliveNotifications();
     notifyListeners();
   }
 
@@ -207,6 +211,7 @@ class DeviceManager extends ChangeNotifier {
     _devices.clear();
     _selectedDeviceId = '';
     registry.clearAll();
+    KeepAliveService.instance.stop();
     notifyListeners();
   }
 
@@ -375,6 +380,15 @@ class DeviceManager extends ChangeNotifier {
   bool alertOnDisconnect = true;
   bool autoEnableBTOnStart = true;
   bool autoEnableWifiOnStart = true;
+  bool keepAliveInBackground = true;
+  bool showQuickActionsOnLockScreen = true;
+  bool showLiveTelemetryInNotification = true;
+
+  // Per-device notification feedback & telemetry throttling
+  final Map<String, String> _notificationFeedbackMap = {};
+  final Map<String, DateTime> _notificationFeedbackExpiry = {};
+  final Map<String, DateTime> _lastNotifTelemetrySync = {};
+  final Map<String, Timer> _reconnectTimeoutTimers = {};
 
   void toggleAlertOnDisconnect(bool val) {
     alertOnDisconnect = val;
@@ -394,11 +408,159 @@ class DeviceManager extends ChangeNotifier {
     notifyListeners();
   }
 
+  void toggleKeepAliveInBackground(bool val) {
+    keepAliveInBackground = val;
+    DeviceConnection.keepAliveEnabled = val;
+    _persistSettings();
+    syncKeepAliveNotifications();
+    notifyListeners();
+  }
+
+  void toggleShowQuickActionsOnLockScreen(bool val) {
+    showQuickActionsOnLockScreen = val;
+    _persistSettings();
+    syncKeepAliveNotifications();
+    notifyListeners();
+  }
+
+  void toggleShowLiveTelemetryInNotification(bool val) {
+    showLiveTelemetryInNotification = val;
+    _persistSettings();
+    syncKeepAliveNotifications();
+    notifyListeners();
+  }
+
   void _persistSettings() {
     AppStartupService.saveSettings(
       alertOnDisconnect: alertOnDisconnect,
       autoEnableBT: autoEnableBTOnStart,
       autoEnableWifi: autoEnableWifiOnStart,
+      keepAliveInBackground: keepAliveInBackground,
+      showQuickActionsOnLockScreen: showQuickActionsOnLockScreen,
+      showLiveTelemetryInNotification: showLiveTelemetryInNotification,
+    );
+  }
+
+  /// Notifies all active connections when the app enters/exits background so
+  /// heartbeat intervals and timeout tolerances adapt automatically.
+  void setAppInBackground(bool inBackground) {
+    if (DeviceConnection.isInBackground == inBackground) return;
+    DeviceConnection.isInBackground = inBackground;
+    for (final conn in _connections.values) {
+      conn.refreshHeartbeatSchedule();
+    }
+    syncKeepAliveNotifications();
+  }
+
+  /// Sets a temporary status message on a device's ongoing notification card
+  /// (e.g., after a quick action button press like "Temp: 26.8°C").
+  void setNotificationFeedback(
+    String deviceId,
+    String feedback, {
+    Duration duration = const Duration(seconds: 12),
+  }) {
+    _notificationFeedbackMap[deviceId] = feedback;
+    _notificationFeedbackExpiry[deviceId] = DateTime.now().add(duration);
+  }
+
+  /// Resolves the up to 3 notification quick actions for [deviceId].
+  List<DeviceNotificationAction> getDeviceNotificationActions(
+    String deviceId,
+    String profile,
+  ) {
+    final known = registry.findById(deviceId);
+    return DeviceNotificationModel.resolveActions(
+      profile: DeviceProfile.fromString(profile),
+      customActionKeys: known?.notificationActions,
+      availableTools: tool.getTools(deviceId),
+    );
+  }
+
+  /// Customizes the notification quick action keys for a paired device.
+  Future<void> setDeviceNotificationActions(
+    String deviceId,
+    List<String>? actionKeys,
+  ) async {
+    final known = registry.findById(deviceId);
+    if (known != null) {
+      final updated = known.copyWith(
+        notificationActions: actionKeys,
+        clearNotificationActions: actionKeys == null || actionKeys.isEmpty,
+      );
+      await registry.addOrUpdate(updated);
+    }
+    await syncKeepAliveNotifications();
+    notifyListeners();
+  }
+
+  /// Synchronizes the native Android Foreground Service & ongoing notification
+  /// cards with the currently connected (or reconnecting) devices.
+  Future<void> syncKeepAliveNotifications() async {
+    if (!keepAliveInBackground) {
+      await KeepAliveService.instance.stop();
+      return;
+    }
+
+    final now = DateTime.now();
+    final activeModels = <DeviceNotificationModel>[];
+
+    for (final d in _devices) {
+      final conn = _connections[d.id];
+      final isReconnecting = conn?.state == DeviceConnectionState.reconnecting;
+      if (!d.isConnected && !isReconnecting) continue;
+
+      String statusLine;
+      final feedbackExpiry = _notificationFeedbackExpiry[d.id];
+      final activeFeedback =
+          (feedbackExpiry != null && now.isBefore(feedbackExpiry))
+              ? _notificationFeedbackMap[d.id]
+              : null;
+
+      if (isReconnecting) {
+        final target = d.ipAddress ?? d.selectedTransport.toUpperCase();
+        statusLine = 'Reconnecting ($target)...';
+      } else if (activeFeedback != null && activeFeedback.isNotEmpty) {
+        statusLine = 'Connected · $activeFeedback';
+      } else if (showLiveTelemetryInNotification) {
+        final t = getTelemetry(d.id);
+        final p = d.profile.toLowerCase();
+        if (p == 'computer' || p == 'raspberry_pi' || p == 'laptop') {
+          statusLine =
+              'Connected · CPU ${t.cpuUsage.toStringAsFixed(0)}% · RAM ${t.ramUsage.toStringAsFixed(0)}% · ${t.temperature.toStringAsFixed(0)}°C';
+        } else if (p == 'pico' || p == 'microcontroller' || p == 'esp32') {
+          final tempPart = t.temperature > 0
+              ? ' · Temp ${t.temperature.toStringAsFixed(1)}°C'
+              : '';
+          statusLine = 'Connected · ${d.ipAddress ?? "Wi-Fi"}$tempPart';
+        } else if (p == 'quadruped' || p == 'robot') {
+          final tempPart = t.temperature > 0
+              ? ' · ${t.temperature.toStringAsFixed(0)}°C'
+              : '';
+          statusLine = 'Connected · Locomotion Ready$tempPart';
+        } else {
+          statusLine =
+              'Connected · ${d.ipAddress ?? d.selectedTransport.toUpperCase()}';
+        }
+      } else {
+        statusLine =
+            'Connected · ${d.ipAddress ?? d.selectedTransport.toUpperCase()}';
+      }
+
+      activeModels.add(
+        DeviceNotificationModel(
+          deviceId: d.id,
+          name: d.name,
+          profile: d.profile,
+          statusLine: statusLine,
+          isReconnecting: isReconnecting,
+          actions: getDeviceNotificationActions(d.id, d.profile),
+        ),
+      );
+    }
+
+    await KeepAliveService.instance.sync(
+      activeModels,
+      showOnLockScreen: showQuickActionsOnLockScreen,
     );
   }
 
@@ -413,6 +575,7 @@ class DeviceManager extends ChangeNotifier {
     if (idx != -1) {
       if (!connected) {
         _intentionalDisconnects.add(deviceId);
+        _reconnectTimeoutTimers.remove(deviceId)?.cancel();
       } else {
         _intentionalDisconnects.remove(deviceId);
       }
@@ -423,6 +586,7 @@ class DeviceManager extends ChangeNotifier {
       } else {
         _disconnectDevice(deviceId);
       }
+      syncKeepAliveNotifications();
       notifyListeners();
     }
   }
@@ -433,10 +597,39 @@ class DeviceManager extends ChangeNotifier {
 
     final dev = _devices[idx];
     final isConn = conn.isConnected;
+    final state = conn.state;
+
+    // While in silent background reconnection, keep the ongoing notification up
+    // ("Reconnecting...") and suppress premature disconnect alerts unless
+    // reconnection fails continuously for 60 seconds.
+    if (state == DeviceConnectionState.reconnecting) {
+      _reconnectTimeoutTimers[deviceId] ??= Timer(
+        const Duration(seconds: 60),
+        () {
+          _reconnectTimeoutTimers.remove(deviceId);
+          if (conn.state != DeviceConnectionState.connected && dev.isConnected) {
+            dev.isConnected = false;
+            notifyListeners();
+            syncKeepAliveNotifications();
+            if (alertOnDisconnect) {
+              NotificationService.instance.showDeviceDisconnectedNotification(
+                deviceName: dev.name,
+                deviceId: dev.id,
+              );
+            }
+          }
+        },
+      );
+      syncKeepAliveNotifications();
+      notifyListeners();
+      return;
+    }
 
     if (dev.isConnected && !isConn) {
+      _reconnectTimeoutTimers.remove(deviceId)?.cancel();
       // Unexpected or transport-level disconnect
       dev.isConnected = false;
+      syncKeepAliveNotifications();
       notifyListeners();
 
       final wasIntentional = _intentionalDisconnects.remove(deviceId);
@@ -457,15 +650,20 @@ class DeviceManager extends ChangeNotifier {
           },
         ));
       }
-    } else if (!dev.isConnected && isConn) {
+    } else if (isConn) {
+      final wasOffline = !dev.isConnected;
+      _reconnectTimeoutTimers.remove(deviceId)?.cancel();
       dev.isConnected = true;
       _intentionalDisconnects.remove(deviceId);
+      syncKeepAliveNotifications();
       notifyListeners();
 
-      NotificationService.instance.showDeviceConnectedNotification(
-        deviceName: dev.name,
-        deviceId: dev.id,
-      );
+      if (wasOffline) {
+        NotificationService.instance.showDeviceConnectedNotification(
+          deviceName: dev.name,
+          deviceId: dev.id,
+        );
+      }
     }
   }
 
@@ -719,6 +917,15 @@ class DeviceManager extends ChangeNotifier {
       temperature: tmp,
     );
     notifyListeners();
+
+    if (keepAliveInBackground && showLiveTelemetryInNotification) {
+      final now = DateTime.now();
+      final lastSync = _lastNotifTelemetrySync[deviceId];
+      if (lastSync == null || now.difference(lastSync).inSeconds >= 5) {
+        _lastNotifTelemetrySync[deviceId] = now;
+        syncKeepAliveNotifications();
+      }
+    }
   }
 
   /// Explicitly query the device for telemetry via executeTool fallback if needed
@@ -794,6 +1001,10 @@ class DeviceManager extends ChangeNotifier {
   void dispose() {
     _telemetryTimer?.cancel();
     _savedDevicesCheckTimer?.cancel();
+    for (final t in _reconnectTimeoutTimers.values) {
+      t.cancel();
+    }
+    _reconnectTimeoutTimers.clear();
     for (final conn in _connections.values) {
       conn.dispose();
     }

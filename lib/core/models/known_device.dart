@@ -10,6 +10,7 @@ class KnownDevice {
   final String? sshUsername;
   final String? sshPassword;
   final int? sshPort;
+  final List<String>? notificationActions;
   final DateTime pairedAt;
   DateTime lastSeenAt;
   bool isTrusted;
@@ -25,6 +26,7 @@ class KnownDevice {
     this.sshUsername,
     this.sshPassword,
     this.sshPort,
+    this.notificationActions,
     DateTime? pairedAt,
     DateTime? lastSeenAt,
     this.isTrusted = true,
@@ -42,6 +44,8 @@ class KnownDevice {
     String? sshPassword,
     int? sshPort,
     bool clearSsh = false,
+    List<String>? notificationActions,
+    bool clearNotificationActions = false,
     DateTime? lastSeenAt,
     bool? isTrusted,
   }) {
@@ -56,6 +60,9 @@ class KnownDevice {
       sshUsername: clearSsh ? null : (sshUsername ?? this.sshUsername),
       sshPassword: clearSsh ? null : (sshPassword ?? this.sshPassword),
       sshPort: clearSsh ? null : (sshPort ?? this.sshPort),
+      notificationActions: clearNotificationActions
+          ? null
+          : (notificationActions ?? this.notificationActions),
       pairedAt: pairedAt,
       lastSeenAt: lastSeenAt ?? this.lastSeenAt,
       isTrusted: isTrusted ?? this.isTrusted,
@@ -63,6 +70,7 @@ class KnownDevice {
   }
 
   factory KnownDevice.fromJson(Map<String, dynamic> json) {
+    final rawActions = json['notification_actions'] as List<dynamic>?;
     return KnownDevice(
       deviceId: (json['device_id'] ?? json['deviceId'] ?? json['id'] ?? '') as String,
       name: json['name'] as String? ?? '',
@@ -74,6 +82,7 @@ class KnownDevice {
       sshUsername: json['ssh_username'] as String?,
       sshPassword: json['ssh_password'] as String?,
       sshPort: json['ssh_port'] as int?,
+      notificationActions: rawActions?.map((e) => e.toString()).toList(),
       pairedAt: json['paired_at'] != null
           ? DateTime.tryParse(json['paired_at'].toString()) ?? DateTime.now()
           : DateTime.now(),
@@ -95,6 +104,7 @@ class KnownDevice {
         if (sshUsername != null) 'ssh_username': sshUsername,
         if (sshPassword != null) 'ssh_password': sshPassword,
         if (sshPort != null) 'ssh_port': sshPort,
+        if (notificationActions != null) 'notification_actions': notificationActions,
         'paired_at': pairedAt.toIso8601String(),
         'last_seen_at': lastSeenAt.toIso8601String(),
         'is_trusted': isTrusted,

@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../services/app_startup_service.dart';
 import '../services/backup_service.dart';
 import '../services/device_manager.dart';
+import '../services/keep_alive_service.dart';
 import '../services/notification_service.dart';
 import '../services/permission_service.dart';
 import '../theme/app_theme.dart';
@@ -21,6 +22,7 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   final DeviceManager _deviceManager = DeviceManager();
   bool _notificationGranted = false;
+  bool _batteryExempt = false;
   bool _isCheckingConnections = false;
 
   @override
@@ -28,6 +30,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     super.initState();
     _deviceManager.addListener(_onManagerChange);
     _checkNotificationPermission();
+    _checkBatteryOptimization();
   }
 
   @override
@@ -46,6 +49,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (mounted) {
       setState(() => _notificationGranted = granted);
     }
+  }
+
+  Future<void> _checkBatteryOptimization() async {
+    final exempt =
+        await KeepAliveService.instance.isIgnoringBatteryOptimizations();
+    if (mounted) {
+      setState(() => _batteryExempt = exempt);
+    }
+  }
+
+  Future<void> _requestBatteryExemption() async {
+    await KeepAliveService.instance.requestBatteryExemption();
+    await Future.delayed(const Duration(seconds: 1));
+    await _checkBatteryOptimization();
   }
 
   Future<void> _requestNotificationPermission() async {
@@ -428,6 +445,127 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 size: 20,
               ),
               onTap: _sendTestNotification,
+            ),
+
+            // Background & Lock Screen Section
+            const SizedBox(height: 28),
+            Text(
+              'Background & Lock Screen',
+              style: GoogleFonts.exo2(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 14),
+
+            _buildSettingCard(
+              title: 'Keep connections alive in background',
+              subtitle:
+                  'Maintains Wi-Fi/BLE links and shows ongoing device controls when locked or minimized',
+              trailing: Transform.scale(
+                scale: 0.85,
+                child: Switch(
+                  value: _deviceManager.keepAliveInBackground,
+                  activeThumbColor: AppTheme.primaryOrange,
+                  activeTrackColor: AppTheme.primaryOrange.withAlpha(80),
+                  inactiveThumbColor: Colors.white,
+                  inactiveTrackColor: AppTheme.darkBorder,
+                  onChanged: (val) {
+                    _deviceManager.toggleKeepAliveInBackground(val);
+                  },
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            _buildSettingCard(
+              title: 'Show quick actions on lock screen',
+              subtitle:
+                  'Displays per-device action buttons (LED, Media, STOP, Disconnect) on the lock screen',
+              trailing: Transform.scale(
+                scale: 0.85,
+                child: Switch(
+                  value: _deviceManager.showQuickActionsOnLockScreen,
+                  activeThumbColor: AppTheme.primaryOrange,
+                  activeTrackColor: AppTheme.primaryOrange.withAlpha(80),
+                  inactiveThumbColor: Colors.white,
+                  inactiveTrackColor: AppTheme.darkBorder,
+                  onChanged: (val) {
+                    _deviceManager.toggleShowQuickActionsOnLockScreen(val);
+                  },
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            _buildSettingCard(
+              title: 'Show live telemetry in notifications',
+              subtitle:
+                  'Updates ongoing notification subtitles with live CPU, RAM, and temperature readings',
+              trailing: Transform.scale(
+                scale: 0.85,
+                child: Switch(
+                  value: _deviceManager.showLiveTelemetryInNotification,
+                  activeThumbColor: AppTheme.primaryOrange,
+                  activeTrackColor: AppTheme.primaryOrange.withAlpha(80),
+                  inactiveThumbColor: Colors.white,
+                  inactiveTrackColor: AppTheme.darkBorder,
+                  onChanged: (val) {
+                    _deviceManager.toggleShowLiveTelemetryInNotification(val);
+                  },
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            _buildSettingCard(
+              title: 'Battery optimization exemption',
+              subtitle: _batteryExempt
+                  ? 'Unrestricted — Android Doze will not suspend background connections'
+                  : 'Tap to allow unrestricted background execution while devices are connected',
+              trailing: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: _batteryExempt
+                      ? Colors.green.withAlpha(35)
+                      : AppTheme.primaryOrange.withAlpha(35),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: _batteryExempt
+                        ? Colors.greenAccent
+                        : AppTheme.primaryOrange,
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      _batteryExempt
+                          ? Icons.battery_charging_full
+                          : Icons.battery_saver,
+                      size: 15,
+                      color: _batteryExempt
+                          ? Colors.greenAccent
+                          : AppTheme.primaryOrange,
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      _batteryExempt ? 'Exempt' : 'Allow',
+                      style: GoogleFonts.exo2(
+                        color: _batteryExempt
+                            ? Colors.greenAccent
+                            : AppTheme.primaryOrange,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              onTap: _batteryExempt ? null : _requestBatteryExemption,
             ),
 
             // Appearance Section

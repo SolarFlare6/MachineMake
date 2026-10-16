@@ -6,9 +6,11 @@ import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
+import '../core/connection/device_connection.dart';
 import '../theme/app_theme.dart';
 import 'device_manager.dart';
 import 'device_registry.dart';
+import 'keep_alive_service.dart';
 import 'notification_service.dart';
 
 /// Runs once at app startup and wires up the auto-enable BT/Wi-Fi settings.
@@ -23,6 +25,9 @@ class AppStartupService {
   static const String _keyAlertOnDisconnect    = 'setting_alert_disconnect';
   static const String _keyAutoEnableBT         = 'setting_auto_enable_bt';
   static const String _keyAutoEnableWifi       = 'setting_auto_enable_wifi';
+  static const String _keyKeepAliveBackground  = 'setting_keep_alive_background';
+  static const String _keyShowLockScreenActions = 'setting_show_lock_screen_actions';
+  static const String _keyShowNotifTelemetry   = 'setting_show_notif_telemetry';
   static const String _keyFirstSetupDone       = 'first_setup_done';
   static const String _keyClientId             = 'dcp_client_id';
 
@@ -52,8 +57,9 @@ class AppStartupService {
     await DeviceRegistry().load();
     dm.initFromStartup(clientId: clientId);
 
-    // ── Initialize Notifications & Theme ─────────────────────────────────
+    // ── Initialize Notifications, Keep-Alive Bridge & Theme ───────────────
     await NotificationService.instance.init();
+    KeepAliveService.instance.init();
     await AppTheme.init();
 
     // ── Restore setup state ───────────────────────────────────────────────
@@ -63,6 +69,12 @@ class AppStartupService {
     dm.alertOnDisconnect    = prefs.getBool(_keyAlertOnDisconnect) ?? true;
     dm.autoEnableBTOnStart  = prefs.getBool(_keyAutoEnableBT)      ?? true;
     dm.autoEnableWifiOnStart = prefs.getBool(_keyAutoEnableWifi)   ?? true;
+    dm.keepAliveInBackground = prefs.getBool(_keyKeepAliveBackground) ?? true;
+    dm.showQuickActionsOnLockScreen =
+        prefs.getBool(_keyShowLockScreenActions) ?? true;
+    dm.showLiveTelemetryInNotification =
+        prefs.getBool(_keyShowNotifTelemetry) ?? true;
+    DeviceConnection.keepAliveEnabled = dm.keepAliveInBackground;
 
     // ── Auto-enable Bluetooth ─────────────────────────────────────────────
     if (dm.autoEnableBTOnStart && Platform.isAndroid) {
@@ -120,11 +132,17 @@ class AppStartupService {
     required bool alertOnDisconnect,
     required bool autoEnableBT,
     required bool autoEnableWifi,
+    bool keepAliveInBackground = true,
+    bool showQuickActionsOnLockScreen = true,
+    bool showLiveTelemetryInNotification = true,
   }) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_keyAlertOnDisconnect, alertOnDisconnect);
     await prefs.setBool(_keyAutoEnableBT,      autoEnableBT);
     await prefs.setBool(_keyAutoEnableWifi,    autoEnableWifi);
+    await prefs.setBool(_keyKeepAliveBackground, keepAliveInBackground);
+    await prefs.setBool(_keyShowLockScreenActions, showQuickActionsOnLockScreen);
+    await prefs.setBool(_keyShowNotifTelemetry, showLiveTelemetryInNotification);
   }
 
   /// Sets whether the first-time setup has completed and persists it.

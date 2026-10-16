@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../core/models/device_notification_model.dart';
 import '../core/models/device_profile.dart';
 import '../services/device_manager.dart';
 import '../services/device_registry.dart';
@@ -509,6 +510,185 @@ class _DeviceManagerScreenState extends State<DeviceManagerScreen> {
     );
   }
 
+  void _showNotificationActionsDialog(
+    String deviceId,
+    String deviceName,
+    String profile,
+  ) {
+    final currentActions =
+        _deviceManager.getDeviceNotificationActions(deviceId, profile);
+    final selectedKeys = currentActions.map((a) => a.actionKey).toList();
+
+    // Available options per profile + common actions
+    final availableOptions = <DeviceNotificationAction>[
+      ...DeviceNotificationModel.defaultActionsForProfile(
+        DeviceProfile.fromString(profile),
+      ),
+      const DeviceNotificationAction(label: '📶 Ping', key: 'ping'),
+      const DeviceNotificationAction(
+        label: '💡 Toggle LED',
+        key: 'led_toggle',
+      ),
+      const DeviceNotificationAction(
+        label: '🌡 Read Temp',
+        key: 'read_temperature',
+      ),
+      const DeviceNotificationAction(
+        label: '⏯ Play/Pause',
+        key: 'media_play_pause',
+      ),
+      const DeviceNotificationAction(
+        label: '🔒 Lock PC',
+        key: 'lock_workstation',
+      ),
+      const DeviceNotificationAction(
+        label: '🛑 STOP',
+        key: 'emergency_stop',
+      ),
+      const DeviceNotificationAction(
+        label: '🧍 Stand/Sit',
+        key: 'stand_sit_toggle',
+      ),
+      const DeviceNotificationAction(
+        label: '⏏ Disconnect',
+        key: 'disconnect',
+      ),
+    ];
+
+    // Deduplicate by actionKey
+    final seen = <String>{};
+    final uniqueOptions = <DeviceNotificationAction>[];
+    for (final opt in availableOptions) {
+      if (seen.add(opt.actionKey)) {
+        uniqueOptions.add(opt);
+      }
+    }
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          backgroundColor: AppTheme.modalBackground,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: const BorderSide(color: AppTheme.darkBorder, width: 1.5),
+          ),
+          title: Row(
+            children: [
+              Icon(Icons.notifications_active,
+                  color: AppTheme.primaryOrange, size: 24),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Lock Screen Quick Actions',
+                      style: GoogleFonts.exo2(
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                    Text(
+                      '$deviceName (Pick up to 3)',
+                      style: GoogleFonts.exo2(
+                        fontSize: 12,
+                        color: AppTheme.primaryOrange,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          content: SizedBox(
+            width: 340,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: uniqueOptions.map((opt) {
+                  final isSelected = selectedKeys.contains(opt.actionKey);
+                  return CheckboxListTile(
+                    value: isSelected,
+                    dense: true,
+                    activeColor: AppTheme.primaryOrange,
+                    checkColor: Colors.black,
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(
+                      opt.label,
+                      style: GoogleFonts.exo2(
+                        color: Colors.white,
+                        fontWeight:
+                            isSelected ? FontWeight.bold : FontWeight.normal,
+                        fontSize: 14,
+                      ),
+                    ),
+                    subtitle: Text(
+                      opt.requiresUnlock
+                          ? '${opt.actionKey} · Requires unlock'
+                          : '${opt.actionKey} · Instant on lock screen',
+                      style: GoogleFonts.exo2(
+                        color: AppTheme.textMuted,
+                        fontSize: 11,
+                      ),
+                    ),
+                    onChanged: (checked) {
+                      setDialogState(() {
+                        if (checked == true) {
+                          if (selectedKeys.length < 3) {
+                            selectedKeys.add(opt.actionKey);
+                          }
+                        } else {
+                          selectedKeys.remove(opt.actionKey);
+                        }
+                      });
+                    },
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                await _deviceManager.setDeviceNotificationActions(
+                  deviceId,
+                  null,
+                );
+                if (ctx.mounted) Navigator.of(ctx).pop();
+              },
+              child: Text(
+                'Reset Default',
+                style: GoogleFonts.exo2(color: AppTheme.textMuted),
+              ),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryOrange,
+                foregroundColor: AppTheme.textDarkButton,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              onPressed: () async {
+                await _deviceManager.setDeviceNotificationActions(
+                  deviceId,
+                  selectedKeys.isEmpty ? null : selectedKeys,
+                );
+                if (ctx.mounted) Navigator.of(ctx).pop();
+              },
+              child: Text(
+                'Save',
+                style: GoogleFonts.exo2(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final knownDevices = _registry.devices;
@@ -826,62 +1006,119 @@ class _DeviceManagerScreenState extends State<DeviceManagerScreen> {
                   ],
                 ),
 
-                // Bottom Row: SSH Credentials button / pill (omitted for microcontrollers)
-                if (DeviceProfile.fromString(profile) != DeviceProfile.microcontroller) ...[
-                  const SizedBox(height: 8),
-                  InkWell(
-                    onTap: () => _showSshCredentialsDialog(id, name),
-                    borderRadius: BorderRadius.circular(8),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 9,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: hasSsh
-                            ? AppTheme.primaryOrange.withAlpha(20)
-                            : Colors.white.withAlpha(8),
+                // Bottom Row: SSH Credentials & Notification Quick Actions pills
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    if (DeviceProfile.fromString(profile) !=
+                        DeviceProfile.microcontroller)
+                      InkWell(
+                        onTap: () => _showSshCredentialsDialog(id, name),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: hasSsh
-                              ? AppTheme.primaryOrange.withAlpha(100)
-                              : AppTheme.darkBorder,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.vpn_key_outlined,
-                            size: 13,
-                            color: hasSsh
-                                ? AppTheme.primaryOrange
-                                : AppTheme.textMuted,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 9,
+                            vertical: 5,
                           ),
-                          const SizedBox(width: 6),
-                          Text(
-                            hasSsh ? 'SSH: $sshUser (Saved)' : 'Set SSH Credentials',
-                            style: GoogleFonts.exo2(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
+                          decoration: BoxDecoration(
+                            color: hasSsh
+                                ? AppTheme.primaryOrange.withAlpha(20)
+                                : Colors.white.withAlpha(8),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
                               color: hasSsh
-                                  ? AppTheme.primaryOrange
-                                  : AppTheme.textMuted,
+                                  ? AppTheme.primaryOrange.withAlpha(100)
+                                  : AppTheme.darkBorder,
                             ),
                           ),
-                          const SizedBox(width: 6),
-                          Icon(
-                            hasSsh ? Icons.edit : Icons.add_circle_outline,
-                            size: 12,
-                            color: hasSsh
-                                ? AppTheme.primaryOrange
-                                : AppTheme.textMuted,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.vpn_key_outlined,
+                                size: 13,
+                                color: hasSsh
+                                    ? AppTheme.primaryOrange
+                                    : AppTheme.textMuted,
+                              ),
+                              const SizedBox(width: 6),
+                              Flexible(
+                                child: Text(
+                                  hasSsh
+                                      ? 'SSH: $sshUser (Saved)'
+                                      : 'Set SSH Credentials',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: GoogleFonts.exo2(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: hasSsh
+                                        ? AppTheme.primaryOrange
+                                        : AppTheme.textMuted,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Icon(
+                                hasSsh ? Icons.edit : Icons.add_circle_outline,
+                                size: 12,
+                                color: hasSsh
+                                    ? AppTheme.primaryOrange
+                                    : AppTheme.textMuted,
+                              ),
+                            ],
                           ),
-                        ],
+                        ),
+                      ),
+                    InkWell(
+                      onTap: () =>
+                          _showNotificationActionsDialog(id, name, profile),
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 9,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withAlpha(8),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppTheme.darkBorder),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.notifications_active_outlined,
+                              size: 13,
+                              color: AppTheme.primaryOrange,
+                            ),
+                            const SizedBox(width: 6),
+                            Flexible(
+                              child: Text(
+                                'Quick Actions: ${_deviceManager.getDeviceNotificationActions(id, profile).map((a) => a.label).join(" · ")}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: GoogleFonts.exo2(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white70,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Icon(
+                              Icons.tune,
+                              size: 12,
+                              color: AppTheme.primaryOrange,
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ],
             ),
           );

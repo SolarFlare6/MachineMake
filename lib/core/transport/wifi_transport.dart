@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:web_socket_channel/io.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'device_transport.dart';
 import '../connection/connection_state_enum.dart';
@@ -48,7 +49,11 @@ class WifiTransport implements DeviceTransport {
 
     try {
       final uri = Uri.parse('ws://$host:$port/dcp');
-      _channel = WebSocketChannel.connect(uri, protocols: ['dcp']);
+      _channel = IOWebSocketChannel.connect(
+        uri,
+        protocols: const ['dcp'],
+        pingInterval: const Duration(seconds: 20),
+      );
 
       // Listen for incoming messages
       _channel!.stream.listen(

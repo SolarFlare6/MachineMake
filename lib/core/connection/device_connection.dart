@@ -24,15 +24,26 @@ class DeviceConnection extends ChangeNotifier {
   DeviceManifest? _manifest;
   String? _lastError;
   int _reconnectAttempts = 0;
-  static const int _maxReconnectAttempts = 4;
+  static const int _maxForegroundAttempts = 4;
   Timer? _reconnectTimer;
+  bool _userRequestedDisconnect = false;
+
+  /// Global flag indicating whether background keep-alive mode is enabled.
+  static bool keepAliveEnabled = true;
+
+  /// Global flag indicating whether the app is currently backgrounded or locked.
+  static bool isInBackground = false;
 
   // Event subscription from DcpSession → EventManager
   StreamSubscription<DeviceEvent>? _eventSub;
   StreamSubscription<DeviceConnectionState>? _transportStateSub;
   Timer? _heartbeatTimer;
   int _missedHeartbeats = 0;
-  static const int _maxMissedHeartbeats = 2;
+  int get _maxMissedHeartbeats => isInBackground ? 3 : 2;
+  Duration get _heartbeatInterval =>
+      isInBackground ? const Duration(seconds: 15) : const Duration(seconds: 5);
+  Duration get _pingTimeout =>
+      isInBackground ? const Duration(seconds: 6) : const Duration(seconds: 3);
 
   // Stored connection parameters for auto-reconnect
   String? _host;
@@ -49,7 +60,16 @@ class DeviceConnection extends ChangeNotifier {
   DcpSession? get session => _session;
   DeviceManifest? get manifest => _manifest;
   String? get lastError => _lastError;
+  int get reconnectAttempts => _reconnectAttempts;
   bool get isConnected => _state == DeviceConnectionState.connected;
+  bool get isReconnecting => _state == DeviceConnectionState.reconnecting;
+
+  /// Adjusts the heartbeat timer interval when foreground/background state changes.
+  void refreshHeartbeatSchedule() {
+    if (_state == DeviceConnectionState.connected && _session != null) {
+      _startHeartbeat();
+    }
+  }
 
   /// Connect using a Wi-Fi WebSocket transport.
   Future<void> connectWifi({
@@ -63,6 +83,7 @@ class DeviceConnection extends ChangeNotifier {
     _psk = psk;
     _clientId = clientId;
     _isMock = false;
+    _userRequestedDisconnect = false;
 
     final transport = WifiTransport(deviceId: deviceId, host: host, port: port);
     await _initSession(transport, psk, clientId);
@@ -78,6 +99,7 @@ class DeviceConnection extends ChangeNotifier {
     _psk = psk;
     _clientId = clientId;
     _isMock = false;
+    _userRequestedDisconnect = false;
 
     final device = BluetoothDevice.fromId(bleAddress);
     final transport = BluetoothTransport(deviceId: deviceId, device: device);
@@ -94,6 +116,7 @@ class DeviceConnection extends ChangeNotifier {
     _mockType = mockDeviceType;
     _clientId = clientId;
     _psk = psk;
+    _userRequestedDisconnect = false;
 
     final transport = MockTransport(
       deviceId: deviceId,
@@ -119,7 +142,11 @@ class DeviceConnection extends ChangeNotifier {
       psk: psk,
     );
 
-    _setState(DeviceConnectionState.pairing);
+    if (_reconnectAttempts > 0) {
+      _setState(DeviceConnectionState.reconnecting);
+    } else {
+      _setState(DeviceConnectionState.pairing);
+    }
 
     try {
       await _session!.connect();
@@ -172,13 +199,18 @@ class DeviceConnection extends ChangeNotifier {
       _startHeartbeat();
     } catch (e) {
       _lastError = e.toString();
-      _setState(DeviceConnectionState.error);
-      _scheduleReconnect();
+      if (!_userRequestedDisconnect &&
+          (keepAliveEnabled || _reconnectAttempts < _maxForegroundAttempts)) {
+        _setState(DeviceConnectionState.reconnecting);
+        _scheduleReconnect();
+      } else {
+        _setState(DeviceConnectionState.error);
+      }
     }
   }
 
   /// Actively tests connection to the remote device by sending a DCP ping.
-  Future<bool> checkConnection({Duration timeout = const Duration(seconds: 3)}) async {
+  Future<bool> checkConnection({Duration? timeout}) async {
     if (_state != DeviceConnectionState.connected || _session == null) {
       return false;
     }
@@ -186,8 +218,10 @@ class DeviceConnection extends ChangeNotifier {
       return _transport?.isConnected ?? false;
     }
 
+    final effectiveTimeout = timeout ?? _pingTimeout;
+
     try {
-      final isAlive = await _session!.ping(timeout: timeout);
+      final isAlive = await _session!.ping(timeout: effectiveTimeout);
       if (isAlive) {
         _missedHeartbeats = 0;
         return true;
@@ -210,8 +244,7 @@ class DeviceConnection extends ChangeNotifier {
   void _startHeartbeat() {
     _heartbeatTimer?.cancel();
     _missedHeartbeats = 0;
-    // Health-check interval every 5 seconds to actively detect dropped connections
-    _heartbeatTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
+    _heartbeatTimer = Timer.periodic(_heartbeatInterval, (_) async {
       if (_state != DeviceConnectionState.connected || _session == null) {
         _heartbeatTimer?.cancel();
         return;
@@ -223,28 +256,44 @@ class DeviceConnection extends ChangeNotifier {
         return;
       }
 
-      await checkConnection(timeout: const Duration(seconds: 3));
+      await checkConnection(timeout: _pingTimeout);
     });
   }
 
   void _handleConnectionLost(String reason) {
     if (_state == DeviceConnectionState.offline ||
-        _state == DeviceConnectionState.disconnecting) {
+        _state == DeviceConnectionState.disconnecting ||
+        _userRequestedDisconnect) {
       return;
     }
     _heartbeatTimer?.cancel();
     _lastError = reason;
-    _setState(DeviceConnectionState.offline);
-    _scheduleReconnect();
+
+    if (keepAliveEnabled || _reconnectAttempts < _maxForegroundAttempts) {
+      _setState(DeviceConnectionState.reconnecting);
+      _scheduleReconnect();
+    } else {
+      _setState(DeviceConnectionState.offline);
+    }
   }
 
   void _scheduleReconnect() {
-    if (_reconnectAttempts >= _maxReconnectAttempts || _clientId == null) return;
+    if (_userRequestedDisconnect || _clientId == null) return;
+    if (!keepAliveEnabled && _reconnectAttempts >= _maxForegroundAttempts) {
+      _setState(DeviceConnectionState.offline);
+      return;
+    }
+
     _reconnectAttempts++;
-    final delay = Duration(seconds: 1 << _reconnectAttempts);
+    // Exponential backoff: 2s, 4s, 8s, 16s, capped at 30s in keep-alive mode
+    final shift = _reconnectAttempts <= 4 ? _reconnectAttempts : 4;
+    final rawSeconds = 1 << shift; // 2, 4, 8, 16
+    final delaySeconds = _reconnectAttempts > 4 ? 30 : rawSeconds;
+    final delay = Duration(seconds: delaySeconds);
 
     _reconnectTimer?.cancel();
     _reconnectTimer = Timer(delay, () {
+      if (_userRequestedDisconnect) return;
       if (_state != DeviceConnectionState.connected) {
         if (_isMock) {
           connectMock(
@@ -271,13 +320,14 @@ class DeviceConnection extends ChangeNotifier {
   }
 
   Future<void> disconnect() async {
+    _userRequestedDisconnect = true;
     _reconnectTimer?.cancel();
     _heartbeatTimer?.cancel();
     _transportStateSub?.cancel();
     _transportStateSub = null;
     _eventSub?.cancel();
     _eventSub = null;
-    _reconnectAttempts = _maxReconnectAttempts; // prevent auto-reconnect
+    _reconnectAttempts = _maxForegroundAttempts;
     _setState(DeviceConnectionState.disconnecting);
     await _session?.disconnect();
     _transport?.dispose();
