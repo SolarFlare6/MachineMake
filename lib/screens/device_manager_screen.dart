@@ -1097,7 +1097,7 @@ class _DeviceManagerScreenState extends State<DeviceManagerScreen> {
                             const SizedBox(width: 6),
                             Flexible(
                               child: Text(
-                                'Quick Actions: ${_deviceManager.getDeviceNotificationActions(id, profile).map((a) => a.label).join(" · ")}',
+                                'Edit Actions',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: GoogleFonts.exo2(
