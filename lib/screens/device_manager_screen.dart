@@ -26,6 +26,9 @@ class _DeviceManagerScreenState extends State<DeviceManagerScreen> {
     super.initState();
     _deviceManager.addListener(_onStateChange);
     _registry.addListener(_onStateChange);
+    if (!_registry.isLoaded) {
+      _registry.load();
+    }
   }
 
   @override

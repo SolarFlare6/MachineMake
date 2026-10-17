@@ -337,6 +337,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
             deviceName: deviceName,
             pairingCode: pairingCode,
             clientId: AppStartupService.clientId,
+            profile: profile,
           );
 
           if (mounted) {

@@ -8,6 +8,7 @@ import '../core/dcp/dcp_message.dart';
 import '../core/models/device_event.dart';
 import '../core/models/device_notification_model.dart';
 import '../core/models/device_profile.dart';
+import '../core/models/known_device.dart';
 import '../core/models/task_model.dart';
 import '../models/dcp_models.dart';
 import 'app_startup_service.dart';
@@ -170,6 +171,42 @@ class DeviceManager extends ChangeNotifier {
   /// All paired devices (including currently disconnected ones).
   List<DeviceItem> get allPairedDevices => List.unmodifiable(_devices);
 
+  void _persistDeviceToRegistry(DeviceItem device, {String? psk}) {
+    final existing = registry.findById(device.id);
+    if (existing != null) {
+      registry.addOrUpdate(
+        existing.copyWith(
+          name: device.name,
+          type: device.profile,
+          psk: psk ?? existing.psk,
+          lastIp: (device.ipAddress != null && device.ipAddress!.isNotEmpty)
+              ? device.ipAddress
+              : existing.lastIp,
+          lastPort: device.port,
+          lastBleAddress:
+              (device.macAddress != null && device.macAddress!.isNotEmpty)
+                  ? device.macAddress
+                  : existing.lastBleAddress,
+          lastSeenAt: DateTime.now(),
+          isTrusted: true,
+        ),
+      );
+    } else {
+      registry.addOrUpdate(
+        KnownDevice(
+          deviceId: device.id,
+          name: device.name,
+          type: device.profile,
+          psk: psk,
+          lastIp: device.ipAddress,
+          lastPort: device.port,
+          lastBleAddress: device.macAddress,
+          isTrusted: true,
+        ),
+      );
+    }
+  }
+
   void addDevice(DeviceItem device) {
     final idx = _devices.indexWhere((d) => d.id == device.id);
     if (idx >= 0) {
@@ -177,6 +214,7 @@ class DeviceManager extends ChangeNotifier {
     } else {
       _devices.add(device);
     }
+    _persistDeviceToRegistry(device);
     if (device.isConnected) {
       _connectDevice(device.id);
     }
@@ -654,7 +692,9 @@ class DeviceManager extends ChangeNotifier {
       final wasOffline = !dev.isConnected;
       _reconnectTimeoutTimers.remove(deviceId)?.cancel();
       dev.isConnected = true;
+      dev.isPaired = true;
       _intentionalDisconnects.remove(deviceId);
+      _persistDeviceToRegistry(dev);
       syncKeepAliveNotifications();
       notifyListeners();
 
@@ -757,33 +797,26 @@ class DeviceManager extends ChangeNotifier {
             ? manifestName
             : currentDev.name;
 
-        if (currentDev.profile != profileKey || currentDev.name != updatedName) {
-          _devices[devIdx] = DeviceItem(
-            id: currentDev.id,
-            name: updatedName,
-            profile: profileKey,
-            deviceType: typeLabel,
-            availableTransports: currentDev.availableTransports,
-            selectedTransport: currentDev.selectedTransport,
-            isPaired: currentDev.isPaired,
-            isConnected: currentDev.isConnected,
-            ipAddress: currentDev.ipAddress,
-            port: currentDev.port,
-            macAddress: currentDev.macAddress,
-            iconKey: icon,
-          );
+        final updatedDevice = DeviceItem(
+          id: currentDev.id,
+          name: updatedName,
+          profile: profileKey,
+          deviceType: typeLabel,
+          availableTransports: currentDev.availableTransports,
+          selectedTransport: currentDev.selectedTransport,
+          isPaired: true,
+          isConnected: currentDev.isConnected,
+          ipAddress: currentDev.ipAddress,
+          port: currentDev.port,
+          macAddress: currentDev.macAddress,
+          iconKey: icon,
+        );
+        _devices[devIdx] = updatedDevice;
 
-          // Update persisted registry device type and name as well
-          final known = registry.findById(deviceId);
-          if (known != null) {
-            registry.addOrUpdate(known.copyWith(
-              name: updatedName,
-              type: profileKey,
-            ));
-          }
+        // Always persist/update the device in DeviceRegistry so it survives app restarts
+        _persistDeviceToRegistry(updatedDevice, psk: psk);
 
-          notifyListeners();
-        }
+        notifyListeners();
       }
     }
   }

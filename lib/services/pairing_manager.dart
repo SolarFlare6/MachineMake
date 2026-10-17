@@ -169,6 +169,7 @@ class PairingManager extends ChangeNotifier {
     required String deviceName,
     required String pairingCode,
     required String clientId,
+    String profile = 'quadruped',
     String clientName = 'MachineMake App',
   }) async {
     _step = PairingStep.waitingForDeviceConfirmation;
@@ -232,17 +233,28 @@ class PairingManager extends ChangeNotifier {
 
       final secret = result['secret'] as String;
 
-      final known = KnownDevice(
-        deviceId: deviceId,
-        name: deviceName,
-        type: 'quadruped',
-        psk: secret,
-        lastIp: host,
-        lastPort: port,
-        isTrusted: true,
-        pairedAt: DateTime.now(),
-        lastSeenAt: DateTime.now(),
-      );
+      final existing = DeviceRegistry().findById(deviceId);
+      final known = existing != null
+          ? existing.copyWith(
+              name: deviceName,
+              type: profile,
+              psk: secret,
+              lastIp: host,
+              lastPort: port,
+              isTrusted: true,
+              lastSeenAt: DateTime.now(),
+            )
+          : KnownDevice(
+              deviceId: deviceId,
+              name: deviceName,
+              type: profile,
+              psk: secret,
+              lastIp: host,
+              lastPort: port,
+              isTrusted: true,
+              pairedAt: DateTime.now(),
+              lastSeenAt: DateTime.now(),
+            );
       await DeviceRegistry().addOrUpdate(known);
 
       _step = PairingStep.handshakeComplete;
