@@ -9,6 +9,7 @@ import '../services/notification_service.dart';
 import '../services/permission_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/machine_make_logo.dart';
+import '../widgets/needle_model_settings_card.dart';
 import 'device_manager_screen.dart';
 import 'welcome_screen.dart';
 
@@ -29,12 +30,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void initState() {
     super.initState();
     _deviceManager.addListener(_onManagerChange);
+    AppTheme.accentColorNotifier.addListener(_onManagerChange);
     _checkNotificationPermission();
     _checkBatteryOptimization();
   }
 
   @override
   void dispose() {
+    AppTheme.accentColorNotifier.removeListener(_onManagerChange);
     _deviceManager.removeListener(_onManagerChange);
     super.dispose();
   }
@@ -234,13 +237,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.redAccent,
               foregroundColor: Colors.white,
+              minimumSize: const Size(0, 42),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
             child: Text(
               'Clear & Reset',
-              style: GoogleFonts.exo2(fontWeight: FontWeight.bold),
+              style: GoogleFonts.exo2(fontWeight: FontWeight.bold, fontSize: 13),
             ),
           ),
         ],
@@ -581,6 +586,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const SizedBox(height: 14),
 
             _buildAccentColorPickerCard(),
+
+            // Needle AI & Voice Model Section
+            const SizedBox(height: 28),
+            Text(
+              'Needle AI & Voice Model',
+              style: GoogleFonts.exo2(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 14),
+
+            // ignore: prefer_const_constructors
+            NeedleModelSettingsCard(),
 
             // Control Section
             const SizedBox(height: 28),

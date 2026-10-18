@@ -854,51 +854,58 @@ class DeviceManager extends ChangeNotifier {
     return response;
   }
 
-  /// Parses natural language voice text and executes through Needle AI (dual on-device/local engine).
+  /// Parses natural language voice text and executes through the Hybrid Needle AI pipeline
+  /// (Stage 0 Target Resolution -> Stage 1 Fast Rules -> Stage 2 Local LLM -> Stage 3 On-Device).
   Future<VoiceExecutionResult> executeVoiceCommand(
     String deviceId,
-    String voiceText,
-  ) async {
-    final dev = _devices.firstWhere(
-      (d) => d.id == deviceId,
-      orElse: () => DeviceItem(
-        id: deviceId,
-        name: 'Device',
-        profile: 'quadruped',
-        deviceType: 'Quadruped Robot',
-        availableTransports: ['wifi'],
-        selectedTransport: 'wifi',
-        isPaired: true,
-        isConnected: false,
-        iconKey: 'quadruped',
-      ),
-    );
+    String voiceText, {
+    bool allowDestructive = false,
+  }) async {
+    final preview = NeedleAiService.instance.previewHybridRouting(deviceId, voiceText);
+    final resolvedDev = preview.targetResolution.targetDevice;
+    final effectiveId = resolvedDev.id.isNotEmpty ? resolvedDev.id : deviceId;
 
-    final conn = _connections[deviceId];
+    final conn = _connections[effectiveId];
     if (conn == null || !conn.isConnected || conn.session == null) {
       return VoiceExecutionResult(
         success: false,
         userPrompt: voiceText,
-        message: '${dev.name} is not connected. Connect from the Devices tab first.',
+        resolvedDeviceId: effectiveId,
+        resolvedDeviceName: resolvedDev.name,
+        message:
+            '${resolvedDev.name} is not connected. Connect from the Devices tab first.',
       );
     }
 
     final needleResponse = await NeedleAiService.instance.processCommand(
-      deviceId: deviceId,
+      deviceId: effectiveId,
       prompt: voiceText,
+      allowDestructive: allowDestructive,
     );
 
-    final locPrefix = needleResponse.executedWhere == NeedleExecutionMode.device
-        ? '[On-Device AI]'
-        : '[Local App AI]';
+    final planSource = needleResponse.plan?.source;
+    final badgePrefix = planSource != null
+        ? '[${planSource.badgeLabel}]'
+        : (needleResponse.executedWhere == NeedleExecutionMode.device
+            ? '[On-Device AI]'
+            : '[Fast Rules]');
+
+    final requiresConfirm = needleResponse.error == 'CONFIRMATION_REQUIRED' ||
+        ((needleResponse.plan?.requiresConfirmation ?? false) && !allowDestructive);
 
     return VoiceExecutionResult(
       success: needleResponse.success,
       toolName: needleResponse.plan?.toolName,
       params: needleResponse.plan?.parameters,
       userPrompt: voiceText,
-      message: '$locPrefix ${needleResponse.message}',
+      message: '$badgePrefix ${needleResponse.message}',
       executedWhere: needleResponse.executedWhere,
+      plan: needleResponse.plan,
+      planSource: planSource,
+      resolvedDeviceId: needleResponse.plan?.targetDeviceId ?? effectiveId,
+      resolvedDeviceName: needleResponse.plan?.targetDeviceName ?? resolvedDev.name,
+      requiresConfirmation: requiresConfirm,
+      suggestions: needleResponse.suggestions,
     );
   }
 

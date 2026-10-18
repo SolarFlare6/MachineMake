@@ -9,6 +9,7 @@ import '../core/needle/needle_models.dart';
 import '../models/dcp_models.dart';
 import '../screens/discovery_screen.dart';
 import '../services/device_manager.dart';
+import '../services/llm_model_manager.dart';
 import '../services/needle_ai_service.dart';
 import '../theme/app_theme.dart';
 import 'voice_sphere.dart';
@@ -49,6 +50,7 @@ class _VoiceCmdDialogState extends State<VoiceCmdDialog> {
   void initState() {
     super.initState();
     _initCurrentDevice();
+    LlmModelManager.instance.preloadIfConfigured();
   }
 
   void _initCurrentDevice() {
@@ -216,11 +218,90 @@ class _VoiceCmdDialogState extends State<VoiceCmdDialog> {
       await _speechToText.stop();
     } catch (_) {}
 
-    final targetId = _currentDeviceId ?? (widget.devices.isNotEmpty ? widget.devices.first.id : '');
-    final deviceName = _selectedDevice?.name ?? 'Device';
+    final targetId =
+        _currentDeviceId ?? (widget.devices.isNotEmpty ? widget.devices.first.id : '');
+
+    // Check if preview plan requires confirmation for destructive commands (shutdown, reboot, sleep)
+    bool allowDestructive = false;
+    final preview = NeedleAiService.instance.previewHybridRouting(
+      targetId,
+      commandText.trim(),
+    );
+    final effectiveTargetName =
+        preview.targetResolution.targetDevice.name.isNotEmpty
+            ? preview.targetResolution.targetDevice.name
+            : (_selectedDevice?.name ?? 'Device');
+
+    if (preview.plan.requiresConfirmation && mounted) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: AppTheme.modalBackground,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: const BorderSide(color: Colors.redAccent, width: 1.4),
+          ),
+          title: Row(
+            children: [
+              const Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 24),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Confirm ${preview.plan.toolName.toUpperCase()}',
+                  style: GoogleFonts.exo2(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Text(
+            'Are you sure you want to execute "${preview.plan.explanation}" on $effectiveTargetName?',
+            style: GoogleFonts.exo2(
+              fontSize: 14,
+              color: AppTheme.textMuted,
+              height: 1.4,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text('Cancel', style: GoogleFonts.exo2(color: Colors.white70)),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.redAccent,
+                foregroundColor: Colors.white,
+                minimumSize: const Size(0, 42),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: Text(
+                'Confirm & Execute',
+                style: GoogleFonts.exo2(fontWeight: FontWeight.bold, fontSize: 13),
+              ),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed != true) {
+        _hasSubmitted = false;
+        return;
+      }
+      allowDestructive = true;
+    }
 
     // 1. Invoke callback for command dispatch
-    widget.onCommandExecuted(targetId, commandText.trim());
+    widget.onCommandExecuted(
+      preview.targetResolution.targetDevice.id,
+      commandText.trim(),
+    );
 
     if (!mounted) return;
 
@@ -229,13 +310,20 @@ class _VoiceCmdDialogState extends State<VoiceCmdDialog> {
     // Pop the dialog
     Navigator.of(context).pop();
 
-    // 2. Dispatch command to robot server via DeviceManager
-    final result = await DeviceManager().executeVoiceCommand(targetId, commandText.trim());
+    // 2. Dispatch command via DeviceManager (Hybrid Needle AI pipeline)
+    final result = await DeviceManager().executeVoiceCommand(
+      targetId,
+      commandText.trim(),
+      allowDestructive: allowDestructive,
+    );
 
     final isSuccess = result.success;
     final accentColor = isSuccess
         ? const Color(0xFF00E676)
-        : (result.toolName != null ? AppTheme.primaryOrange : const Color(0xFFFF5252));
+        : (result.toolName != null && result.toolName!.isNotEmpty
+            ? AppTheme.primaryOrange
+            : const Color(0xFFFF5252));
+    final displayDeviceName = result.resolvedDeviceName ?? effectiveTargetName;
 
     // 3. Show execution feedback Toast (floating SnackBar)
     messenger.showSnackBar(
@@ -261,7 +349,9 @@ class _VoiceCmdDialogState extends State<VoiceCmdDialog> {
               child: Icon(
                 isSuccess
                     ? Icons.check
-                    : (result.toolName != null ? Icons.warning_amber : Icons.help_outline),
+                    : (result.toolName != null && result.toolName!.isNotEmpty
+                        ? Icons.warning_amber
+                        : Icons.help_outline),
                 color: accentColor,
                 size: 20,
               ),
@@ -273,7 +363,7 @@ class _VoiceCmdDialogState extends State<VoiceCmdDialog> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Voice: "$commandText"  •  $deviceName',
+                    'Voice: "$commandText"  •  $displayDeviceName',
                     style: GoogleFonts.exo2(
                       color: AppTheme.textMuted,
                       fontSize: 11,
@@ -656,7 +746,8 @@ class _VoiceCmdDialogState extends State<VoiceCmdDialog> {
                     ),
                   )
                 : Text(
-                    _speechError ?? 'Say something like "walk forward", "stop", or "take snapshot"...',
+                    _speechError ??
+                        'Say e.g. "On the connected PC press enter", "walk forward", or "pin 4 on"...',
                     textAlign: TextAlign.center,
                     style: GoogleFonts.exo2(
                       color: _speechError != null ? Colors.redAccent : AppTheme.textMuted,
@@ -665,6 +756,11 @@ class _VoiceCmdDialogState extends State<VoiceCmdDialog> {
                   ),
           ),
         ),
+
+        if (_recognizedText.trim().isNotEmpty && _currentDeviceId != null) ...[
+          const SizedBox(height: 8),
+          _buildLivePlanPreview(_currentDeviceId!, _recognizedText.trim()),
+        ],
 
         // Manual text fallback if speech recognition error occurred
         if (_speechError != null) ...[
@@ -796,20 +892,71 @@ class _VoiceCmdDialogState extends State<VoiceCmdDialog> {
     );
   }
 
+  Widget _buildLivePlanPreview(String defaultDeviceId, String text) {
+    final routing = NeedleAiService.instance.previewHybridRouting(
+      defaultDeviceId,
+      text,
+    );
+    final plan = routing.plan;
+    final targetName = routing.targetResolution.targetDevice.name;
+    final useLlm = routing.preferLocalLlm;
+    final matchedRule =
+        !useLlm && plan.toolName.isNotEmpty && plan.confidence >= 0.85;
+
+    final badgeColor = useLlm
+        ? const Color(0xFFCE93D8)
+        : (matchedRule ? const Color(0xFF00E676) : AppTheme.textMuted);
+
+    final label = useLlm
+        ? 'Local LLM → $targetName (SmolLM2-360M will plan)'
+        : (matchedRule
+            ? 'Fast Rule → $targetName: ${plan.toolName}(${plan.parameters})'
+            : 'Target: $targetName');
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: badgeColor.withAlpha(25),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: badgeColor.withAlpha(100)),
+      ),
+      child: Text(
+        label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: GoogleFonts.exo2(
+          fontSize: 11,
+          color: badgeColor,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
   Widget _buildNeedleBadge(String? deviceId) {
     if (deviceId == null) return const SizedBox.shrink();
+    final llmReady = LlmModelManager.instance.isReadyForInference;
     final mode = NeedleAiService.instance.resolveExecutionMode(deviceId);
     final isDevice = mode == NeedleExecutionMode.device;
+
+    final title = llmReady
+        ? 'Needle Hybrid AI: Fast Rules + SmolLM2-360M'
+        : (isDevice
+            ? 'Needle Hybrid AI: Fast Rules + On-Device'
+            : 'Needle Hybrid AI: Fast Rules (0 MB)');
+    final subtitle = llmReady
+        ? 'Instant rules (<1ms) + offline LLM for complex phrasing'
+        : 'Instant rules active • Optional 271 MB offline LLM in Settings';
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: isDevice
+        color: llmReady
             ? const Color(0xFF673AB7).withAlpha(35)
             : const Color(0xFF00B0FF).withAlpha(30),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
-          color: isDevice
+          color: llmReady
               ? const Color(0xFF9C27B0).withAlpha(120)
               : const Color(0xFF00B0FF).withAlpha(110),
         ),
@@ -818,9 +965,9 @@ class _VoiceCmdDialogState extends State<VoiceCmdDialog> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
-            isDevice ? Icons.psychology : Icons.phone_android,
+            llmReady ? Icons.psychology : Icons.bolt,
             size: 15,
-            color: isDevice ? const Color(0xFFCE93D8) : const Color(0xFF80D8FF),
+            color: llmReady ? const Color(0xFFCE93D8) : const Color(0xFF80D8FF),
           ),
           const SizedBox(width: 8),
           Flexible(
@@ -829,17 +976,17 @@ class _VoiceCmdDialogState extends State<VoiceCmdDialog> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  isDevice ? 'Needle AI: On-Device Executor' : 'Needle AI: Local App Executor',
+                  title,
                   style: GoogleFonts.exo2(
-                    color: isDevice ? const Color(0xFFE1BEE7) : const Color(0xFFB3E5FC),
+                    color: llmReady
+                        ? const Color(0xFFE1BEE7)
+                        : const Color(0xFFB3E5FC),
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 Text(
-                  isDevice
-                      ? 'Target hardware runs AI decision engine'
-                      : 'Microcontroller detected; AI runs locally in-app',
+                  subtitle,
                   style: GoogleFonts.exo2(
                     color: AppTheme.textMuted,
                     fontSize: 9.5,

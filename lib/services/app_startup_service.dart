@@ -11,6 +11,7 @@ import '../theme/app_theme.dart';
 import 'device_manager.dart';
 import 'device_registry.dart';
 import 'keep_alive_service.dart';
+import 'llm_model_manager.dart';
 import 'notification_service.dart';
 
 /// Runs once at app startup and wires up the auto-enable BT/Wi-Fi settings.
@@ -57,9 +58,10 @@ class AppStartupService {
     await DeviceRegistry().load();
     dm.initFromStartup(clientId: clientId);
 
-    // ── Initialize Notifications, Keep-Alive Bridge & Theme ───────────────
+    // ── Initialize Notifications, Keep-Alive Bridge, Local LLM & Theme ────
     await NotificationService.instance.init();
     KeepAliveService.instance.init();
+    await LlmModelManager.instance.init();
     await AppTheme.init();
 
     // ── Restore setup state ───────────────────────────────────────────────

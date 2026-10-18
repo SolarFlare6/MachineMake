@@ -289,7 +289,7 @@ packages:
     source: hosted
     version: "6.3.3"
   http:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: http
       sha256: "87721a4a50b19c7f1d49001e51409bddc46303966ce89a65af4f4e6004896412"
@@ -368,6 +368,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "5.1.1"
+  llama_flutter_android:
+    dependency: "direct main"
+    description:
+      name: llama_flutter_android
+      sha256: "7f31b242a8a19ad2ee3a7cbf1ed4ac3bb17c19d4e360d19ae1ea24bdd86f5b05"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.2.6"
   matcher:
     dependency: transitive
     description:
@@ -433,7 +441,7 @@ packages:
     source: hosted
     version: "1.1.0"
   path_provider:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: path_provider
       sha256: "50c5dd5b6e1aaf6fb3a78b33f6aa3afca52bf903a8a5298f53101fdaee55bbcd"
