@@ -109,7 +109,9 @@ class LlmModelManager extends ChangeNotifier {
 
   bool get isReadyForInference =>
       _isEnabled &&
-      (_state == LlmModelState.installed || _state == LlmModelState.readyInRam);
+      (_state == LlmModelState.installed ||
+          _state == LlmModelState.loadingIntoRam ||
+          _state == LlmModelState.readyInRam);
 
   String get formattedDownloadedMb =>
       '${(_downloadedBytes / (1024 * 1024)).toStringAsFixed(1)} MB';
@@ -442,14 +444,32 @@ class LlmModelManager extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<bool>? _loadingFuture;
+
   /// Ensures the model is loaded into native `llama.cpp` RAM before inference.
-  Future<bool> ensureLoadedInRam() async {
-    if (!_isEnabled) return false;
+  /// If a load is already in progress (e.g. from [preloadIfConfigured]), awaits
+  /// the existing load operation instead of throwing 'Already loading'.
+  Future<bool> ensureLoadedInRam() {
+    if (!_isEnabled) return Future.value(false);
     if (_runtime.isLoaded) {
-      _state = LlmModelState.readyInRam;
-      return true;
+      if (_state != LlmModelState.readyInRam) {
+        _state = LlmModelState.readyInRam;
+        notifyListeners();
+      }
+      return Future.value(true);
     }
 
+    if (_loadingFuture != null) {
+      return _loadingFuture!;
+    }
+
+    _loadingFuture = _performLoadIntoRam().whenComplete(() {
+      _loadingFuture = null;
+    });
+    return _loadingFuture!;
+  }
+
+  Future<bool> _performLoadIntoRam() async {
     final file = await getModelFile();
     if (!await file.exists()) {
       await refreshDiskState();
@@ -471,7 +491,8 @@ class LlmModelManager extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      _state = prevState == LlmModelState.installed
+      _state = prevState == LlmModelState.installed ||
+              prevState == LlmModelState.loadingIntoRam
           ? LlmModelState.installed
           : LlmModelState.error;
       _errorMessage = 'Failed to load model into RAM: ${_formatError(e)}';

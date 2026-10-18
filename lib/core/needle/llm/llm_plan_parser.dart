@@ -35,29 +35,43 @@ class LlmPlanParser {
       final callsList = decoded['calls'];
       if (callsList is List && callsList.isNotEmpty) {
         final steps = <NeedlePlan>[];
+        final flattenedItems = <Map>[];
         for (final item in callsList) {
-          if (item is Map) {
-            final tool = (item['tool'] ?? item['name'] ?? '').toString().trim();
-            final rawParams = item['params'] ?? item['parameters'] ?? item['arguments'];
-            final params = rawParams is Map
-                ? Map<String, dynamic>.from(rawParams)
-                : <String, dynamic>{};
-            if (tool.isNotEmpty && tool != 'none') {
-              steps.add(
-                NeedlePlan(
-                  toolName: tool,
-                  parameters: params,
-                  explanation: 'Executing $tool on ${targetDeviceName ?? "device"}',
-                  confidence: 0.86,
-                  thoughts: [
-                    'Stage 2 (Local LLM SmolLM2-360M) selected tool "$tool" with params $params',
-                  ],
-                  source: NeedlePlanSource.localLlm,
-                  targetDeviceId: targetDeviceId,
-                  targetDeviceName: targetDeviceName,
-                ),
-              );
+          if (item is Map && item['calls'] is List) {
+            for (final inner in (item['calls'] as List)) {
+              if (inner is Map) flattenedItems.add(inner);
             }
+          } else if (item is List) {
+            for (final inner in item) {
+              if (inner is Map) flattenedItems.add(inner);
+            }
+          } else if (item is Map) {
+            flattenedItems.add(item);
+          }
+        }
+        for (final item in flattenedItems) {
+          final tool = (item['tool'] ?? item['name'] ?? '').toString().trim();
+          final rawParams =
+              item['params'] ?? item['parameters'] ?? item['arguments'];
+          final params = rawParams is Map
+              ? Map<String, dynamic>.from(rawParams)
+              : <String, dynamic>{};
+          if (tool.isNotEmpty && tool != 'none') {
+            steps.add(
+              NeedlePlan(
+                toolName: tool,
+                parameters: params,
+                explanation:
+                    'Executing $tool on ${targetDeviceName ?? "device"}',
+                confidence: 0.86,
+                thoughts: [
+                  'Stage 2 (Local LLM SmolLM2-360M) selected tool "$tool" with params $params',
+                ],
+                source: NeedlePlanSource.localLlm,
+                targetDeviceId: targetDeviceId,
+                targetDeviceName: targetDeviceName,
+              ),
+            );
           }
         }
 

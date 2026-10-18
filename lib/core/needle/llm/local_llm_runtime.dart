@@ -94,21 +94,11 @@ class LlamaFlutterRuntime implements LocalLlmRuntime {
       return;
     }
 
-    int gpuLayers = 0;
-    try {
-      final gpu = await _controller!.detectGpu();
-      if (gpu.vulkanSupported && gpu.recommendedGpuLayers > 0) {
-        gpuLayers = gpu.recommendedGpuLayers;
-      }
-    } catch (_) {
-      gpuLayers = 0;
-    }
-
     await _controller!.loadModel(
       modelPath: modelPath,
       threads: threads,
       contextSize: contextSize,
-      gpuLayers: gpuLayers,
+      gpuLayers: 0,
     );
 
     _isLoaded = true;
@@ -121,9 +111,9 @@ class LlamaFlutterRuntime implements LocalLlmRuntime {
     required String systemPrompt,
     required String userPrompt,
     String? gbnfGrammar,
-    int maxTokens = 96,
+    int maxTokens = 140,
     double temperature = 0.05,
-    Duration timeout = const Duration(milliseconds: 2800),
+    Duration timeout = const Duration(milliseconds: 9000),
   }) async {
     if (!_isLoaded || _controller == null) {
       throw StateError('Local LLM is not loaded in memory.');
@@ -133,6 +123,7 @@ class LlamaFlutterRuntime implements LocalLlmRuntime {
 
     if (_controller!.isGenerating) {
       await _controller!.stop();
+      await Future.delayed(const Duration(milliseconds: 120));
     }
 
     try {
@@ -143,9 +134,9 @@ class LlamaFlutterRuntime implements LocalLlmRuntime {
     final completer = Completer<String>();
     StreamSubscription<String>? sub;
 
-    // Seed assistant message with `{"calls":[` so SmolLM2-360M-Instruct
-    // immediately emits structured JSON without conversational preamble.
-    const assistantPrefix = '{"calls":[';
+    // Seed assistant message with `{"calls":[{"tool":"` so SmolLM2-360M-Instruct
+    // immediately emits the tool name and JSON parameters without preamble.
+    const assistantPrefix = '{"calls":[{"tool":"';
     final rawChatMlPrompt = '<|im_start|>system\n'
         '$systemPrompt<|im_end|>\n'
         '<|im_start|>user\n'
@@ -158,7 +149,9 @@ class LlamaFlutterRuntime implements LocalLlmRuntime {
         try {
           await _controller?.stop();
         } catch (_) {}
-        completer.complete('$assistantPrefix${buffer.toString()}');
+        completer.complete(
+          _combinePrefixAndBuffer(assistantPrefix, buffer.toString()),
+        );
       }
     });
 
@@ -175,7 +168,8 @@ class LlamaFlutterRuntime implements LocalLlmRuntime {
       sub = stream.listen(
         (token) {
           buffer.write(token);
-          final current = '$assistantPrefix${buffer.toString()}';
+          final current =
+              _combinePrefixAndBuffer(assistantPrefix, buffer.toString());
           // Early stop as soon as the root JSON object closes `]}`
           if (_isCompleteJsonCalls(current) && !completer.isCompleted) {
             completer.complete(current);
@@ -184,7 +178,9 @@ class LlamaFlutterRuntime implements LocalLlmRuntime {
         },
         onDone: () {
           if (!completer.isCompleted) {
-            completer.complete('$assistantPrefix${buffer.toString()}');
+            completer.complete(
+              _combinePrefixAndBuffer(assistantPrefix, buffer.toString()),
+            );
           }
         },
         onError: (Object err) {
@@ -201,6 +197,23 @@ class LlamaFlutterRuntime implements LocalLlmRuntime {
       await sub?.cancel();
       _resetIdleTimer();
     }
+  }
+
+  String _combinePrefixAndBuffer(String assistantPrefix, String rawBuffer) {
+    final trimmed = rawBuffer.trimLeft();
+    if (trimmed.startsWith('{"calls"')) {
+      return trimmed;
+    }
+    if (trimmed.startsWith('[{"tool"')) {
+      return '{"calls":$trimmed';
+    }
+    if (trimmed.startsWith('{"tool"')) {
+      return '{"calls":[$trimmed';
+    }
+    if (trimmed.startsWith('"') && assistantPrefix.endsWith('"')) {
+      return '$assistantPrefix${trimmed.substring(1)}';
+    }
+    return '$assistantPrefix$rawBuffer';
   }
 
   bool _isCompleteJsonCalls(String text) {

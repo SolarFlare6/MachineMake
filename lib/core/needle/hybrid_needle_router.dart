@@ -215,7 +215,7 @@ class HybridNeedleRouter {
             prompt: llmInputPrompt,
             availableTools: effectiveTools,
             deviceProfile: profileStr,
-            maxTools: 10,
+            maxTools: 6,
           );
           final systemPrompt = ToolPromptBuilder.buildSystemPrompt(
             deviceName: targetDevice.name,
@@ -228,7 +228,7 @@ class HybridNeedleRouter {
             systemPrompt: systemPrompt,
             userPrompt: llmInputPrompt,
             gbnfGrammar: grammar,
-            maxTokens: 96,
+            maxTokens: 140,
             temperature: 0.05,
           );
 

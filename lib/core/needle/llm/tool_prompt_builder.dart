@@ -18,16 +18,16 @@ class ToolPromptBuilder {
 
     final buf = StringBuffer();
     buf.writeln(
-      'You are Needle, a hardware tool-calling planner for "$deviceName" ($deviceProfile).',
+      'You are Needle, a hardware tool planner for "$deviceName" ($deviceProfile).',
     );
     buf.writeln(
-      'Respond ONLY with a single JSON object matching: {"calls":[{"tool":"<name>","params":{...}}]}',
+      'Output ONLY JSON: {"calls":[{"tool":"<name>","params":{...}}]}',
     );
-    buf.writeln('Available tools:');
+    buf.writeln('Tools:');
 
     for (final t in tools) {
       if (t.parameters.isEmpty) {
-        buf.writeln('- ${t.name}(): ${t.description}');
+        buf.writeln('- ${t.name}()');
       } else {
         final paramsDesc = t.parameters.map((p) {
           if (p.enumValues != null && p.enumValues!.isNotEmpty) {
@@ -35,41 +35,38 @@ class ToolPromptBuilder {
           }
           return '${p.name}:${p.type}';
         }).join(', ');
-        buf.writeln('- ${t.name}($paramsDesc): ${t.description}');
+        buf.writeln('- ${t.name}($paramsDesc)');
       }
     }
 
-    buf.writeln('\nExamples:');
+    buf.writeln('Examples:');
     final p = deviceProfile.toLowerCase();
-    if (p.contains('pc') || p.contains('desktop') || p.contains('laptop')) {
+    if (p.contains('pc') || p.contains('desktop') || p.contains('laptop') || p.contains('computer')) {
       buf.writeln(
-        'User: "press enter" -> {"calls":[{"tool":"keyboard_press","params":{"key":"enter"}}]}',
+        'User: press the windows key then type hello and press enter\n'
+        'Assistant: {"calls":[{"tool":"keyboard_press","params":{"key":"win"}},{"tool":"keyboard_type","params":{"text":"hello"}},{"tool":"keyboard_press","params":{"key":"enter"}}]}',
       );
       buf.writeln(
-        'User: "type hello and hit enter" -> {"calls":[{"tool":"keyboard_type","params":{"text":"hello"}},{"tool":"keyboard_press","params":{"key":"enter"}}]}',
-      );
-      buf.writeln(
-        'User: "it is too loud" -> {"calls":[{"tool":"media_control","params":{"action":"vol_down"}}]}',
+        'User: it is too loud\n'
+        'Assistant: {"calls":[{"tool":"media_control","params":{"action":"vol_down"}}]}',
       );
     } else if (p.contains('pico') || p.contains('mcu')) {
       buf.writeln(
-        'User: "turn on pin 4" -> {"calls":[{"tool":"gpio_write","params":{"pin":4,"state":true}}]}',
+        'User: turn on pin 4 and set pwm 0 to 75 percent\n'
+        'Assistant: {"calls":[{"tool":"gpio_write","params":{"pin":4,"state":true}},{"tool":"pwm_set","params":{"channel":0,"value":0.75}}]}',
       );
       buf.writeln(
-        'User: "set pwm 0 to 75 percent" -> {"calls":[{"tool":"pwm_set","params":{"channel":0,"value":0.75}}]}',
-      );
-      buf.writeln(
-        'User: "turn off the light" -> {"calls":[{"tool":"set_led","params":{"on":false}}]}',
+        'User: turn off the light\n'
+        'Assistant: {"calls":[{"tool":"set_led","params":{"on":false}}]}',
       );
     } else {
       buf.writeln(
-        'User: "walk forward 2 meters and take a photo" -> {"calls":[{"tool":"walk","params":{"direction":"forward","distance":2.0}},{"tool":"camera_snapshot","params":{}}]}',
+        'User: walk forward 2 meters and take a photo\n'
+        'Assistant: {"calls":[{"tool":"walk","params":{"direction":"forward","distance":2.0}},{"tool":"camera_snapshot","params":{}}]}',
       );
       buf.writeln(
-        'User: "take a break" -> {"calls":[{"tool":"sit","params":{}}]}',
-      );
-      buf.writeln(
-        'User: "press enter" -> {"calls":[{"tool":"keyboard_press","params":{"key":"enter"}}]}',
+        'User: take a break\n'
+        'Assistant: {"calls":[{"tool":"sit","params":{}}]}',
       );
     }
 
