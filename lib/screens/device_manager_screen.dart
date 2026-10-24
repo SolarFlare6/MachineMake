@@ -518,176 +518,240 @@ class _DeviceManagerScreenState extends State<DeviceManagerScreen> {
     String deviceName,
     String profile,
   ) {
+    final devProfile = DeviceProfile.fromString(profile);
     final currentActions =
         _deviceManager.getDeviceNotificationActions(deviceId, profile);
     final selectedKeys = currentActions.map((a) => a.actionKey).toList();
 
-    // Available options per profile + common actions
-    final availableOptions = <DeviceNotificationAction>[
-      ...DeviceNotificationModel.defaultActionsForProfile(
-        DeviceProfile.fromString(profile),
-      ),
-      const DeviceNotificationAction(label: '📶 Ping', key: 'ping'),
-      const DeviceNotificationAction(
-        label: '💡 Toggle LED',
-        key: 'led_toggle',
-      ),
-      const DeviceNotificationAction(
-        label: '🌡 Read Temp',
-        key: 'read_temperature',
-      ),
-      const DeviceNotificationAction(
-        label: '⏯ Play/Pause',
-        key: 'media_play_pause',
-      ),
-      const DeviceNotificationAction(
-        label: '🔒 Lock PC',
-        key: 'lock_workstation',
-      ),
-      const DeviceNotificationAction(
-        label: '🛑 STOP',
-        key: 'emergency_stop',
-      ),
-      const DeviceNotificationAction(
-        label: '🧍 Stand/Sit',
-        key: 'stand_sit_toggle',
-      ),
-      const DeviceNotificationAction(
-        label: '⏏ Disconnect',
-        key: 'disconnect',
-      ),
-    ];
-
-    // Deduplicate by actionKey
-    final seen = <String>{};
-    final uniqueOptions = <DeviceNotificationAction>[];
-    for (final opt in availableOptions) {
-      if (seen.add(opt.actionKey)) {
-        uniqueOptions.add(opt);
+    // Detect initial GPIO pin if a custom gpio_*:<pin> action is already configured
+    int selectedGpioPin = 0;
+    for (final key in selectedKeys) {
+      if (key.startsWith('gpio_')) {
+        final parts = key.split(':');
+        if (parts.length > 1) {
+          final parsed = int.tryParse(parts[1]);
+          if (parsed != null && parsed >= 0 && parsed <= 28) {
+            selectedGpioPin = parsed;
+            break;
+          }
+        }
       }
     }
 
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          backgroundColor: AppTheme.modalBackground,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-            side: const BorderSide(color: AppTheme.darkBorder, width: 1.5),
-          ),
-          title: Row(
-            children: [
-              Icon(Icons.notifications_active,
-                  color: AppTheme.primaryOrange, size: 24),
-              const SizedBox(width: 10),
-              Expanded(
+        builder: (ctx, setDialogState) {
+          final profileOptions =
+              DeviceNotificationModel.availableActionsForProfile(
+            devProfile,
+            gpioPin: selectedGpioPin,
+          );
+
+          // Also include any already-selected custom keys (e.g. a second GPIO pin)
+          final seen = <String>{};
+          final uniqueOptions = <DeviceNotificationAction>[];
+          for (final opt in profileOptions) {
+            if (seen.add(opt.actionKey)) {
+              uniqueOptions.add(opt);
+            }
+          }
+          for (final key in selectedKeys) {
+            if (seen.add(key)) {
+              uniqueOptions.add(DeviceNotificationModel.actionFromKey(key));
+            }
+          }
+
+          return AlertDialog(
+            backgroundColor: AppTheme.modalBackground,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+              side: const BorderSide(color: AppTheme.darkBorder, width: 1.5),
+            ),
+            title: Row(
+              children: [
+                Icon(Icons.notifications_active,
+                    color: AppTheme.primaryOrange, size: 24),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Lock Screen Quick Actions',
+                        style: GoogleFonts.exo2(
+                          fontSize: 17,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                      Text(
+                        '$deviceName · ${devProfile.label} (Pick up to 3)',
+                        style: GoogleFonts.exo2(
+                          fontSize: 12,
+                          color: AppTheme.primaryOrange,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            content: SizedBox(
+              width: 340,
+              child: SingleChildScrollView(
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      'Lock Screen Quick Actions',
-                      style: GoogleFonts.exo2(
-                        fontSize: 17,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                    if (devProfile == DeviceProfile.microcontroller) ...[
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withAlpha(10),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppTheme.darkBorder),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Target GPIO Pin:',
+                              style: GoogleFonts.exo2(
+                                color: Colors.white,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            DropdownButtonHideUnderline(
+                              child: DropdownButton<int>(
+                                value: selectedGpioPin,
+                                dropdownColor: AppTheme.modalBackground,
+                                iconEnabledColor: AppTheme.primaryOrange,
+                                style: GoogleFonts.exo2(
+                                  color: AppTheme.primaryOrange,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                ),
+                                items: List.generate(
+                                  29,
+                                  (pin) => DropdownMenuItem<int>(
+                                    value: pin,
+                                    child: Text('GP$pin (Pin $pin)'),
+                                  ),
+                                ),
+                                onChanged: (newPin) {
+                                  if (newPin == null) return;
+                                  setDialogState(() {
+                                    // Update any currently selected gpio action on the previous pin to the new pin
+                                    for (int i = 0;
+                                        i < selectedKeys.length;
+                                        i++) {
+                                      if (selectedKeys[i] ==
+                                          'gpio_toggle:$selectedGpioPin') {
+                                        selectedKeys[i] =
+                                            'gpio_toggle:$newPin';
+                                      } else if (selectedKeys[i] ==
+                                          'gpio_high:$selectedGpioPin') {
+                                        selectedKeys[i] = 'gpio_high:$newPin';
+                                      } else if (selectedKeys[i] ==
+                                          'gpio_low:$selectedGpioPin') {
+                                        selectedKeys[i] = 'gpio_low:$newPin';
+                                      }
+                                    }
+                                    selectedGpioPin = newPin;
+                                  });
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    Text(
-                      '$deviceName (Pick up to 3)',
-                      style: GoogleFonts.exo2(
-                        fontSize: 12,
-                        color: AppTheme.primaryOrange,
-                      ),
-                    ),
+                    ],
+                    ...uniqueOptions.map((opt) {
+                      final isSelected = selectedKeys.contains(opt.actionKey);
+                      return CheckboxListTile(
+                        value: isSelected,
+                        dense: true,
+                        activeColor: AppTheme.primaryOrange,
+                        checkColor: Colors.black,
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(
+                          opt.label,
+                          style: GoogleFonts.exo2(
+                            color: Colors.white,
+                            fontWeight: isSelected
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                            fontSize: 14,
+                          ),
+                        ),
+                        subtitle: Text(
+                          opt.requiresUnlock
+                              ? '${opt.actionKey} · Requires unlock'
+                              : '${opt.actionKey} · Instant on lock screen',
+                          style: GoogleFonts.exo2(
+                            color: AppTheme.textMuted,
+                            fontSize: 11,
+                          ),
+                        ),
+                        onChanged: (checked) {
+                          setDialogState(() {
+                            if (checked == true) {
+                              if (selectedKeys.length < 3) {
+                                selectedKeys.add(opt.actionKey);
+                              }
+                            } else {
+                              selectedKeys.remove(opt.actionKey);
+                            }
+                          });
+                        },
+                      );
+                    }),
                   ],
                 ),
               ),
-            ],
-          ),
-          content: SizedBox(
-            width: 340,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: uniqueOptions.map((opt) {
-                  final isSelected = selectedKeys.contains(opt.actionKey);
-                  return CheckboxListTile(
-                    value: isSelected,
-                    dense: true,
-                    activeColor: AppTheme.primaryOrange,
-                    checkColor: Colors.black,
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(
-                      opt.label,
-                      style: GoogleFonts.exo2(
-                        color: Colors.white,
-                        fontWeight:
-                            isSelected ? FontWeight.bold : FontWeight.normal,
-                        fontSize: 14,
-                      ),
-                    ),
-                    subtitle: Text(
-                      opt.requiresUnlock
-                          ? '${opt.actionKey} · Requires unlock'
-                          : '${opt.actionKey} · Instant on lock screen',
-                      style: GoogleFonts.exo2(
-                        color: AppTheme.textMuted,
-                        fontSize: 11,
-                      ),
-                    ),
-                    onChanged: (checked) {
-                      setDialogState(() {
-                        if (checked == true) {
-                          if (selectedKeys.length < 3) {
-                            selectedKeys.add(opt.actionKey);
-                          }
-                        } else {
-                          selectedKeys.remove(opt.actionKey);
-                        }
-                      });
-                    },
+            ),
+            actions: [
+              TextButton(
+                onPressed: () async {
+                  await _deviceManager.setDeviceNotificationActions(
+                    deviceId,
+                    null,
                   );
-                }).toList(),
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () async {
-                await _deviceManager.setDeviceNotificationActions(
-                  deviceId,
-                  null,
-                );
-                if (ctx.mounted) Navigator.of(ctx).pop();
-              },
-              child: Text(
-                'Reset Default',
-                style: GoogleFonts.exo2(color: AppTheme.textMuted),
-              ),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primaryOrange,
-                foregroundColor: AppTheme.textDarkButton,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  if (ctx.mounted) Navigator.of(ctx).pop();
+                },
+                child: Text(
+                  'Reset Default',
+                  style: GoogleFonts.exo2(color: AppTheme.textMuted),
                 ),
               ),
-              onPressed: () async {
-                await _deviceManager.setDeviceNotificationActions(
-                  deviceId,
-                  selectedKeys.isEmpty ? null : selectedKeys,
-                );
-                if (ctx.mounted) Navigator.of(ctx).pop();
-              },
-              child: Text(
-                'Save',
-                style: GoogleFonts.exo2(fontWeight: FontWeight.bold),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primaryOrange,
+                  foregroundColor: AppTheme.textDarkButton,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onPressed: () async {
+                  await _deviceManager.setDeviceNotificationActions(
+                    deviceId,
+                    selectedKeys.isEmpty ? null : selectedKeys,
+                  );
+                  if (ctx.mounted) Navigator.of(ctx).pop();
+                },
+                child: Text(
+                  'Save',
+                  style: GoogleFonts.exo2(fontWeight: FontWeight.bold),
+                ),
               ),
-            ),
-          ],
-        ),
+            ],
+          );
+        },
       ),
     );
   }

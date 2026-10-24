@@ -9,6 +9,7 @@ class QuickActionDispatcher {
 
   static final Map<String, bool> _picoLedState = {};
   static final Map<String, bool> _robotStandingState = {};
+  static final Map<String, bool> _gpioPinState = {};
 
   static Future<void> dispatch(String deviceId, String action) async {
     final dm = DeviceManager();
@@ -31,6 +32,38 @@ class QuickActionDispatcher {
     }
 
     try {
+      // Dynamic GPIO pin actions (gpio_toggle:<pin>, gpio_high:<pin>, gpio_low:<pin>)
+      if (action.startsWith('gpio_toggle:') ||
+          action.startsWith('gpio_high:') ||
+          action.startsWith('gpio_low:')) {
+        final parts = action.split(':');
+        final mode = parts.first;
+        final pin = int.tryParse(parts.length > 1 ? parts[1] : '0') ?? 0;
+        final pinKey = '$deviceId:$pin';
+
+        final bool targetHigh;
+        if (mode == 'gpio_high') {
+          targetHigh = true;
+        } else if (mode == 'gpio_low') {
+          targetHigh = false;
+        } else {
+          targetHigh = !(_gpioPinState[pinKey] ?? false);
+        }
+
+        _gpioPinState[pinKey] = targetHigh;
+        await dm.executeTool(deviceId, 'gpio_write', {
+          'pin': pin,
+          'state': targetHigh,
+          'value': targetHigh ? 1 : 0,
+        });
+        dm.setNotificationFeedback(
+          deviceId,
+          'Pin GP$pin: ${targetHigh ? "HIGH (1)" : "LOW (0)"}',
+        );
+        await dm.syncKeepAliveNotifications();
+        return;
+      }
+
       switch (action) {
         case 'emergency_stop':
           try {
@@ -40,6 +73,34 @@ class QuickActionDispatcher {
             await dm.executeTool(deviceId, 'emergency_stop', {});
           } catch (_) {}
           dm.setNotificationFeedback(deviceId, 'EMERGENCY STOP ACTIVE');
+          break;
+
+        case 'sit':
+          _robotStandingState[deviceId] = false;
+          try {
+            await dm.executeTool(deviceId, 'sit', {});
+          } catch (_) {
+            await dm.executeTool(
+              deviceId,
+              'walk',
+              {'direction': 'stop', 'posture': 'sit'},
+            );
+          }
+          dm.setNotificationFeedback(deviceId, 'Posture: Sitting');
+          break;
+
+        case 'stand':
+          _robotStandingState[deviceId] = true;
+          try {
+            await dm.executeTool(deviceId, 'stand', {});
+          } catch (_) {
+            await dm.executeTool(
+              deviceId,
+              'walk',
+              {'direction': 'stop', 'posture': 'stand'},
+            );
+          }
+          dm.setNotificationFeedback(deviceId, 'Posture: Standing');
           break;
 
         case 'stand_sit_toggle':
@@ -56,6 +117,15 @@ class QuickActionDispatcher {
             deviceId,
             nextStanding ? 'Posture: Standing' : 'Posture: Sitting',
           );
+          break;
+
+        case 'camera_snapshot':
+          try {
+            await dm.executeTool(deviceId, 'camera_snapshot', {});
+          } catch (_) {
+            await dm.executeTool(deviceId, 'take_picture', {});
+          }
+          dm.setNotificationFeedback(deviceId, 'Snapshot captured');
           break;
 
         case 'led_toggle':
@@ -116,6 +186,51 @@ class QuickActionDispatcher {
           dm.setNotificationFeedback(deviceId, 'Media: Play/Pause toggled');
           break;
 
+        case 'volume_mute':
+          try {
+            await dm.executeTool(deviceId, 'media_control', {'action': 'mute'});
+          } catch (_) {
+            await dm.executeTool(deviceId, 'volume_mute', {});
+          }
+          dm.setNotificationFeedback(deviceId, 'Audio: Mute toggled');
+          break;
+
+        case 'volume_up':
+          try {
+            await dm.executeTool(deviceId, 'media_control', {'action': 'volume_up'});
+          } catch (_) {
+            await dm.executeTool(deviceId, 'volume_up', {});
+          }
+          dm.setNotificationFeedback(deviceId, 'Volume Up');
+          break;
+
+        case 'volume_down':
+          try {
+            await dm.executeTool(deviceId, 'media_control', {'action': 'volume_down'});
+          } catch (_) {
+            await dm.executeTool(deviceId, 'volume_down', {});
+          }
+          dm.setNotificationFeedback(deviceId, 'Volume Down');
+          break;
+
+        case 'press_enter':
+          try {
+            await dm.executeTool(deviceId, 'keyboard_press', {'key': 'enter'});
+          } catch (_) {
+            await dm.executeTool(deviceId, 'press_key', {'key': 'enter'});
+          }
+          dm.setNotificationFeedback(deviceId, 'Pressed: Enter ⏎');
+          break;
+
+        case 'space_key':
+          try {
+            await dm.executeTool(deviceId, 'keyboard_press', {'key': 'space'});
+          } catch (_) {
+            await dm.executeTool(deviceId, 'press_key', {'key': 'space'});
+          }
+          dm.setNotificationFeedback(deviceId, 'Pressed: Space ␣');
+          break;
+
         case 'lock_workstation':
           try {
             await dm.executeTool(deviceId, 'lock_device', {'os': 'windows'});
@@ -123,6 +238,33 @@ class QuickActionDispatcher {
             await dm.executeTool(deviceId, 'lock_workstation', {});
           }
           dm.setNotificationFeedback(deviceId, 'Workstation Locked');
+          break;
+
+        case 'system_sleep':
+          try {
+            await dm.executeTool(deviceId, 'sleep_device', {});
+          } catch (_) {
+            await dm.executeTool(deviceId, 'system_sleep', {});
+          }
+          dm.setNotificationFeedback(deviceId, 'Sleep requested');
+          break;
+
+        case 'system_reboot':
+          try {
+            await dm.executeTool(deviceId, 'reboot_device', {});
+          } catch (_) {
+            await dm.executeTool(deviceId, 'system_reboot', {});
+          }
+          dm.setNotificationFeedback(deviceId, 'Rebooting...');
+          break;
+
+        case 'system_shutdown':
+          try {
+            await dm.executeTool(deviceId, 'shutdown_device', {});
+          } catch (_) {
+            await dm.executeTool(deviceId, 'system_shutdown', {});
+          }
+          dm.setNotificationFeedback(deviceId, 'Shutting down...');
           break;
 
         case 'ping':

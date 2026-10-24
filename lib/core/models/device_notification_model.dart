@@ -63,18 +63,18 @@ class DeviceNotificationModel {
       case DeviceProfile.computer:
         return const [
           DeviceNotificationAction(
-            key: 'media_play_pause',
-            label: '⏯ Play/Pause',
-            requiresUnlock: false,
-          ),
-          DeviceNotificationAction(
             key: 'lock_workstation',
             label: '🔒 Lock PC',
             requiresUnlock: false,
           ),
           DeviceNotificationAction(
-            key: 'disconnect',
-            label: '⏏ Disconnect',
+            key: 'media_play_pause',
+            label: '⏯ Play/Pause',
+            requiresUnlock: false,
+          ),
+          DeviceNotificationAction(
+            key: 'press_enter',
+            label: '⏎ Press Enter',
             requiresUnlock: false,
           ),
         ];
@@ -91,6 +91,105 @@ class DeviceNotificationModel {
             requiresUnlock: false,
           ),
           DeviceNotificationAction(
+            key: 'gpio_toggle:0',
+            label: '⚡ GP0 High/Low',
+            requiresUnlock: false,
+          ),
+        ];
+      case DeviceProfile.quadruped:
+      case DeviceProfile.robot:
+        return const [
+          DeviceNotificationAction(
+            key: 'sit',
+            label: '🪑 Sit',
+            requiresUnlock: false,
+          ),
+          DeviceNotificationAction(
+            key: 'stand',
+            label: '🧍 Stand',
+            requiresUnlock: false,
+          ),
+          DeviceNotificationAction(
+            key: 'emergency_stop',
+            label: '🛑 E-Stop',
+            requiresUnlock: false, // Safety critical: never require unlock
+          ),
+        ];
+      case DeviceProfile.generic:
+        return const [
+          DeviceNotificationAction(
+            key: 'ping',
+            label: '📶 Ping',
+            requiresUnlock: false,
+          ),
+          DeviceNotificationAction(
+            key: 'disconnect',
+            label: '⏏ Disconnect',
+            requiresUnlock: false,
+          ),
+        ];
+    }
+  }
+
+  /// Returns all selectable quick actions unique to a given [DeviceProfile].
+  static List<DeviceNotificationAction> availableActionsForProfile(
+    DeviceProfile profile, {
+    int gpioPin = 0,
+  }) {
+    switch (profile) {
+      case DeviceProfile.computer:
+        return const [
+          DeviceNotificationAction(
+            key: 'lock_workstation',
+            label: '🔒 Lock PC',
+            requiresUnlock: false,
+          ),
+          DeviceNotificationAction(
+            key: 'media_play_pause',
+            label: '⏯ Play/Pause',
+            requiresUnlock: false,
+          ),
+          DeviceNotificationAction(
+            key: 'press_enter',
+            label: '⏎ Press Enter',
+            requiresUnlock: false,
+          ),
+          DeviceNotificationAction(
+            key: 'space_key',
+            label: '␣ Press Space',
+            requiresUnlock: false,
+          ),
+          DeviceNotificationAction(
+            key: 'volume_mute',
+            label: '🔇 Mute/Unmute',
+            requiresUnlock: false,
+          ),
+          DeviceNotificationAction(
+            key: 'volume_up',
+            label: '🔊 Volume Up',
+            requiresUnlock: false,
+          ),
+          DeviceNotificationAction(
+            key: 'volume_down',
+            label: '🔉 Volume Down',
+            requiresUnlock: false,
+          ),
+          DeviceNotificationAction(
+            key: 'system_sleep',
+            label: '🌙 Sleep PC',
+            requiresUnlock: false,
+          ),
+          DeviceNotificationAction(
+            key: 'system_reboot',
+            label: '🔄 Reboot',
+            requiresUnlock: true,
+          ),
+          DeviceNotificationAction(
+            key: 'system_shutdown',
+            label: '⏻ Shutdown',
+            requiresUnlock: true,
+          ),
+          DeviceNotificationAction(
             key: 'disconnect',
             label: '⏏ Disconnect',
             requiresUnlock: false,
@@ -100,16 +199,64 @@ class DeviceNotificationModel {
       case DeviceProfile.robot:
         return const [
           DeviceNotificationAction(
-            key: 'emergency_stop',
-            label: '🛑 STOP',
-            requiresUnlock: false, // Safety critical: never require unlock
-          ),
-          DeviceNotificationAction(
-            key: 'stand_sit_toggle',
-            label: '🧍 Stand/Sit',
+            key: 'sit',
+            label: '🪑 Sit',
             requiresUnlock: false,
           ),
           DeviceNotificationAction(
+            key: 'stand',
+            label: '🧍 Stand',
+            requiresUnlock: false,
+          ),
+          DeviceNotificationAction(
+            key: 'emergency_stop',
+            label: '🛑 E-Stop',
+            requiresUnlock: false,
+          ),
+          DeviceNotificationAction(
+            key: 'stand_sit_toggle',
+            label: '🧍 Stand/Sit Toggle',
+            requiresUnlock: false,
+          ),
+          DeviceNotificationAction(
+            key: 'camera_snapshot',
+            label: '📷 Snapshot',
+            requiresUnlock: false,
+          ),
+          DeviceNotificationAction(
+            key: 'disconnect',
+            label: '⏏ Disconnect',
+            requiresUnlock: false,
+          ),
+        ];
+      case DeviceProfile.microcontroller:
+        return [
+          const DeviceNotificationAction(
+            key: 'led_toggle',
+            label: '💡 Toggle LED',
+            requiresUnlock: false,
+          ),
+          const DeviceNotificationAction(
+            key: 'read_temperature',
+            label: '🌡 Read Temp',
+            requiresUnlock: false,
+          ),
+          DeviceNotificationAction(
+            key: 'gpio_toggle:$gpioPin',
+            label: '⚡ GP$gpioPin High/Low',
+            requiresUnlock: false,
+          ),
+          DeviceNotificationAction(
+            key: 'gpio_high:$gpioPin',
+            label: '⬆️ Set GP$gpioPin High',
+            requiresUnlock: false,
+          ),
+          DeviceNotificationAction(
+            key: 'gpio_low:$gpioPin',
+            label: '⬇️ Set GP$gpioPin Low',
+            requiresUnlock: false,
+          ),
+          const DeviceNotificationAction(
             key: 'disconnect',
             label: '⏏ Disconnect',
             requiresUnlock: false,
@@ -160,7 +307,33 @@ class DeviceNotificationModel {
     if (lower == 'emergency_stop' || lower == 'stop') {
       return const DeviceNotificationAction(
         key: 'emergency_stop',
-        label: '🛑 STOP',
+        label: '🛑 E-Stop',
+        requiresUnlock: false,
+      );
+    }
+
+    // Dynamic GPIO pin actions (e.g., gpio_toggle:4, gpio_high:15, gpio_low:2)
+    if (lower.startsWith('gpio_toggle:')) {
+      final pin = int.tryParse(lower.substring('gpio_toggle:'.length)) ?? 0;
+      return DeviceNotificationAction(
+        key: 'gpio_toggle:$pin',
+        label: '⚡ GP$pin High/Low',
+        requiresUnlock: false,
+      );
+    }
+    if (lower.startsWith('gpio_high:')) {
+      final pin = int.tryParse(lower.substring('gpio_high:'.length)) ?? 0;
+      return DeviceNotificationAction(
+        key: 'gpio_high:$pin',
+        label: '⬆️ Set GP$pin High',
+        requiresUnlock: false,
+      );
+    }
+    if (lower.startsWith('gpio_low:')) {
+      final pin = int.tryParse(lower.substring('gpio_low:'.length)) ?? 0;
+      return DeviceNotificationAction(
+        key: 'gpio_low:$pin',
+        label: '⬇️ Set GP$pin Low',
         requiresUnlock: false,
       );
     }
@@ -177,6 +350,42 @@ class DeviceNotificationModel {
         return const DeviceNotificationAction(
           key: 'lock_workstation',
           label: '🔒 Lock PC',
+          requiresUnlock: false,
+        );
+      case 'press_enter':
+        return const DeviceNotificationAction(
+          key: 'press_enter',
+          label: '⏎ Press Enter',
+          requiresUnlock: false,
+        );
+      case 'space_key':
+        return const DeviceNotificationAction(
+          key: 'space_key',
+          label: '␣ Press Space',
+          requiresUnlock: false,
+        );
+      case 'volume_mute':
+        return const DeviceNotificationAction(
+          key: 'volume_mute',
+          label: '🔇 Mute/Unmute',
+          requiresUnlock: false,
+        );
+      case 'volume_up':
+        return const DeviceNotificationAction(
+          key: 'volume_up',
+          label: '🔊 Volume Up',
+          requiresUnlock: false,
+        );
+      case 'volume_down':
+        return const DeviceNotificationAction(
+          key: 'volume_down',
+          label: '🔉 Volume Down',
+          requiresUnlock: false,
+        );
+      case 'system_sleep':
+        return const DeviceNotificationAction(
+          key: 'system_sleep',
+          label: '🌙 Sleep PC',
           requiresUnlock: false,
         );
       case 'system_reboot':
@@ -219,6 +428,12 @@ class DeviceNotificationModel {
         return const DeviceNotificationAction(
           key: 'sit',
           label: '🪑 Sit',
+          requiresUnlock: false,
+        );
+      case 'camera_snapshot':
+        return const DeviceNotificationAction(
+          key: 'camera_snapshot',
+          label: '📷 Snapshot',
           requiresUnlock: false,
         );
       case 'ping':

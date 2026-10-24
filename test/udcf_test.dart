@@ -404,17 +404,23 @@ void main() {
     test('DeviceNotificationModel resolves profile defaults and caps at 3 actions', () {
       final pcActions = DeviceNotificationModel.defaultActionsForProfile(DeviceProfile.computer);
       expect(pcActions.map((a) => a.key).toList(),
-          equals(['media_play_pause', 'lock_workstation', 'disconnect']));
+          equals(['lock_workstation', 'media_play_pause', 'press_enter']));
 
       final picoActions = DeviceNotificationModel.defaultActionsForProfile(DeviceProfile.microcontroller);
       expect(picoActions.map((a) => a.key).toList(),
-          equals(['led_toggle', 'read_temperature', 'disconnect']));
+          equals(['led_toggle', 'read_temperature', 'gpio_toggle:0']));
 
       final robotActions = DeviceNotificationModel.defaultActionsForProfile(DeviceProfile.quadruped);
       expect(robotActions.map((a) => a.key).toList(),
-          equals(['emergency_stop', 'stand_sit_toggle', 'disconnect']));
+          equals(['sit', 'stand', 'emergency_stop']));
       // Safety check: emergency_stop must never require unlock
-      expect(robotActions.first.requiresUnlock, isFalse);
+      expect(robotActions.last.requiresUnlock, isFalse);
+
+      // Dynamic GPIO pin resolution
+      final gpioCustom = DeviceNotificationModel.actionFromKey('gpio_high:14');
+      expect(gpioCustom.key, equals('gpio_high:14'));
+      expect(gpioCustom.label, equals('⬆️ Set GP14 High'));
+      expect(gpioCustom.requiresUnlock, isFalse);
 
       // Custom actions resolution (truncates to max 3 and marks sensitive actions as requiresUnlock)
       final custom = DeviceNotificationModel.resolveActions(

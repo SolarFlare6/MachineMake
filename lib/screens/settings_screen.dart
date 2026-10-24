@@ -487,7 +487,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _buildSettingCard(
               title: 'Show quick actions on lock screen',
               subtitle:
-                  'Displays per-device action buttons (LED, Media, STOP, Disconnect) on the lock screen',
+                  'Displays device-specific lock screen actions (PC: Lock/Play/Enter · Robot: Sit/Stand/E-Stop · MCU: LED/Temp/GPIO Pin)',
               trailing: Transform.scale(
                 scale: 0.85,
                 child: Switch(
