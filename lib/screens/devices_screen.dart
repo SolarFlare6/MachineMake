@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../core/connection/connection_state_enum.dart';
-import '../core/models/device_profile.dart';
 import '../core/routing/profile_router.dart';
 import '../services/device_manager.dart';
 import '../theme/app_theme.dart';
@@ -46,54 +45,22 @@ class _DevicesScreenState extends State<DevicesScreen> {
   }
 
   void _openShell() {
-    final selectedDev = _deviceManager.selectedDevice;
-    if (selectedDev != null &&
-        DeviceProfile.fromString(selectedDev.profile) ==
-            DeviceProfile.microcontroller) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '${selectedDev.name} is a microcontroller and does not support SSH terminal.',
-          ),
-          backgroundColor: Colors.amber[800],
-        ),
-      );
-      return;
-    }
-
-    final deviceId = selectedDev?.id ??
-        (_deviceManager.devices.isNotEmpty
-            ? _deviceManager.devices.first.id
-            : 'device-01');
-    final cfg = _deviceManager.getSSHConfig(deviceId);
-    final defaultHost = cfg.hostname.isNotEmpty
-        ? cfg.hostname
-        : (selectedDev?.ipAddress ?? '');
-
     showDialog(
       context: context,
       builder: (_) => SSHDialog(
-        initialHostname: defaultHost,
-        initialUsername: cfg.username.isNotEmpty ? cfg.username : 'pi',
-        initialPassword: cfg.password,
-        initialPort: cfg.port,
+        initialHostname: '',
+        initialUsername: '',
+        initialPassword: '',
+        initialPort: 22,
+        showSaveCheckbox: false,
         onConnectDetailed: (hostname, username, password, port) {
-          _deviceManager.saveSSHConfig(
-            deviceId,
-            hostname,
-            password,
-            username: username,
-            port: port,
-          );
-
           Navigator.of(context).push(
             MaterialPageRoute(
               builder: (_) => SshTerminalScreen(
                 host: hostname,
                 port: port,
-                username: username,
+                username: username.isNotEmpty ? username : 'pi',
                 password: password,
-                deviceName: selectedDev?.name,
               ),
             ),
           );
