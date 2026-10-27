@@ -1,8 +1,8 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/device_manager.dart';
 import '../services/event_manager.dart';
+import '../services/snapshot_saver_service.dart';
 import '../theme/app_theme.dart';
 
 /// Full-featured Controls screen with:
@@ -98,23 +98,11 @@ class _ControlsScreenState extends State<ControlsScreen> {
   }
 
   Future<void> _captureSnapshot() async {
-    setState(() => _currentAction = 'Snapshot Taken');
-    try {
-      final res = await DeviceManager().executeTool(_targetId, 'camera_snapshot', {});
-      if (res.result is Map) {
-        final rawB64 = (res.result as Map)['image_b64'];
-        if (rawB64 is String && rawB64.isNotEmpty) {
-          EventManager().updateCameraFrame(_targetId, base64Decode(rawB64));
-        }
-      }
-    } catch (_) {}
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Camera snapshot saved', style: GoogleFonts.exo2()),
-        backgroundColor: AppTheme.primaryOrange,
-        duration: const Duration(seconds: 1),
-      ),
+    setState(() => _currentAction = 'Snapshot Saved');
+    await SnapshotSaverService.saveCurrentFrame(
+      context,
+      deviceId: _targetId,
+      deviceName: widget.deviceName,
     );
   }
 

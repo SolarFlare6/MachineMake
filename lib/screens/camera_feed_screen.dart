@@ -1,8 +1,8 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/device_manager.dart';
 import '../services/event_manager.dart';
+import '../services/snapshot_saver_service.dart';
 import '../theme/app_theme.dart';
 
 class CameraFeedScreen extends StatefulWidget {
@@ -45,21 +45,10 @@ class _CameraFeedScreenState extends State<CameraFeedScreen> {
   }
 
   Future<void> _captureSnapshot() async {
-    try {
-      final res = await DeviceManager().executeTool(_targetId, 'camera_snapshot', {});
-      if (res.result is Map) {
-        final rawB64 = (res.result as Map)['image_b64'];
-        if (rawB64 is String && rawB64.isNotEmpty) {
-          EventManager().updateCameraFrame(_targetId, base64Decode(rawB64));
-        }
-      }
-    } catch (_) {}
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Snapshot saved', style: GoogleFonts.exo2()),
-        backgroundColor: AppTheme.primaryOrange,
-      ),
+    await SnapshotSaverService.saveCurrentFrame(
+      context,
+      deviceId: _targetId,
+      deviceName: widget.deviceName,
     );
   }
 

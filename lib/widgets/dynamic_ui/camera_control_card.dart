@@ -1,9 +1,9 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/connection/device_connection.dart';
 import '../../core/models/device_capability.dart';
 import '../../services/event_manager.dart';
+import '../../services/snapshot_saver_service.dart';
 import '../../theme/app_theme.dart';
 
 /// Camera control card for a generic device with camera capability.
@@ -32,27 +32,11 @@ class _CameraControlCardState extends State<CameraControlCard> {
   }
 
   Future<void> _takeSnapshot() async {
-    try {
-      final res = await widget.conn?.session?.executeTool('camera_snapshot', {});
-      if (res != null && res.result is Map) {
-        final rawB64 = (res.result as Map)['image_b64'];
-        if (rawB64 is String && rawB64.isNotEmpty) {
-          EventManager().updateCameraFrame(
-            widget.conn?.deviceId ?? '',
-            base64Decode(rawB64),
-          );
-        }
-      }
-    } catch (_) {}
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Snapshot captured', style: GoogleFonts.exo2()),
-          backgroundColor: AppTheme.primaryOrange,
-          duration: const Duration(seconds: 1),
-        ),
-      );
-    }
+    await SnapshotSaverService.saveCurrentFrame(
+      context,
+      deviceId: widget.conn?.deviceId,
+      deviceName: widget.capability.name,
+    );
   }
 
   @override
