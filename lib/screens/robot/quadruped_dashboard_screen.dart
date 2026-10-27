@@ -1,8 +1,10 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/connection/device_connection.dart';
 import '../../core/models/device_manifest.dart';
 import '../../models/dcp_models.dart';
+import '../../services/event_manager.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/robot/robot_dashboard_header.dart';
 import 'robot_move_tab.dart';
@@ -36,6 +38,12 @@ class QuadrupedDashboardScreen extends StatefulWidget {
 class _QuadrupedDashboardScreenState extends State<QuadrupedDashboardScreen> {
   int _currentTabIndex = 0;
   bool _isStreaming = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _isStreaming = EventManager().isCameraStreaming(widget.device.id);
+  }
 
   void _triggerEmergencyStop() {
     widget.conn?.session?.executeTool('cleanup_servos', {});
@@ -85,6 +93,7 @@ class _QuadrupedDashboardScreenState extends State<QuadrupedDashboardScreen> {
 
   void _toggleCameraStream() {
     setState(() => _isStreaming = !_isStreaming);
+    EventManager().setCameraStreaming(widget.device.id, _isStreaming);
     if (_isStreaming) {
       widget.conn?.session?.executeTool('start_camera', {});
     } else {
@@ -92,8 +101,18 @@ class _QuadrupedDashboardScreenState extends State<QuadrupedDashboardScreen> {
     }
   }
 
-  void _takeSnapshot() {
-    widget.conn?.session?.executeTool('camera_snapshot', {});
+  Future<void> _takeSnapshot() async {
+    try {
+      final res = await widget.conn?.session?.executeTool('camera_snapshot', {});
+      if (res != null && res.result is Map) {
+        final rawB64 = (res.result as Map)['image_b64'];
+        if (rawB64 is String && rawB64.isNotEmpty) {
+          final bytes = base64Decode(rawB64);
+          EventManager().updateCameraFrame(widget.device.id, bytes);
+        }
+      }
+    } catch (_) {}
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text('Camera snapshot captured', style: GoogleFonts.exo2()),
       backgroundColor: AppTheme.primaryOrange,
@@ -122,6 +141,7 @@ class _QuadrupedDashboardScreenState extends State<QuadrupedDashboardScreen> {
 
       // 2. Camera Tab
       RobotCameraTab(
+        deviceId: widget.device.id,
         isStreaming: _isStreaming,
         onToggleStream: _toggleCameraStream,
         onSnapshot: _takeSnapshot,

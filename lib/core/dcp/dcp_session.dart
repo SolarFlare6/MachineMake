@@ -174,7 +174,7 @@ class DcpSession {
       // Send standard DCP subscribe
       await sendRequest(
         DcpMessage.subscribeEvents(
-          ['telemetry', 'alert', 'imu_update', 'sensor_update', 'task_progress', 'task_completed'],
+          ['telemetry', 'alert', 'imu_update', 'sensor_update', 'camera_frame', 'task_progress', 'task_completed'],
         ),
         timeout: const Duration(seconds: 3),
       );
@@ -184,8 +184,8 @@ class DcpSession {
         await sendFireAndForget(DcpMessage.raw(
           command: 'subscribe_events',
           arguments: {
-            'events': ['telemetry', 'alert', 'imu_update', 'sensor_update'],
-            'event_types': ['telemetry', 'alert', 'imu_update', 'sensor_update'],
+            'events': ['telemetry', 'alert', 'imu_update', 'sensor_update', 'camera_frame'],
+            'event_types': ['telemetry', 'alert', 'imu_update', 'sensor_update', 'camera_frame'],
           },
         ));
       } catch (_) {}

@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/device_manager.dart';
+import '../services/event_manager.dart';
 import '../theme/app_theme.dart';
 
 /// Full-featured Controls screen with:
@@ -26,16 +28,29 @@ class ControlsScreen extends StatefulWidget {
 class _ControlsScreenState extends State<ControlsScreen> {
   double _speed = 0.5;
   String _currentAction = 'Standing';
-  bool _isCameraStreaming = false;
+  bool _isCameraStreaming = true;
 
-  // Camera angles
+  // Camera angles (Channel 15 = Pan, Channel 14 = Tilt)
   double _camPan = 90.0;
   double _camTilt = 90.0;
 
   String get _targetId => widget.deviceId ?? DeviceManager().selectedDeviceId;
 
+  @override
+  void initState() {
+    super.initState();
+    // Automatically start camera stream when entering ControlsScreen
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      EventManager().setCameraStreaming(_targetId, true);
+      _sendTool('start_camera', {}, 'Camera Streaming');
+    });
+  }
+
   Future<void> _sendTool(String tool, Map<String, dynamic> params, String actionLabel) async {
-    setState(() => _currentAction = actionLabel);
+    if (mounted) {
+      setState(() => _currentAction = actionLabel);
+    }
     try {
       await DeviceManager().executeTool(_targetId, tool, params);
     } catch (_) {}
@@ -45,14 +60,22 @@ class _ControlsScreenState extends State<ControlsScreen> {
     setState(() {
       _camPan = (_camPan + delta).clamp(0.0, 180.0);
     });
-    _sendTool(delta < 0 ? 'pan_to_left' : 'pan_to_right', {'angle': _camPan.round()}, 'Camera Pan: ${_camPan.round()}°');
+    _sendTool(
+      'driver_set_servo_angle_with_index',
+      {'index': 0, 'angle': _camPan.round()},
+      'Camera Pan: ${_camPan.round()}°',
+    );
   }
 
   void _tiltCam(double delta) {
     setState(() {
       _camTilt = (_camTilt + delta).clamp(20.0, 160.0);
     });
-    _sendTool('driver_set_servo_angle_with_index', {'index': 14, 'angle': _camTilt.round()}, 'Camera Tilt: ${_camTilt.round()}°');
+    _sendTool(
+      'driver_set_servo_angle_with_index',
+      {'index': 1, 'angle': _camTilt.round()},
+      'Camera Tilt: ${_camTilt.round()}°',
+    );
   }
 
   void _centerCamera() {
@@ -60,11 +83,13 @@ class _ControlsScreenState extends State<ControlsScreen> {
       _camPan = 90.0;
       _camTilt = 90.0;
     });
-    _sendTool('driver_set_servo_angle_with_index', {'index': 14, 'angle': 90}, 'Camera Centered');
+    _sendTool('driver_set_servo_angle_with_index', {'index': 0, 'angle': 90}, 'Camera Centered');
+    _sendTool('driver_set_servo_angle_with_index', {'index': 1, 'angle': 90}, 'Camera Centered');
   }
 
   void _toggleCamera() {
     setState(() => _isCameraStreaming = !_isCameraStreaming);
+    EventManager().setCameraStreaming(_targetId, _isCameraStreaming);
     if (_isCameraStreaming) {
       _sendTool('start_camera', {}, 'Camera Streaming');
     } else {
@@ -72,8 +97,18 @@ class _ControlsScreenState extends State<ControlsScreen> {
     }
   }
 
-  void _captureSnapshot() {
-    _sendTool('camera_snapshot', {}, 'Snapshot Taken');
+  Future<void> _captureSnapshot() async {
+    setState(() => _currentAction = 'Snapshot Taken');
+    try {
+      final res = await DeviceManager().executeTool(_targetId, 'camera_snapshot', {});
+      if (res.result is Map) {
+        final rawB64 = (res.result as Map)['image_b64'];
+        if (rawB64 is String && rawB64.isNotEmpty) {
+          EventManager().updateCameraFrame(_targetId, base64Decode(rawB64));
+        }
+      }
+    } catch (_) {}
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Camera snapshot saved', style: GoogleFonts.exo2()),
@@ -120,86 +155,206 @@ class _ControlsScreenState extends State<ControlsScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               // ── 1. Live Camera Feed Card ──────────────────────────
-              Container(
-                height: 190,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF131418),
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(
-                    color: _isCameraStreaming ? AppTheme.primaryOrange.withAlpha(150) : AppTheme.darkBorder,
-                    width: 1.5,
-                  ),
-                ),
-                child: Stack(
-                  children: [
-                    Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            _isCameraStreaming ? Icons.connected_tv : Icons.videocam_off_outlined,
-                            size: 42,
-                            color: _isCameraStreaming ? AppTheme.primaryOrange : AppTheme.textMuted,
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            _isCameraStreaming ? 'Live RTSP / WebRTC Camera Feed' : 'Camera Feed Paused',
-                            style: GoogleFonts.exo2(
-                              color: _isCameraStreaming ? Colors.white : AppTheme.textMuted,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 14,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'State: $_currentAction',
-                            style: GoogleFonts.exo2(
-                              color: AppTheme.textMuted,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    // Live badge
-                    Positioned(
-                      top: 10,
-                      left: 10,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: _isCameraStreaming ? const Color(0xFF00E676).withAlpha(40) : Colors.black45,
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(
-                            color: _isCameraStreaming ? const Color(0xFF00E676) : AppTheme.darkBorder,
-                          ),
+              ListenableBuilder(
+                listenable: EventManager(),
+                builder: (context, _) {
+                  final frameBytes = EventManager().latestCameraFrame(_targetId);
+                  return GestureDetector(
+                    onTap: !_isCameraStreaming ? _toggleCamera : null,
+                    child: Container(
+                      height: 210,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF131418),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(
+                          color: (_isCameraStreaming || frameBytes != null)
+                              ? AppTheme.primaryOrange.withAlpha(180)
+                              : AppTheme.darkBorder,
+                          width: 1.5,
                         ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(17),
+                        child: Stack(
+                          fit: StackFit.expand,
                           children: [
-                            Container(
-                              width: 8,
-                              height: 8,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: _isCameraStreaming ? const Color(0xFF00E676) : Colors.grey,
+                            if (frameBytes != null && _isCameraStreaming)
+                              Image.memory(
+                                frameBytes,
+                                fit: BoxFit.cover,
+                                gaplessPlayback: true,
+                              )
+                            else if (frameBytes != null && !_isCameraStreaming)
+                              Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  Image.memory(
+                                    frameBytes,
+                                    fit: BoxFit.cover,
+                                    gaplessPlayback: true,
+                                  ),
+                                  Container(
+                                    color: Colors.black.withAlpha(130),
+                                    alignment: Alignment.center,
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.play_circle_fill,
+                                            size: 46, color: AppTheme.primaryOrange),
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          'Stream Paused · Tap to Resume',
+                                          style: GoogleFonts.exo2(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              )
+                            else
+                              Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      _isCameraStreaming
+                                          ? Icons.videocam
+                                          : Icons.videocam_off_outlined,
+                                      size: 42,
+                                      color: _isCameraStreaming
+                                          ? AppTheme.primaryOrange
+                                          : AppTheme.textMuted,
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      _isCameraStreaming
+                                          ? 'Connecting to Robot Camera Stream...'
+                                          : 'Camera Feed Paused (Tap to Start)',
+                                      style: GoogleFonts.exo2(
+                                        color: _isCameraStreaming
+                                            ? Colors.white
+                                            : AppTheme.textMuted,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'State: $_currentAction',
+                                      style: GoogleFonts.exo2(
+                                        color: AppTheme.textMuted,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            // Live badge
+                            Positioned(
+                              top: 10,
+                              left: 10,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: _isCameraStreaming
+                                      ? const Color(0xFF00E676).withAlpha(40)
+                                      : Colors.black54,
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                    color: _isCameraStreaming
+                                        ? const Color(0xFF00E676)
+                                        : AppTheme.darkBorder,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Container(
+                                      width: 8,
+                                      height: 8,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: _isCameraStreaming
+                                            ? const Color(0xFF00E676)
+                                            : Colors.grey,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      _isCameraStreaming ? 'LIVE' : 'PAUSED',
+                                      style: GoogleFonts.exo2(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                        color: _isCameraStreaming
+                                            ? const Color(0xFF00E676)
+                                            : Colors.grey,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
-                            const SizedBox(width: 6),
-                            Text(
-                              _isCameraStreaming ? 'LIVE' : 'STANDBY',
-                              style: GoogleFonts.exo2(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: _isCameraStreaming ? const Color(0xFF00E676) : Colors.grey,
+                            // On-card Start/Stop + Snapshot mini controls in bottom-right
+                            Positioned(
+                              bottom: 10,
+                              right: 10,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                   InkWell(
+                                    onTap: _toggleCamera,
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 10, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: Colors.black.withAlpha(170),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                          color: _isCameraStreaming
+                                              ? Colors.redAccent
+                                              : AppTheme.primaryOrange,
+                                        ),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            _isCameraStreaming
+                                                ? Icons.stop
+                                                : Icons.play_arrow,
+                                            size: 14,
+                                            color: _isCameraStreaming
+                                                ? Colors.redAccent
+                                                : AppTheme.primaryOrange,
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            _isCameraStreaming ? 'Stop' : 'Start',
+                                            style: GoogleFonts.exo2(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ],
                         ),
                       ),
                     ),
-                  ],
-                ),
+                  );
+                },
               ),
 
               const SizedBox(height: 20),
@@ -454,7 +609,7 @@ class _ControlsScreenState extends State<ControlsScreen> {
             child: _buildMiniBtn(
               icon: Icons.keyboard_arrow_up,
               color: const Color(0xFF4FC3F7),
-              onTap: () => _tiltCam(15.0),
+              onTap: () => _tiltCam(-15.0),
             ),
           ),
           // Tilt Down
@@ -463,7 +618,7 @@ class _ControlsScreenState extends State<ControlsScreen> {
             child: _buildMiniBtn(
               icon: Icons.keyboard_arrow_down,
               color: const Color(0xFF4FC3F7),
-              onTap: () => _tiltCam(-15.0),
+              onTap: () => _tiltCam(15.0),
             ),
           ),
           // Pan Left
@@ -472,7 +627,7 @@ class _ControlsScreenState extends State<ControlsScreen> {
             child: _buildMiniBtn(
               icon: Icons.keyboard_arrow_left,
               color: const Color(0xFF4FC3F7),
-              onTap: () => _panCam(-15.0),
+              onTap: () => _panCam(15.0),
             ),
           ),
           // Pan Right
@@ -481,7 +636,7 @@ class _ControlsScreenState extends State<ControlsScreen> {
             child: _buildMiniBtn(
               icon: Icons.keyboard_arrow_right,
               color: const Color(0xFF4FC3F7),
-              onTap: () => _panCam(15.0),
+              onTap: () => _panCam(-15.0),
             ),
           ),
           // Center Cam

@@ -1,7 +1,9 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/connection/device_connection.dart';
 import '../../core/models/device_capability.dart';
+import '../../services/event_manager.dart';
 import '../../theme/app_theme.dart';
 
 /// Camera control card for a generic device with camera capability.
@@ -29,8 +31,19 @@ class _CameraControlCardState extends State<CameraControlCard> {
     }
   }
 
-  void _takeSnapshot() {
-    widget.conn?.session?.executeTool('camera_snapshot', {});
+  Future<void> _takeSnapshot() async {
+    try {
+      final res = await widget.conn?.session?.executeTool('camera_snapshot', {});
+      if (res != null && res.result is Map) {
+        final rawB64 = (res.result as Map)['image_b64'];
+        if (rawB64 is String && rawB64.isNotEmpty) {
+          EventManager().updateCameraFrame(
+            widget.conn?.deviceId ?? '',
+            base64Decode(rawB64),
+          );
+        }
+      }
+    } catch (_) {}
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -80,33 +93,49 @@ class _CameraControlCardState extends State<CameraControlCard> {
             ],
           ),
           const SizedBox(height: 14),
-          // Preview placeholder
-          Container(
-            height: 120,
-            decoration: BoxDecoration(
-              color: AppTheme.darkBackground,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: AppTheme.darkBorder),
-            ),
-            child: Center(
-              child: _isStreaming
-                  ? Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.play_circle_outline, color: AppTheme.gpuCyan, size: 40),
-                        const SizedBox(height: 6),
-                        Text('Live stream active', style: GoogleFonts.exo2(color: AppTheme.gpuCyan, fontSize: 12)),
-                      ],
-                    )
-                  : Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.videocam_off, color: AppTheme.textMuted.withAlpha(100), size: 40),
-                        const SizedBox(height: 6),
-                        Text('Camera inactive', style: GoogleFonts.exo2(color: AppTheme.textMuted, fontSize: 12)),
-                      ],
-                    ),
-            ),
+          // Preview placeholder / live frame
+          ListenableBuilder(
+            listenable: EventManager(),
+            builder: (context, _) {
+              final frameBytes = EventManager().latestCameraFrame(widget.conn?.deviceId);
+              return Container(
+                height: 140,
+                decoration: BoxDecoration(
+                  color: AppTheme.darkBackground,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppTheme.darkBorder),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(9),
+                  child: (_isStreaming && frameBytes != null)
+                      ? Image.memory(
+                          frameBytes,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                          gaplessPlayback: true,
+                        )
+                      : Center(
+                          child: _isStreaming
+                              ? Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.play_circle_outline, color: AppTheme.gpuCyan, size: 40),
+                                    const SizedBox(height: 6),
+                                    Text('Connecting to live stream...', style: GoogleFonts.exo2(color: AppTheme.gpuCyan, fontSize: 12)),
+                                  ],
+                                )
+                              : Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.videocam_off, color: AppTheme.textMuted.withAlpha(100), size: 40),
+                                    const SizedBox(height: 6),
+                                    Text('Camera inactive', style: GoogleFonts.exo2(color: AppTheme.textMuted, fontSize: 12)),
+                                  ],
+                                ),
+                        ),
+                ),
+              );
+            },
           ),
           const SizedBox(height: 12),
           Row(

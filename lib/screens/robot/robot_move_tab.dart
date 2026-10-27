@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/connection/device_connection.dart';
+import '../../services/event_manager.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/robot/robot_body_sim.dart';
 
@@ -219,61 +220,81 @@ class _RobotMoveTabState extends State<RobotMoveTab> {
             Expanded(
               child: GestureDetector(
                 onTap: widget.onExpandCamera,
-                child: Container(
-                  height: 130,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF131418),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppTheme.darkBorder, width: 1.2),
-                  ),
-                  child: Stack(
-                    children: [
-                      Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                child: ListenableBuilder(
+                  listenable: EventManager(),
+                  builder: (context, _) {
+                    final frameBytes = EventManager().latestCameraFrame(widget.conn?.deviceId);
+                    return Container(
+                      height: 130,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF131418),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: frameBytes != null ? AppTheme.primaryOrange : AppTheme.darkBorder,
+                          width: 1.2,
+                        ),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(15),
+                        child: Stack(
+                          fit: StackFit.expand,
                           children: [
-                            Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: AppTheme.darkCard,
-                                shape: BoxShape.circle,
+                            if (frameBytes != null)
+                              Image.memory(
+                                frameBytes,
+                                fit: BoxFit.cover,
+                                gaplessPlayback: true,
+                              )
+                            else
+                              Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(10),
+                                      decoration: BoxDecoration(
+                                        color: AppTheme.darkCard,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                        Icons.videocam,
+                                        color: AppTheme.textMuted,
+                                        size: 26,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'camera feed here',
+                                      style: GoogleFonts.exo2(
+                                        color: AppTheme.textMuted,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
-                              child: const Icon(
-                                Icons.videocam,
-                                color: AppTheme.textMuted,
-                                size: 26,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'camera feed here',
-                              style: GoogleFonts.exo2(
-                                color: AppTheme.textMuted,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
+                            Positioned(
+                              top: 8,
+                              right: 8,
+                              child: Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: BoxDecoration(
+                                  color: Colors.black45,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: const Icon(
+                                  Icons.fullscreen,
+                                  color: Colors.white70,
+                                  size: 18,
+                                ),
                               ),
                             ),
                           ],
                         ),
                       ),
-                      Positioned(
-                        top: 8,
-                        right: 8,
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            color: Colors.black45,
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: const Icon(
-                            Icons.fullscreen,
-                            color: Colors.white70,
-                            size: 18,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+                    );
+                  },
                 ),
               ),
             ),
