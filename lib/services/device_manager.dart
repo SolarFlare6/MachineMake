@@ -1009,6 +1009,8 @@ class DeviceManager extends ChangeNotifier {
               ramUsage: (existing.ramUsage + ((timer.tick % 3) - 1) * 0.3).clamp(1.0, 100.0),
             );
           }
+        } else if (conn != null && conn.isConnected) {
+          pollTelemetry(device.id);
         }
       }
       if (devices.isNotEmpty) {

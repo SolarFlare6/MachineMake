@@ -155,9 +155,17 @@ class DeviceConnection extends ChangeNotifier {
       _lastError = null;
       _setState(DeviceConnectionState.connected);
 
-      // Wire session events → global EventManager bus
+      // Wire session events → global EventManager bus (normalize deviceId to this connection's key)
       _eventSub = _session!.events.listen((event) {
-        EventManager().emit(event);
+        final normalizedEvent = event.deviceId == deviceId
+            ? event
+            : DeviceEvent(
+                eventType: event.eventType,
+                deviceId: deviceId,
+                data: event.data,
+                receivedAt: event.receivedAt,
+              );
+        EventManager().emit(normalizedEvent);
 
         // If event carries task progress, forward to TaskManager
         final data = event.data;

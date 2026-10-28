@@ -316,7 +316,7 @@ class _OverviewScreenState extends State<OverviewScreen> {
                                         ),
                                         const SizedBox(height: 10),
                                       ] else if (profile.isComputer) ...[
-                                         // PCs / Laptops / macOS open specialized computer dashboard
+                                        // PCs / Laptops / macOS open specialized computer dashboard
                                         _buildQuickOpButton(
                                           'Open device',
                                           () {
@@ -330,22 +330,7 @@ class _OverviewScreenState extends State<OverviewScreen> {
                                         ),
                                         const SizedBox(height: 10),
                                       ] else ...[
-                                        // Robots have both hardware control and robot dashboard
-                                        _buildQuickOpButton(
-                                          'Hardware control',
-                                          () {
-                                            Navigator.of(context).push(
-                                              MaterialPageRoute(
-                                                builder: (_) => HardwareControlScreen(
-                                                  deviceName: device.name,
-                                                  deviceId: device.id,
-                                                  conn: conn,
-                                                ),
-                                              ),
-                                            );
-                                          },
-                                        ),
-                                        const SizedBox(height: 10),
+                                        // Robots open specialized robot dashboard (no Hardware control button)
                                         _buildQuickOpButton(
                                           'Open device',
                                           () {

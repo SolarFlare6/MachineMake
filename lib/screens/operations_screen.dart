@@ -203,7 +203,10 @@ class _OperationsScreenState extends State<OperationsScreen> {
     final selectedDev = _deviceManager.selectedDevice;
     final isComputer = selectedDev != null &&
         DeviceProfile.fromString(selectedDev.profile).isComputer;
-    final showHardwareControl = !isComputer || _hasUniqueHardware(selectedDev);
+    final isRobot = selectedDev != null &&
+        DeviceProfile.fromString(selectedDev.profile).isRobot;
+    final showHardwareControl =
+        !isRobot && (!isComputer || _hasUniqueHardware(selectedDev));
 
     return Scaffold(
       backgroundColor: AppTheme.darkBackground,
