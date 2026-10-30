@@ -1,12 +1,15 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/connection/device_connection.dart';
+import '../../core/models/device_event.dart';
+import '../../services/event_manager.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/robot/robot_imu_display.dart';
 
 /// Telemetry tab for the quadruped robot:
 /// - MPU6050 Gyro & Accel attitude telemetry cards
-/// - Real-time pitch, roll, and yaw visualization
+/// - Real-time pitch, roll, and yaw visualization streamed from the robot server
 class RobotSensorsTab extends StatefulWidget {
   final DeviceConnection? conn;
   final double pitch;
@@ -16,8 +19,8 @@ class RobotSensorsTab extends StatefulWidget {
   const RobotSensorsTab({
     super.key,
     this.conn,
-    this.pitch = 1.2,
-    this.roll = -0.4,
+    this.pitch = 0.0,
+    this.roll = 0.0,
     this.yaw = 0.0,
   });
 
@@ -29,27 +32,135 @@ class _RobotSensorsTabState extends State<RobotSensorsTab> {
   // ── MPU6050 Telemetry State ───────────────────────────────────────
   late double _pitch;
   late double _roll;
+  late double _yaw;
 
-  final double _accelX = 0.02;
-  final double _accelY = -0.05;
-  final double _accelZ = 0.98;
-  final double _gyroX = 0.8;
-  final double _gyroY = -1.2;
-  final double _gyroZ = 0.3;
+  double _accelX = 0.0;
+  double _accelY = 0.0;
+  double _accelZ = 1.0;
+  double _gyroX = 0.0;
+  double _gyroY = 0.0;
+  double _gyroZ = 0.0;
+
+  StreamSubscription<DeviceEvent>? _telemetrySub;
 
   @override
   void initState() {
     super.initState();
     _pitch = widget.pitch;
     _roll = widget.roll;
+    _yaw = widget.yaw;
+
+    // Seed with the most recent cached IMU packet if available
+    final cachedImu = EventManager().latestImuData(widget.conn?.deviceId);
+    if (cachedImu != null) {
+      _applyImuMap(cachedImu, notify: false);
+    }
+
+    // Listen to live 2 Hz telemetry events from the robot server
+    _telemetrySub = EventManager().eventsOfType('telemetry').listen((event) {
+      final targetId = widget.conn?.deviceId;
+      if (targetId != null &&
+          targetId.isNotEmpty &&
+          event.deviceId.isNotEmpty &&
+          event.deviceId != targetId) {
+        return;
+      }
+      final imu = event.data['imu'];
+      if (imu is Map) {
+        _applyImuMap(Map<String, dynamic>.from(imu));
+      }
+    });
+
+    // Fetch an initial snapshot on mount
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _fetchSensorsSilent();
+    });
   }
 
-  // ── DCP Helper ────────────────────────────────────────────────────
-  void _exec(String tool, Map<String, dynamic> params) {
-    widget.conn?.session?.executeTool(tool, params);
+  @override
+  void dispose() {
+    _telemetrySub?.cancel();
+    super.dispose();
+  }
+
+  void _applyImuMap(Map<String, dynamic> imu, {bool notify = true}) {
+    void updateFields() {
+      if (imu['pitch'] is num) _pitch = (imu['pitch'] as num).toDouble();
+      if (imu['roll'] is num) _roll = (imu['roll'] as num).toDouble();
+      if (imu['yaw'] is num) _yaw = (imu['yaw'] as num).toDouble();
+
+      final accel = imu['accel'];
+      if (accel is Map) {
+        if (accel['x'] is num) _accelX = (accel['x'] as num).toDouble();
+        if (accel['y'] is num) _accelY = (accel['y'] as num).toDouble();
+        if (accel['z'] is num) _accelZ = (accel['z'] as num).toDouble();
+      }
+
+      final gyro = imu['gyro'];
+      if (gyro is Map) {
+        if (gyro['x'] is num) _gyroX = (gyro['x'] as num).toDouble();
+        if (gyro['y'] is num) _gyroY = (gyro['y'] as num).toDouble();
+        if (gyro['z'] is num) _gyroZ = (gyro['z'] as num).toDouble();
+      }
+    }
+
+    if (notify && mounted) {
+      setState(updateFields);
+    } else {
+      updateFields();
+    }
+  }
+
+  Map<String, dynamic>? _extractResultMap(dynamic resp) {
+    if (resp == null) return null;
+    final dynamic raw = resp is Map ? resp : resp.result;
+    if (raw is Map) {
+      if (raw['result'] is Map) {
+        return Map<String, dynamic>.from(raw['result'] as Map);
+      }
+      return Map<String, dynamic>.from(raw);
+    }
+    return null;
+  }
+
+  Future<void> _fetchSensorsSilent() async {
+    final session = widget.conn?.session;
+    if (session == null) return;
+
+    try {
+      final results = await Future.wait([
+        session.executeTool('get_pitch_roll', {}),
+        session.executeTool('get_sensor_accel', {}),
+        session.executeTool('get_sensor_gyro', {}),
+      ]);
+
+      if (!mounted) return;
+      final pr = _extractResultMap(results[0]);
+      final accel = _extractResultMap(results[1]);
+      final gyro = _extractResultMap(results[2]);
+
+      setState(() {
+        if (pr != null) {
+          if (pr['pitch'] is num) _pitch = (pr['pitch'] as num).toDouble();
+          if (pr['roll'] is num) _roll = (pr['roll'] as num).toDouble();
+          if (pr['yaw'] is num) _yaw = (pr['yaw'] as num).toDouble();
+        }
+        if (accel != null) {
+          if (accel['x'] is num) _accelX = (accel['x'] as num).toDouble();
+          if (accel['y'] is num) _accelY = (accel['y'] as num).toDouble();
+          if (accel['z'] is num) _accelZ = (accel['z'] as num).toDouble();
+        }
+        if (gyro != null) {
+          if (gyro['x'] is num) _gyroX = (gyro['x'] as num).toDouble();
+          if (gyro['y'] is num) _gyroY = (gyro['y'] as num).toDouble();
+          if (gyro['z'] is num) _gyroZ = (gyro['z'] as num).toDouble();
+        }
+      });
+    } catch (_) {}
   }
 
   void _snack(String msg, Color bg) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(msg, style: GoogleFonts.exo2()),
@@ -60,15 +171,19 @@ class _RobotSensorsTabState extends State<RobotSensorsTab> {
   }
 
   // ── Sensors DCP ───────────────────────────────────────────────────
-  void _refreshSensors() {
-    _exec('get_pitch_roll', {});
-    _exec('get_sensor_accel', {});
-    _exec('get_sensor_gyro', {});
-    _snack('MPU6050 telemetry requested', AppTheme.primaryOrange);
+  Future<void> _refreshSensors() async {
+    await _fetchSensorsSilent();
+    _snack('MPU6050 telemetry refreshed', AppTheme.primaryOrange);
   }
 
   @override
   Widget build(BuildContext context) {
+    // Automatically scale bar range whether driver reports m/s² (~9.81) or g (~1.0)
+    final bool isMetersPerSecSq =
+        _accelX.abs() > 2.5 || _accelY.abs() > 2.5 || _accelZ.abs() > 2.5;
+    final double accelMax = isMetersPerSecSq ? 15.0 : 2.0;
+    final String accelUnit = isMetersPerSecSq ? 'm/s²' : 'g (9.81 m/s²)';
+
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -128,8 +243,8 @@ class _RobotSensorsTabState extends State<RobotSensorsTab> {
 
           const SizedBox(height: 14),
 
-          // ── IMU Attitude Visualizer (Pitch & Roll) ─────────────────
-          RobotImuDisplay(pitch: _pitch, roll: _roll, yaw: widget.yaw),
+          // ── IMU Attitude Visualizer (Pitch, Roll & Yaw) ────────────
+          RobotImuDisplay(pitch: _pitch, roll: _roll, yaw: _yaw),
 
           const SizedBox(height: 14),
 
@@ -137,11 +252,11 @@ class _RobotSensorsTabState extends State<RobotSensorsTab> {
           _buildAxisCard(
             icon: Icons.speed,
             title: 'MPU6050 Accelerometer',
-            unit: 'g (9.81 m/s²)',
+            unit: accelUnit,
             axes: [
-              ('Accel X', _accelX, const Color(0xFF4FC3F7), 2.0),
-              ('Accel Y', _accelY, const Color(0xFF81D4FA), 2.0),
-              ('Accel Z', _accelZ, const Color(0xFF00E676),  2.0),
+              ('Accel X', _accelX, const Color(0xFF4FC3F7), accelMax),
+              ('Accel Y', _accelY, const Color(0xFF81D4FA), accelMax),
+              ('Accel Z', _accelZ, const Color(0xFF00E676), accelMax),
             ],
           ),
 

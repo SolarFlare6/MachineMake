@@ -60,11 +60,25 @@ class _RobotConfigTabState extends State<RobotConfigTab> {
             onChanged: (val) {
               setState(() => _stabilizerEnabled = val);
               widget.onParamChanged('active_stabilizer', val);
+              ScaffoldMessenger.of(context)
+                ..hideCurrentSnackBar()
+                ..showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      val ? 'IMU Active Stabilizer enabled' : 'IMU Active Stabilizer disabled',
+                      style: GoogleFonts.exo2(),
+                    ),
+                    backgroundColor: val ? AppTheme.primaryOrange : Colors.white24,
+                    duration: const Duration(milliseconds: 900),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
             },
           ),
 
           const SizedBox(height: 12),
 
+          // autonomy option
           _buildSwitchCard(
             title: 'Autonomy Switch',
             subtitle: 'Enable autonomous navigation, Needle AI perception and self-balancing',
@@ -73,6 +87,19 @@ class _RobotConfigTabState extends State<RobotConfigTab> {
             onChanged: (val) {
               setState(() => _autonomyEnabled = val);
               widget.onParamChanged('autonomy_enabled', val);
+              ScaffoldMessenger.of(context)
+                ..hideCurrentSnackBar()
+                ..showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      val ? 'Autonomous mode enabled' : 'Autonomous mode disabled',
+                      style: GoogleFonts.exo2(),
+                    ),
+                    backgroundColor: val ? AppTheme.primaryOrange : Colors.white24,
+                    duration: const Duration(milliseconds: 900),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
             },
           ),
 
@@ -104,6 +131,37 @@ class _RobotConfigTabState extends State<RobotConfigTab> {
           _AudioControlSection(conn: widget.conn),
 
           // this is the end of the audio widgets section
+
+          SizedBox(height: 7,),
+
+          // Voice synth control for the robot
+
+          // voice synth title
+          Row(
+            children: [
+              Icon(Icons.record_voice_over, color: AppTheme.primaryOrange, size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Voice synthesizer',
+                  style: GoogleFonts.exo2(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+
+          // spacer
+          SizedBox(height: 12,),
+
+          // here is the Voice synthesizer widgets
+          _VoiceSynthesizerSection(conn: widget.conn),
+
+          // end of the Voice synthesizer widgets
 
         ], // end of the children in the screen
       ),
@@ -212,12 +270,13 @@ class _AudioControlSectionState extends State<_AudioControlSection> {
   String _selectedFile = '/home/pi/audio/bark.wav';
 
   static const List<Map<String, dynamic>> _kFiles = [
-    {'name': 'Dog Bark',     'file': '/home/pi/audio/bark.wav',        'icon': Icons.pets,            'color': Color(0xFF4FC3F7)},
-    {'name': 'Alert Siren',  'file': '/home/pi/audio/alert.wav',       'icon': Icons.warning_amber,   'color': Colors.redAccent},
-    {'name': 'Greeting',     'file': '/home/pi/audio/hello.wav',       'icon': Icons.waving_hand,     'color': Color(0xFF00E676)},
-    {'name': 'Robot Beep',   'file': '/home/pi/audio/r2d2.wav',        'icon': Icons.smart_toy,       'color': Colors.amberAccent},
-    {'name': 'Warning Tone', 'file': '/home/pi/audio/warning.wav',     'icon': Icons.shield_outlined, 'color': Colors.orangeAccent},
-    {'name': 'Low Battery',  'file': '/home/pi/audio/low_battery.wav', 'icon': Icons.battery_alert,   'color': Colors.deepOrangeAccent},
+    {'name': 'Nano blip',     'file': '/home/pi//Desktop/machine_make/audio_files/nano_blip.ogg',        'icon': Icons.radio_button_checked,            'color': Color(
+        0xFF06F4E0)},
+    {'name': 'Alert',  'file': '/home/pi//Desktop/machine_make/audio_files/alert_nano.ogg',       'icon': Icons.crisis_alert_outlined,   'color': Colors.redAccent},
+    {'name': 'Greeting blip',     'file': '/home/pi//Desktop/machine_make/audio_files/greetings.ogg',       'icon': Icons.waving_hand,     'color': Color(0xFF00E676)},
+    {'name': 'Robot Beep',   'file': '/home/pi//Desktop/machine_make/audio_files/robo_blip.ogg',        'icon': Icons.smart_toy,       'color': Colors.amberAccent},
+    {'name': 'Robot music', 'file': '/home/pi//Desktop/machine_make/audio_files/cool_robo_beat.ogg',     'icon': Icons.music_note, 'color': Colors.orangeAccent},
+    {'name': 'Power down sound',  'file': '/home/pi//Desktop/machine_make/audio_files/power down.ogg', 'icon': Icons.power,   'color': Colors.deepOrangeAccent},
   ];
 
   // ── DCP helpers ───────────────────────────────────────────────────
@@ -627,6 +686,214 @@ class _AudioControlSectionState extends State<_AudioControlSection> {
               icon: Icon(_playingFile != null ? Icons.graphic_eq : Icons.play_arrow, size: 18),
               label: Text(
                 _playingFile != null ? 'Now playing…' : 'Play selected file',
+                style: GoogleFonts.exo2(fontWeight: FontWeight.bold, fontSize: 13),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Voice Synthesizer Section ─────────────────────────────────────────────────
+class _VoiceSynthesizerSection extends StatefulWidget {
+  final DeviceConnection? conn;
+  const _VoiceSynthesizerSection({this.conn});
+
+  @override
+  State<_VoiceSynthesizerSection> createState() => _VoiceSynthesizerSectionState();
+}
+
+class _VoiceSynthesizerSectionState extends State<_VoiceSynthesizerSection> {
+  final TextEditingController _textController = TextEditingController();
+  double _voiceVolume = 1.7;
+  bool _isSynthesizing = false;
+
+  @override
+  void dispose() {
+    _textController.dispose();
+    super.dispose();
+  }
+
+  void _snack(String msg, Color bg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        content: Text(msg, style: GoogleFonts.exo2()),
+        backgroundColor: bg,
+        duration: const Duration(seconds: 1),
+        behavior: SnackBarBehavior.floating,
+      ));
+  }
+
+  void _setVoiceVolume(double v) {
+    setState(() => _voiceVolume = v);
+    widget.conn?.session?.executeTool('set_volume', {'volume': v});
+  }
+
+  void _synthesizeSpeech() {
+    final text = _textController.text.trim();
+    if (text.isEmpty) {
+      _snack('Please enter text for the robot to speak', Colors.amberAccent);
+      return;
+    }
+
+    setState(() => _isSynthesizing = true);
+    widget.conn?.session?.executeTool('speak', {
+      'text': text,
+      'volume': _voiceVolume,
+    });
+    _snack('Synthesizing: "$text" (Vol ${_voiceVolume.toStringAsFixed(1)})', AppTheme.primaryOrange);
+
+    Future.delayed(const Duration(milliseconds: 900), () {
+      if (mounted) setState(() => _isSynthesizing = false);
+    });
+  }
+
+  void _stopSpeech() {
+    setState(() => _isSynthesizing = false);
+    widget.conn?.session?.executeTool('stop_audio', {});
+    _snack('Voice playback stopped', Colors.white24);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.darkCard,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.darkBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Header matching Buzzer & Speaker cards
+          Row(children: [
+            Icon(Icons.voicemail, color: AppTheme.primaryOrange, size: 18),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Piper TTS',
+                    style: GoogleFonts.exo2(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                /*Text('speak · stop_speaking',
+                    style: GoogleFonts.exo2(color: AppTheme.textMuted, fontSize: 10)),*/
+              ]),
+            ),
+            GestureDetector(
+              onTap: _stopSpeech,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.redAccent.withAlpha(20),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: Colors.redAccent.withAlpha(80)),
+                ),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  const Icon(Icons.stop, color: Colors.redAccent, size: 13),
+                  const SizedBox(width: 4),
+                  Text('Stop',
+                      style: GoogleFonts.exo2(
+                          color: Colors.redAccent, fontSize: 10, fontWeight: FontWeight.bold)),
+                ]),
+              ),
+            ),
+          ]),
+
+          const SizedBox(height: 14),
+
+          Text('Speech Text',
+              style: GoogleFonts.exo2(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 8),
+
+          // Textbox for entering speech text
+          TextField(
+            controller: _textController,
+            maxLines: 2,
+            minLines: 1,
+            textInputAction: TextInputAction.send,
+            onSubmitted: (_) => _synthesizeSpeech(),
+            style: GoogleFonts.exo2(color: Colors.white, fontSize: 13),
+            decoration: InputDecoration(
+              hintText: 'Enter text for the robot to say…',
+              hintStyle: GoogleFonts.exo2(color: AppTheme.textMuted, fontSize: 13),
+              filled: true,
+              fillColor: AppTheme.darkSurface,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: AppTheme.darkBorder),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(color: AppTheme.primaryOrange, width: 1.5),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 14),
+
+          // Volume slider (0.0 to 3.0)
+          Row(children: [
+            Icon(
+              _voiceVolume == 0 ? Icons.volume_off : Icons.volume_up,
+              color: AppTheme.primaryOrange,
+              size: 16,
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                'Speaker Volume',
+                style: GoogleFonts.exo2(
+                  color: Colors.white70,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            Text(
+              _voiceVolume.toStringAsFixed(1),
+              style: GoogleFonts.firaCode(
+                color: AppTheme.primaryOrange,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ]),
+          SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              activeTrackColor: AppTheme.primaryOrange,
+              inactiveTrackColor: AppTheme.darkBorder,
+              thumbColor: AppTheme.primaryOrange,
+              overlayColor: AppTheme.primaryOrange.withAlpha(25),
+            ),
+            child: Slider(
+              value: _voiceVolume,
+              min: 0.0,
+              max: 3.0,
+              divisions: 30,
+              onChanged: _setVoiceVolume,
+            ),
+          ),
+
+          const SizedBox(height: 8),
+
+          // Synthesys button
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryOrange,
+                foregroundColor: Colors.black,
+                padding: const EdgeInsets.symmetric(vertical: 11),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: _synthesizeSpeech,
+              icon: Icon(_isSynthesizing ? Icons.graphic_eq : Icons.record_voice_over, size: 18),
+              label: Text(
+                'Synthesys',
                 style: GoogleFonts.exo2(fontWeight: FontWeight.bold, fontSize: 13),
               ),
             ),

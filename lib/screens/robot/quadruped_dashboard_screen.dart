@@ -110,7 +110,13 @@ class _QuadrupedDashboardScreenState extends State<QuadrupedDashboardScreen> {
   }
 
   void _handleParamChanged(String param, dynamic val) {
-    widget.conn?.session?.executeTool('set_config', {param: val});
+    if (param == 'autonomy_enabled' || param == 'autonomy') {
+      widget.conn?.session?.executeTool('set_autonomy', {'enabled': val == true});
+    } else if (param == 'active_stabilizer' || param == 'stabilizer_enabled') {
+      widget.conn?.session?.executeTool('set_stabilizer', {'enabled': val == true});
+    } else {
+      widget.conn?.session?.executeTool('set_config', {'param': param, 'value': val});
+    }
   }
 
   @override

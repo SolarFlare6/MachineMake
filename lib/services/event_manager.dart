@@ -18,6 +18,10 @@ class EventManager extends ChangeNotifier {
   final Map<String, bool> _cameraStreamingState = {};
   Uint8List? _lastGlobalCameraFrame;
 
+  /// Cache of the most recent IMU telemetry payload per deviceId.
+  final Map<String, Map<String, dynamic>> _latestImuData = {};
+  Map<String, dynamic>? _lastGlobalImuData;
+
   /// Global stream of all events from all devices.
   Stream<DeviceEvent> get events => _bus.stream;
 
@@ -51,6 +55,14 @@ class EventManager extends ChangeNotifier {
     return _lastGlobalCameraFrame;
   }
 
+  /// Returns the latest IMU telemetry map (`pitch`, `roll`, `yaw`, `accel`, `gyro`) for [deviceId].
+  Map<String, dynamic>? latestImuData([String? deviceId]) {
+    if (deviceId != null && _latestImuData.containsKey(deviceId)) {
+      return _latestImuData[deviceId];
+    }
+    return _lastGlobalImuData;
+  }
+
   /// Stores a decoded JPEG camera frame directly (e.g. from a `camera_snapshot` tool response).
   void updateCameraFrame(String deviceId, Uint8List bytes) {
     if (bytes.isEmpty) return;
@@ -77,6 +89,15 @@ class EventManager extends ChangeNotifier {
             _lastGlobalCameraFrame = bytes;
           }
         } catch (_) {}
+      }
+    } else if (event.eventType == 'telemetry') {
+      final rawImu = event.data['imu'];
+      if (rawImu is Map) {
+        final imuMap = Map<String, dynamic>.from(rawImu);
+        if (event.deviceId.isNotEmpty) {
+          _latestImuData[event.deviceId] = imuMap;
+        }
+        _lastGlobalImuData = imuMap;
       }
     }
     _bus.add(event);
