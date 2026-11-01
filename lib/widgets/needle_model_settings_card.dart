@@ -64,7 +64,7 @@ class _NeedleModelSettingsCardState extends State<NeedleModelSettingsCard> {
           ],
         ),
         content: Text(
-          'This will unload SmolLM2-360M-Instruct from memory and delete the ~271 MB model file from your phone.\n\n'
+          'This will unload ${_manager.modelSpec.displayName} from memory and delete the ~${_manager.modelSpec.formattedSizeMb} model file from your phone.\n\n'
           'Voice commands will seamlessly fall back to Stage 1 Fast Rules (0 MB) and connected device servers. You can re-download the model anytime.',
           style: GoogleFonts.exo2(
             fontSize: 13.5,
@@ -92,7 +92,7 @@ class _NeedleModelSettingsCardState extends State<NeedleModelSettingsCard> {
               ),
             ),
             child: Text(
-              'Delete (Free ~271 MB)',
+              'Delete (Free ~${_manager.modelSpec.formattedSizeMb})',
               style: GoogleFonts.exo2(fontWeight: FontWeight.bold, fontSize: 13),
             ),
           ),
@@ -231,7 +231,7 @@ class _NeedleModelSettingsCardState extends State<NeedleModelSettingsCard> {
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      '${spec.quantization}  •  ~${spec.formattedSizeMb} GGUF',
+                      '${spec.quantization}  •  ~${spec.formattedSizeMb} (${spec.fileName})',
                       style: GoogleFonts.exo2(
                         fontSize: 12,
                         color: AppTheme.primaryOrange,
@@ -336,7 +336,7 @@ class _NeedleModelSettingsCardState extends State<NeedleModelSettingsCard> {
                 Expanded(
                   child: Text(
                     state == LlmModelState.verifying
-                        ? 'Verifying GGUF model integrity...'
+                        ? 'Verifying model file integrity...'
                         : 'Downloading: ${_manager.formattedDownloadedMb} / ${_manager.formattedTotalMb} (${(_manager.downloadProgress * 100).toInt()}%)',
                     style: GoogleFonts.exo2(
                       fontSize: 12,
@@ -554,9 +554,9 @@ class _NeedleModelSettingsCardState extends State<NeedleModelSettingsCard> {
 
           // Toggles
           _buildCompactToggle(
-            title: 'Enable Local LLM for complex commands',
+            title: 'Enable Cactus Needle 3 for complex commands',
             subtitle:
-                'Uses SmolLM2-360M when fast rules are unsure or for multi-step commands',
+                'Uses Cactus Needle 3 (34 MB) when fast rules are unsure or for multi-step commands',
             value: _manager.isEnabled,
             onChanged: (v) => _manager.setEnabled(v),
           ),

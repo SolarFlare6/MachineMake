@@ -134,6 +134,67 @@ class RuleIntentMatcher {
     final availableToolNames = availableTools.map((t) => t.name).toSet();
 
     // ── 1. PC Keyboard Type ("type hello world", "write git status") ────────
+    final speakMatch = RegExp(
+      r'^(?:say|speak|synthesize)\s+(.+)$',
+      caseSensitive: false,
+    ).firstMatch(text);
+    if (speakMatch != null) {
+      var spoken = speakMatch.group(1)!.trim();
+      if ((spoken.startsWith('"') && spoken.endsWith('"')) ||
+          (spoken.startsWith("'") && spoken.endsWith("'"))) {
+        spoken = spoken.substring(1, spoken.length - 1);
+      }
+      if (spoken.isNotEmpty) {
+        thoughts.add('Matched robot speak tool: "$spoken"');
+        return NeedlePlan(
+          toolName: 'speak',
+          parameters: {'text': spoken, 'volume': 1.7},
+          explanation: 'Speaking "$spoken" on ${targetDeviceName ?? "robot"}',
+          confidence: 0.97,
+          thoughts: thoughts,
+          source: NeedlePlanSource.rules,
+          targetDeviceId: targetDeviceId,
+          targetDeviceName: targetDeviceName,
+        );
+      }
+    }
+
+    if (lower.contains('autonomy') || lower.contains('autonomous')) {
+      final enabled = !(lower.contains('off') ||
+          lower.contains('disable') ||
+          lower.contains('stop'));
+      thoughts.add('Matched robot set_autonomy: enabled=$enabled');
+      return NeedlePlan(
+        toolName: 'set_autonomy',
+        parameters: {'enabled': enabled},
+        explanation:
+            '${enabled ? "Enabling" : "Disabling"} autonomous mode on ${targetDeviceName ?? "robot"}',
+        confidence: 0.96,
+        thoughts: thoughts,
+        source: NeedlePlanSource.rules,
+        targetDeviceId: targetDeviceId,
+        targetDeviceName: targetDeviceName,
+      );
+    }
+
+    if (lower.contains('stabilizer') || lower.contains('stabilization')) {
+      final enabled = !(lower.contains('off') ||
+          lower.contains('disable') ||
+          lower.contains('stop'));
+      thoughts.add('Matched robot set_stabilizer: enabled=$enabled');
+      return NeedlePlan(
+        toolName: 'set_stabilizer',
+        parameters: {'enabled': enabled},
+        explanation:
+            '${enabled ? "Enabling" : "Disabling"} IMU active stabilizer on ${targetDeviceName ?? "robot"}',
+        confidence: 0.96,
+        thoughts: thoughts,
+        source: NeedlePlanSource.rules,
+        targetDeviceId: targetDeviceId,
+        targetDeviceName: targetDeviceName,
+      );
+    }
+
     final typeMatch = RegExp(
       r'^(?:type|write|input|enter text)\s+(.+)$',
       caseSensitive: false,

@@ -43,6 +43,7 @@ class _MockLlmRuntime implements LocalLlmRuntime {
     required String systemPrompt,
     required String userPrompt,
     String? gbnfGrammar,
+    String? toolsJson,
     int maxTokens = 96,
     double temperature = 0.05,
     Duration timeout = const Duration(milliseconds: 2800),
@@ -299,8 +300,12 @@ void main() {
       expect(fallbackRouting.plan.steps[1].toolName, equals('keyboard_press'));
     });
 
-    test('Builds valid GBNF grammar and ChatML prompt', () {
+    test('Builds valid Needle 3 JSON Schema tools, GBNF grammar, and parses Needle 3 function_calls', () {
       final tools = ToolRelevanceFilter.defaultToolsForProfile('pc');
+      final needleToolsJson = ToolPromptBuilder.buildNeedleToolsJson(tools);
+      expect(needleToolsJson, contains('"name":"keyboard_press"'));
+      expect(needleToolsJson, contains('"parameters":{"type":"object"'));
+
       final grammar = ToolGrammarBuilder.buildGrammar(tools);
       expect(grammar, contains('keyboard_press'));
       expect(grammar, contains('root   ::='));
@@ -313,6 +318,16 @@ void main() {
       expect(sysPrompt, contains('keyboard_press'));
       expect(sysPrompt, contains('{"calls":['));
 
+      // Official Cactus Compute Needle 3 response format
+      final parsedNeedle3 = LlmPlanParser.parse(
+        '{"type":"call","success":true,"function_calls":[{"name":"keyboard_press","arguments":{"key":"enter"}}],"reasoning":"press enter -> keyboard_press","confidence":0.95}',
+        targetDeviceId: 'pc-1',
+        targetDeviceName: 'Desktop PC',
+      );
+      expect(parsedNeedle3.toolName, equals('keyboard_press'));
+      expect(parsedNeedle3.parameters['key'], equals('enter'));
+      expect(parsedNeedle3.confidence, closeTo(0.95, 0.01));
+
       final parsed = LlmPlanParser.parse(
         '{"calls":[{"tool":"keyboard_press","params":{"key":"enter"}}]}',
         targetDeviceId: 'pc-1',
@@ -323,7 +338,7 @@ void main() {
     });
 
     testWidgets('NeedleModelSettingsCard builds and renders under AppTheme.darkTheme without layout errors', (tester) async {
-      final mockRuntime = _MockLlmRuntime(cannedJsonResponse: '{"calls":[]}');
+      final mockRuntime = _MockLlmRuntime(cannedJsonResponse: '{"function_calls":[]}');
       LlmModelManager.instance.setRuntimeForTesting(
         mockRuntime,
         state: LlmModelState.notInstalled,
@@ -340,7 +355,7 @@ void main() {
       );
       await tester.pump();
       expect(tester.takeException(), isNull);
-      expect(find.textContaining('SmolLM2-360M-Instruct'), findsWidgets);
+      expect(find.textContaining('Cactus Needle 3'), findsWidgets);
       expect(find.text('Test Rules'), findsOneWidget);
 
       // Also verify Installed / Ready in RAM button row under AppTheme.darkTheme

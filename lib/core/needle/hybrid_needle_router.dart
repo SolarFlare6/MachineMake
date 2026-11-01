@@ -204,7 +204,7 @@ class HybridNeedleRouter {
       );
     }
 
-    // ── Stage 2: Local LLM (`SmolLM2-360M-Instruct`) for Complicated Sentences
+    // ── Stage 2: Local LLM (Cactus Needle 3) for Complicated Sentences
     if (_llmManager.isReadyForInference) {
       final loaded = await _llmManager.ensureLoadedInRam();
       if (loaded) {
@@ -215,19 +215,22 @@ class HybridNeedleRouter {
             prompt: llmInputPrompt,
             availableTools: effectiveTools,
             deviceProfile: profileStr,
-            maxTools: 6,
+            maxTools: 8,
           );
           final systemPrompt = ToolPromptBuilder.buildSystemPrompt(
             deviceName: targetDevice.name,
             deviceProfile: profileStr,
             filteredTools: filteredTools,
           );
+          final toolsJson =
+              ToolPromptBuilder.buildNeedleToolsJson(filteredTools);
           final grammar = ToolGrammarBuilder.buildGrammar(filteredTools);
 
           final rawJson = await _llmManager.runtime.generateStructured(
             systemPrompt: systemPrompt,
             userPrompt: llmInputPrompt,
             gbnfGrammar: grammar,
+            toolsJson: toolsJson,
             maxTokens: 140,
             temperature: 0.05,
           );

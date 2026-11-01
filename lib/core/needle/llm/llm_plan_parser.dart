@@ -2,8 +2,9 @@ import 'dart:convert';
 
 import '../needle_models.dart';
 
-/// Parses the JSON output produced by `SmolLM2-360M-Instruct`
-/// (`{"calls":[{"tool":"...","params":{...}}]}`) into a [NeedlePlan].
+/// Parses the JSON output produced by Cactus Compute Needle 3
+/// (`{"type":"call","function_calls":[{"name":"...","arguments":{...}}],"reasoning":"...","confidence":0.94}`)
+/// or GGUF models (`{"calls":[{"tool":"...","params":{...}}]}`) into a [NeedlePlan].
 class LlmPlanParser {
   LlmPlanParser._();
 
@@ -32,7 +33,14 @@ class LlmPlanParser {
         return _failedPlan(rawOutput, targetDeviceId, targetDeviceName);
       }
 
-      final callsList = decoded['calls'];
+      final rawConfidence = decoded['confidence'];
+      final parsedConfidence = rawConfidence is num
+          ? rawConfidence.toDouble().clamp(0.0, 1.0)
+          : 0.88;
+      final reasoning = decoded['reasoning']?.toString().trim();
+
+      // Support both Cactus Compute Needle 3 ("function_calls") and legacy ("calls")
+      final callsList = decoded['function_calls'] ?? decoded['calls'];
       if (callsList is List && callsList.isNotEmpty) {
         final steps = <NeedlePlan>[];
         final flattenedItems = <Map>[];
@@ -50,9 +58,9 @@ class LlmPlanParser {
           }
         }
         for (final item in flattenedItems) {
-          final tool = (item['tool'] ?? item['name'] ?? '').toString().trim();
+          final tool = (item['name'] ?? item['tool'] ?? '').toString().trim();
           final rawParams =
-              item['params'] ?? item['parameters'] ?? item['arguments'];
+              item['arguments'] ?? item['params'] ?? item['parameters'];
           final params = rawParams is Map
               ? Map<String, dynamic>.from(rawParams)
               : <String, dynamic>{};
@@ -63,9 +71,11 @@ class LlmPlanParser {
                 parameters: params,
                 explanation:
                     'Executing $tool on ${targetDeviceName ?? "device"}',
-                confidence: 0.86,
+                confidence: parsedConfidence,
                 thoughts: [
-                  'Stage 2 (Local LLM SmolLM2-360M) selected tool "$tool" with params $params',
+                  'Cactus Needle 3 selected tool "$tool" with arguments $params',
+                  if (reasoning != null && reasoning.isNotEmpty)
+                    'Needle reasoning: $reasoning',
                 ],
                 source: NeedlePlanSource.localLlm,
                 targetDeviceId: targetDeviceId,
@@ -88,9 +98,11 @@ class LlmPlanParser {
           toolName: first.toolName,
           parameters: first.parameters,
           explanation: steps.map((s) => s.explanation).join(' → '),
-          confidence: 0.86,
+          confidence: parsedConfidence,
           thoughts: [
-            'Stage 2 (Local LLM SmolLM2-360M) generated ${steps.length}-step plan',
+            'Cactus Needle 3 generated ${steps.length}-step plan',
+            if (reasoning != null && reasoning.isNotEmpty)
+              'Needle reasoning: $reasoning',
             ...steps.expand((s) => s.thoughts),
           ],
           source: NeedlePlanSource.localLlm,
@@ -100,20 +112,23 @@ class LlmPlanParser {
         );
       }
 
-      // Single-object fallback: `{"tool":"...","params":{...}}`
-      final singleTool = (decoded['tool'] ?? decoded['name'] ?? '').toString().trim();
+      // Single-object fallback: `{"tool":"...","params":{...}}` or `{"name":"...","arguments":{...}}`
+      final singleTool =
+          (decoded['name'] ?? decoded['tool'] ?? '').toString().trim();
       if (singleTool.isNotEmpty && singleTool != 'none') {
-        final rawParams = decoded['params'] ?? decoded['parameters'] ?? {};
+        final rawParams =
+            decoded['arguments'] ?? decoded['params'] ?? decoded['parameters'] ?? {};
         final params = rawParams is Map
             ? Map<String, dynamic>.from(rawParams)
             : <String, dynamic>{};
         return NeedlePlan(
           toolName: singleTool,
           parameters: params,
-          explanation: 'Executing $singleTool on ${targetDeviceName ?? "device"}',
-          confidence: 0.85,
+          explanation:
+              'Executing $singleTool on ${targetDeviceName ?? "device"}',
+          confidence: parsedConfidence,
           thoughts: [
-            'Stage 2 (Local LLM SmolLM2-360M) selected tool "$singleTool"',
+            'Cactus Needle 3 selected tool "$singleTool"',
           ],
           source: NeedlePlanSource.localLlm,
           targetDeviceId: targetDeviceId,

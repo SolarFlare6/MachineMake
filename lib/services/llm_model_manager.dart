@@ -65,7 +65,7 @@ class LlmModelManager extends ChangeNotifier {
   bool _cancelRequested = false;
 
   LlmModelManager._internal() {
-    _runtime = LlamaFlutterRuntime(
+    _runtime = CactusNeedleRuntime(
       onStateChanged: () {
         if (_runtime.isLoaded && _state != LlmModelState.readyInRam) {
           _state = LlmModelState.readyInRam;
@@ -225,7 +225,8 @@ class LlmModelManager extends ChangeNotifier {
   }
 
   /// Verifies that [file] has at least [modelSpec.minIntegrityBytes] and starts
-  /// with the 4-byte ASCII magic header `GGUF` (`0x47, 0x47, 0x55, 0x46`).
+  /// with either the Cactus Needle `.cact` magic header (`0x84, 0x2A, 0xE1, 0x05`
+  /// for Needle 3 or `0x83, 0x2A, 0xE1, 0x05` for Needle 2) or `GGUF`.
   Future<bool> _verifyGgufFile(File file) async {
     try {
       if (!await file.exists()) return false;
@@ -236,11 +237,17 @@ class LlmModelManager extends ChangeNotifier {
       try {
         final magic = await raf.read(4);
         if (magic.length < 4) return false;
+        // Cactus Needle 3 (.cact = 0x05E12A84 LE) or Needle 2 (0x05E12A83 LE)
+        final isCact = (magic[0] == 0x84 || magic[0] == 0x83) &&
+            magic[1] == 0x2A &&
+            magic[2] == 0xE1 &&
+            magic[3] == 0x05;
         // 'G' = 0x47, 'G' = 0x47, 'U' = 0x55, 'F' = 0x46
-        return magic[0] == 0x47 &&
+        final isGguf = magic[0] == 0x47 &&
             magic[1] == 0x47 &&
             magic[2] == 0x55 &&
             magic[3] == 0x46;
+        return isCact || isGguf;
       } finally {
         await raf.close();
       }

@@ -157,11 +157,11 @@ class NeedleAiService extends ChangeNotifier {
     final plan = routing.plan;
     final String llmStatus;
     if (manager.runtime.isLoaded) {
-      llmStatus = 'SmolLM2-360M Loaded in RAM';
+      llmStatus = '${manager.modelSpec.displayName} Loaded in RAM';
     } else if (manager.isInstalled && manager.errorMessage != null) {
       llmStatus = 'Fallback to Fast Rules (${manager.errorMessage})';
     } else if (manager.isInstalled) {
-      llmStatus = 'SmolLM2-360M Installed on Disk';
+      llmStatus = '${manager.modelSpec.displayName} Installed on Disk';
     } else {
       llmStatus = 'Rules Only (LLM not installed)';
     }

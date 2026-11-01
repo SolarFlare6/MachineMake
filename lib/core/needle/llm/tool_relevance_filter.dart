@@ -279,6 +279,37 @@ class ToolRelevanceFilter {
         ],
       ),
       ToolDefinition(
+        name: 'speak',
+        description: 'Synthesize speech on the robot speaker with optional volume (0.0 to 3.0)',
+        parameters: [
+          ToolParameter(name: 'text', type: 'string', description: 'Text for the robot to speak', required: true),
+          ToolParameter(name: 'volume', type: 'float', description: 'Speaker volume from 0.0 to 3.0', required: false),
+        ],
+      ),
+      ToolDefinition(
+        name: 'set_autonomy',
+        description: 'Enable or disable autonomous robot navigation mode',
+        parameters: [
+          ToolParameter(name: 'enabled', type: 'bool', description: 'True to enable autonomy, false to disable', required: true),
+        ],
+      ),
+      ToolDefinition(
+        name: 'set_stabilizer',
+        description: 'Enable or disable IMU active balance stabilizer',
+        parameters: [
+          ToolParameter(name: 'enabled', type: 'bool', description: 'True to enable stabilizer, false to disable', required: true),
+        ],
+      ),
+      ToolDefinition(
+        name: 'animate_running_process',
+        description: 'Run LED strip color animation on the robot',
+        parameters: [
+          ToolParameter(name: 'r', type: 'int', description: 'Red (0-255)', required: false),
+          ToolParameter(name: 'g', type: 'int', description: 'Green (0-255)', required: false),
+          ToolParameter(name: 'b', type: 'int', description: 'Blue (0-255)', required: false),
+        ],
+      ),
+      ToolDefinition(
         name: 'keyboard_press',
         description: 'Press a keyboard key (enter, escape, space, ctrl+c)',
         parameters: [

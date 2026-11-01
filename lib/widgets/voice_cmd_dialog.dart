@@ -908,7 +908,7 @@ class _VoiceCmdDialogState extends State<VoiceCmdDialog> {
         : (matchedRule ? const Color(0xFF00E676) : AppTheme.textMuted);
 
     final label = useLlm
-        ? 'Local LLM → $targetName (SmolLM2-360M will plan)'
+        ? 'Needle 3 AI → $targetName (Cactus Needle 3 will plan)'
         : (matchedRule
             ? 'Fast Rule → $targetName: ${plan.toolName}(${plan.parameters})'
             : 'Target: $targetName');
@@ -940,13 +940,13 @@ class _VoiceCmdDialogState extends State<VoiceCmdDialog> {
     final isDevice = mode == NeedleExecutionMode.device;
 
     final title = llmReady
-        ? 'Needle Hybrid AI: Fast Rules + SmolLM2-360M'
+        ? 'Needle Hybrid AI: Fast Rules + Cactus Needle 3'
         : (isDevice
             ? 'Needle Hybrid AI: Fast Rules + On-Device'
             : 'Needle Hybrid AI: Fast Rules (0 MB)');
     final subtitle = llmReady
-        ? 'Instant rules (<1ms) + offline LLM for complex phrasing'
-        : 'Instant rules active • Optional 271 MB offline LLM in Settings';
+        ? 'Instant rules (<1ms) + Cactus Needle 3 (34 MB) for tool calling'
+        : 'Instant rules active • Optional 34 MB Cactus Needle 3 in Settings';
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),

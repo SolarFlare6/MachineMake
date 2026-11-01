@@ -116,9 +116,9 @@ class IntentNormalizer {
 
     var text = rawPrompt.trim();
 
-    // Check if the command is a "type <literal>" command so we don't mangle the literal text
+    // Check if the command is a "type/say <literal>" command so we don't mangle the literal text
     final typeMatch = RegExp(
-      r'^(.*?)\b(type|write|input|enter text)\s+(.+)$',
+      r'^(.*?)\b(type|write|input|enter text|say|speak)\s+(.+)$',
       caseSensitive: false,
     ).firstMatch(text);
 
@@ -188,8 +188,8 @@ class IntentNormalizer {
       ];
     }
 
-    // Do not split arbitrary "and" inside a literal keyboard typing command
-    if (RegExp(r'^(?:type|write|input|enter text)\s+', caseSensitive: false)
+    // Do not split arbitrary "and" inside a literal keyboard typing or speech command
+    if (RegExp(r'^(?:type|write|input|enter text|say|speak)\s+', caseSensitive: false)
         .hasMatch(trimmed)) {
       return [trimmed];
     }

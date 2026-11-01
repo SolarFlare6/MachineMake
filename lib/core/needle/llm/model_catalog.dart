@@ -1,4 +1,4 @@
-/// Metadata describing a downloadable GGUF model for Needle AI local inference.
+/// Metadata describing a downloadable on-device model for Needle AI local inference.
 class LlmModelSpec {
   final String id;
   final String displayName;
@@ -24,16 +24,34 @@ class LlmModelSpec {
     required this.description,
   });
 
-  /// Human-readable size in MB (e.g. "271 MB").
+  /// Human-readable size in MB (e.g. "34 MB").
   String get formattedSizeMb =>
       '${(expectedSizeBytes / (1024 * 1024)).round()} MB';
 }
 
-/// Catalog of supported on-device GGUF models for Needle AI.
+/// Catalog of supported on-device models for Needle AI.
 class ModelCatalog {
   ModelCatalog._();
 
-  /// Default recommended model: `SmolLM2-360M-Instruct` (`Q4_K_M`, ~271 MB).
+  /// Official Cactus Compute Needle 3 on-device function-calling model (`needle3.cact`, ~34 MB).
+  /// Source: https://github.com/cactus-compute/needle & https://huggingface.co/Cactus-Compute/needle3
+  static const LlmModelSpec needle3 = LlmModelSpec(
+    id: 'cactus-needle-3-cact',
+    displayName: 'Cactus Needle 3',
+    fileName: 'needle3.cact',
+    downloadUrl:
+        'https://huggingface.co/Cactus-Compute/needle3/resolve/main/needle3.cact',
+    fallbackDownloadUrl:
+        'https://huggingface.co/Cactus-Compute/needle3/resolve/main/needle3.cact?download=true',
+    expectedSizeBytes: 35337728, // ~33.7 MB
+    minIntegrityBytes: 30 * 1024 * 1024, // At least 30 MB + .cact magic header
+    contextSize: 2048,
+    quantization: 'CQ2 (2.125-bit SAN)',
+    description:
+        'Official Cactus Compute Needle 3 (110M params, 34 MB) purpose-built for fast on-device grammar-constrained tool calling.',
+  );
+
+  /// Secondary GGUF model (`SmolLM2-360M-Instruct`, `Q4_K_M`, ~271 MB).
   static const LlmModelSpec smolLm2_360m = LlmModelSpec(
     id: 'smollm2-360m-instruct-q4_k_m',
     displayName: 'SmolLM2-360M-Instruct',
@@ -42,13 +60,13 @@ class ModelCatalog {
         'https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct-GGUF/resolve/main/smollm2-360m-instruct-q4_k_m.gguf',
     fallbackDownloadUrl:
         'https://huggingface.co/bartowski/SmolLM2-360M-Instruct-GGUF/resolve/main/SmolLM2-360M-Instruct-Q4_K_M.gguf',
-    expectedSizeBytes: 270840000, // ~258-271 MB
-    minIntegrityBytes: 200 * 1024 * 1024, // At least 200 MB + GGUF magic header
+    expectedSizeBytes: 270840000,
+    minIntegrityBytes: 200 * 1024 * 1024,
     contextSize: 1024,
     quantization: 'Q4_K_M (4-bit)',
     description:
-        'Fast offline instruction-tuned model for complex phrasing, indirect commands, and multi-step tool chains.',
+        'Offline instruction-tuned GGUF model for complex phrasing and multi-step tool chains.',
   );
 
-  static const LlmModelSpec defaultModel = smolLm2_360m;
+  static const LlmModelSpec defaultModel = needle3;
 }

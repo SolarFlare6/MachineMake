@@ -1,11 +1,65 @@
+import 'dart:convert';
+
 import '../../models/tool_definition.dart';
 import 'tool_relevance_filter.dart';
 
-/// Builds a compact ChatML system prompt for `SmolLM2-360M-Instruct` containing
-/// only the relevant tools for the target device and 3 domain-matched few-shot
-/// examples.
+/// Builds system prompts and JSON Schema tool arrays for Cactus Compute Needle 3
+/// (`needle_init`) as well as ChatML fallback prompts.
 class ToolPromptBuilder {
   ToolPromptBuilder._();
+
+  /// Serializes [tools] into the OpenAI / Cactus Needle JSON Schema array string
+  /// expected by `needle_init(system_prompt, tools_json, NULL)`.
+  static String buildNeedleToolsJson(List<ToolDefinition> tools) {
+    final list = <Map<String, dynamic>>[];
+
+    for (final t in tools) {
+      final properties = <String, dynamic>{};
+      final requiredList = <String>[];
+
+      for (final p in t.parameters) {
+        final rawType = p.type.toLowerCase();
+        String jsonType;
+        if (rawType == 'int' || rawType == 'integer') {
+          jsonType = 'integer';
+        } else if (rawType == 'float' ||
+            rawType == 'double' ||
+            rawType == 'number') {
+          jsonType = 'number';
+        } else if (rawType == 'bool' || rawType == 'boolean') {
+          jsonType = 'boolean';
+        } else {
+          jsonType = 'string';
+        }
+
+        final propMap = <String, dynamic>{
+          'type': jsonType,
+          if (p.description.isNotEmpty) 'description': p.description,
+        };
+        if (p.enumValues != null && p.enumValues!.isNotEmpty) {
+          propMap['enum'] = p.enumValues;
+        }
+        properties[p.name] = propMap;
+        if (p.required) {
+          requiredList.add(p.name);
+        }
+      }
+
+      list.add({
+        'name': t.name,
+        'description': t.description.isNotEmpty
+            ? t.description
+            : 'Execute ${t.name} hardware action',
+        'parameters': {
+          'type': 'object',
+          'properties': properties,
+          'required': requiredList,
+        },
+      });
+    }
+
+    return jsonEncode(list);
+  }
 
   static String buildSystemPrompt({
     required String deviceName,
@@ -41,7 +95,10 @@ class ToolPromptBuilder {
 
     buf.writeln('Examples:');
     final p = deviceProfile.toLowerCase();
-    if (p.contains('pc') || p.contains('desktop') || p.contains('laptop') || p.contains('computer')) {
+    if (p.contains('pc') ||
+        p.contains('desktop') ||
+        p.contains('laptop') ||
+        p.contains('computer')) {
       buf.writeln(
         'User: press the windows key then type hello and press enter\n'
         'Assistant: {"calls":[{"tool":"keyboard_press","params":{"key":"win"}},{"tool":"keyboard_type","params":{"text":"hello"}},{"tool":"keyboard_press","params":{"key":"enter"}}]}',
