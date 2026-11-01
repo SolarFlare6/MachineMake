@@ -147,13 +147,17 @@ class NeedleEngine {
       final examplesText = routing.suggestions.isNotEmpty
           ? ' Try ${routing.suggestions.join(", ")}.'
           : '';
+      final baseReason = (plan.explanation.isNotEmpty &&
+              plan.explanation.contains('not available on'))
+          ? plan.explanation
+          : 'Command is not supported on ${resolvedDevice.name}';
 
       return NeedleResponse(
         success: false,
         userPrompt: prompt,
         executedWhere: NeedleExecutionMode.client,
         plan: plan,
-        message: 'Unrecognized command.$examplesText$hintSuffix',
+        message: '$baseReason.$examplesText$hintSuffix',
         suggestions: routing.suggestions,
       );
     }

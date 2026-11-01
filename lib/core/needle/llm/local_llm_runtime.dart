@@ -188,8 +188,6 @@ String _isolateCompleteNeedlePrompt(List<Object?> args) {
       );
     }
 
-    bridge.reset();
-
     final initRc = bridge.init(sysPtr, toolsPtr);
     if (initRc < 0) {
       throw StateError(
@@ -232,7 +230,7 @@ class CactusNeedleRuntime implements LocalLlmRuntime {
   final VoidCallback? onStateChanged;
 
   CactusNeedleRuntime({
-    this.idleUnloadDuration = const Duration(minutes: 5),
+    this.idleUnloadDuration = const Duration(minutes: 30),
     this.onStateChanged,
   });
 

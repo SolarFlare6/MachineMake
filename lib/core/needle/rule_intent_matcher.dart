@@ -1,6 +1,7 @@
 import '../models/tool_definition.dart';
 import 'intent_normalizer.dart';
 import 'needle_models.dart';
+import 'plan_validator.dart';
 
 /// Stage 1: Deterministic & Fuzzy Rule Intent Matcher (0 MB, < 1 ms).
 ///
@@ -92,7 +93,7 @@ class RuleIntentMatcher {
 
       final first = stepPlans.first;
       final requiresConfirm = stepPlans.any((p) => p.requiresConfirmation);
-      return NeedlePlan(
+      final multiPlan = NeedlePlan(
         toolName: first.toolName,
         parameters: first.parameters,
         explanation: stepPlans.map((p) => p.explanation).join(' → '),
@@ -109,14 +110,20 @@ class RuleIntentMatcher {
         targetDeviceId: targetDeviceId,
         targetDeviceName: targetDeviceName,
       );
+      return availableTools.isNotEmpty
+          ? PlanValidator.validateAndCoerce(multiPlan, availableTools)
+          : multiPlan;
     }
 
-    return _matchSingle(
+    final singlePlan = _matchSingle(
       normalized,
       availableTools,
       targetDeviceId: targetDeviceId,
       targetDeviceName: targetDeviceName,
     );
+    return availableTools.isNotEmpty
+        ? PlanValidator.validateAndCoerce(singlePlan, availableTools)
+        : singlePlan;
   }
 
   static NeedlePlan _matchSingle(
@@ -521,7 +528,153 @@ class RuleIntentMatcher {
       );
     }
 
-    // ── 8. LED / Illumination ───────────────────────────────────────────────
+    // ── 7b. Robot Camera Servo & PCA9685 Servo Control ──────────────────────
+    if (RegExp(r'\b(release|cleanup|relax|disable|de-energize)\s+servos?\b')
+        .hasMatch(lower)) {
+      thoughts.add('Matched cleanup_servos intent');
+      return NeedlePlan(
+        toolName: 'cleanup_servos',
+        parameters: const {},
+        explanation: 'Releasing and de-energizing all robot servos',
+        confidence: 0.96,
+        thoughts: thoughts,
+        source: NeedlePlanSource.rules,
+        targetDeviceId: targetDeviceId,
+        targetDeviceName: targetDeviceName,
+      );
+    }
+
+    final mentionsCameraOrServo =
+        lower.contains('camera') || lower.contains('servo');
+    final hasSnapWord = RegExp(r'\bsnap\b').hasMatch(lower);
+    final hasPanWord = RegExp(r'\bpan\b').hasMatch(lower);
+    final mentionsServoDirectionOrAngle = lower.contains('left') ||
+        lower.contains('right') ||
+        hasPanWord ||
+        hasSnapWord ||
+        lower.contains('center') ||
+        lower.contains('angle') ||
+        lower.contains('degree');
+    if (mentionsCameraOrServo && mentionsServoDirectionOrAngle) {
+      final servoIdxMatch =
+          RegExp(r'(?:servo|channel)\s*([0-9]{1,2})').firstMatch(lower);
+      final servoIndex = servoIdxMatch != null
+          ? (int.tryParse(servoIdxMatch.group(1)!) ?? 0).clamp(0, 15)
+          : 0; // Default channel 0 = camera servo
+
+      if (hasSnapWord) {
+        final isRight = lower.contains('right');
+        final tool = isRight ? 'snap_servo_right' : 'snap_servo_left';
+        thoughts.add('Matched $tool (index=$servoIndex)');
+        return NeedlePlan(
+          toolName: tool,
+          parameters: {'index': servoIndex},
+          explanation:
+              'Snapping ${servoIndex == 0 ? "camera " : ""}servo $servoIndex ${isRight ? "right (0°)" : "left (180°)"}',
+          confidence: 0.97,
+          thoughts: thoughts,
+          source: NeedlePlanSource.rules,
+          targetDeviceId: targetDeviceId,
+          targetDeviceName: targetDeviceName,
+        );
+      }
+
+      if (lower.contains('left') || lower.contains('right')) {
+        final isRight = lower.contains('right');
+        final tool = isRight ? 'pan_to_right' : 'pan_to_left';
+        thoughts.add('Matched $tool (index=$servoIndex)');
+        return NeedlePlan(
+          toolName: tool,
+          parameters: {'index': servoIndex},
+          explanation:
+              'Moving ${servoIndex == 0 ? "camera " : ""}servo $servoIndex to the ${isRight ? "right" : "left"}',
+          confidence: 0.97,
+          thoughts: thoughts,
+          source: NeedlePlanSource.rules,
+          targetDeviceId: targetDeviceId,
+          targetDeviceName: targetDeviceName,
+        );
+      }
+
+      final angleMatch =
+          RegExp(r'(\d+(?:\.\d+)?)\s*(?:deg|degree)?').firstMatch(lower);
+      final targetAngle = lower.contains('center')
+          ? 90.0
+          : (angleMatch != null
+              ? (double.tryParse(angleMatch.group(1)!) ?? 90.0).clamp(0.0, 180.0)
+              : 90.0);
+      thoughts.add(
+          'Matched driver_set_servo_angle_with_index (index=$servoIndex, angle=$targetAngle)');
+      return NeedlePlan(
+        toolName: 'driver_set_servo_angle_with_index',
+        parameters: {'index': servoIndex, 'angle': targetAngle},
+        explanation:
+            'Setting ${servoIndex == 0 ? "camera " : ""}servo $servoIndex to ${targetAngle.round()}°',
+        confidence: 0.95,
+        thoughts: thoughts,
+        source: NeedlePlanSource.rules,
+        targetDeviceId: targetDeviceId,
+        targetDeviceName: targetDeviceName,
+      );
+    }
+
+    // ── 8. LED Strip & Illumination ─────────────────────────────────────────
+    if (lower.contains('strip') ||
+        lower.contains('rgb') ||
+        lower.contains('led plate') ||
+        (availableToolNames.contains('turn_on_strip_with_color') &&
+            (lower.contains('led') || lower.contains('light')) &&
+            (_extractNamedColor(lower) != null ||
+                lower.contains('animate') ||
+                lower.contains('strip')))) {
+      final isOff = lower.contains('off') ||
+          lower.contains('disable') ||
+          lower.contains('kill') ||
+          lower.contains('extinguish');
+      if (isOff) {
+        thoughts.add('Matched robot turn_off_strip');
+        return NeedlePlan(
+          toolName: 'turn_off_strip',
+          parameters: const {},
+          explanation: 'Turning off the 8-LED strip on ${targetDeviceName ?? "robot"}',
+          confidence: 0.97,
+          thoughts: thoughts,
+          source: NeedlePlanSource.rules,
+          targetDeviceId: targetDeviceId,
+          targetDeviceName: targetDeviceName,
+        );
+      }
+
+      final rgb = _extractNamedColor(lower) ?? const [0, 230, 118];
+      if (lower.contains('animate') || lower.contains('chase')) {
+        thoughts.add('Matched robot animate_running_process: rgb=$rgb');
+        return NeedlePlan(
+          toolName: 'animate_running_process',
+          parameters: {'r': rgb[0], 'g': rgb[1], 'b': rgb[2]},
+          explanation:
+              'Running LED strip animation with RGB(${rgb[0]}, ${rgb[1]}, ${rgb[2]})',
+          confidence: 0.96,
+          thoughts: thoughts,
+          source: NeedlePlanSource.rules,
+          targetDeviceId: targetDeviceId,
+          targetDeviceName: targetDeviceName,
+        );
+      }
+
+      thoughts.add('Matched robot turn_on_strip_with_color: rgb=$rgb');
+      return NeedlePlan(
+        toolName: 'turn_on_strip_with_color',
+        parameters: {'r': rgb[0], 'g': rgb[1], 'b': rgb[2]},
+        explanation:
+            'Turning on the 8-LED strip with RGB(${rgb[0]}, ${rgb[1]}, ${rgb[2]})',
+        confidence: 0.97,
+        thoughts: thoughts,
+        source: NeedlePlanSource.rules,
+        targetDeviceId: targetDeviceId,
+        targetDeviceName: targetDeviceName,
+      );
+    }
+
     if (lower.contains('led') ||
         lower.contains('light') ||
         lower.contains('torch') ||
@@ -531,6 +684,20 @@ class RuleIntentMatcher {
           lower.contains('kill') ||
           lower.contains('extinguish');
       final state = !isOff;
+      if (!state &&
+          availableToolNames.contains('turn_off_strip') &&
+          !availableToolNames.contains('set_led')) {
+        return NeedlePlan(
+          toolName: 'turn_off_strip',
+          parameters: const {},
+          explanation: 'Turning off the 8-LED strip',
+          confidence: 0.95,
+          thoughts: thoughts,
+          source: NeedlePlanSource.rules,
+          targetDeviceId: targetDeviceId,
+          targetDeviceName: targetDeviceName,
+        );
+      }
       final tool = availableToolNames.contains('set_led')
           ? 'set_led'
           : (availableToolNames.contains('gpio_write') ? 'gpio_write' : 'set_led');
@@ -825,6 +992,25 @@ class RuleIntentMatcher {
       targetDeviceId: targetDeviceId,
       targetDeviceName: targetDeviceName,
     );
+  }
+
+  static List<int>? _extractNamedColor(String lowerText) {
+    if (RegExp(r'\bred\b').hasMatch(lowerText)) return const [255, 0, 0];
+    if (RegExp(r'\bgreen\b').hasMatch(lowerText)) return const [0, 230, 118];
+    if (RegExp(r'\bblue\b').hasMatch(lowerText)) return const [0, 100, 255];
+    if (RegExp(r'\bwhite\b').hasMatch(lowerText)) return const [255, 255, 255];
+    if (RegExp(r'\bpurple|violet|magenta\b').hasMatch(lowerText)) {
+      return const [180, 0, 255];
+    }
+    if (RegExp(r'\byellow|amber\b').hasMatch(lowerText)) {
+      return const [255, 220, 0];
+    }
+    if (RegExp(r'\bcyan|aqua|teal\b').hasMatch(lowerText)) {
+      return const [0, 255, 255];
+    }
+    if (RegExp(r'\borange\b').hasMatch(lowerText)) return const [255, 140, 0];
+    if (RegExp(r'\bpink\b').hasMatch(lowerText)) return const [255, 80, 180];
+    return null;
   }
 
   static double? _extractNumber(String text, {double? defaultVal}) {

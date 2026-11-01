@@ -135,6 +135,9 @@ static unsigned char* g_mapped_cact = nullptr;
 static size_t g_mapped_size = 0;
 static char g_loaded_path[1024] = {0};
 static int g_is_loaded = 0;
+static int g_is_initialized = 0;
+static char* g_last_system_prompt = nullptr;
+static char* g_last_tools_json = nullptr;
 static char g_bridge_error[512] = {0};
 
 extern "C" {
@@ -228,6 +231,7 @@ NEEDLE_API int machmake_needle_load_file(const char* path) {
     strncpy(g_loaded_path, path, sizeof(g_loaded_path) - 1);
     g_loaded_path[sizeof(g_loaded_path) - 1] = '\0';
     g_is_loaded = 1;
+    g_is_initialized = 0;
     return rc;
 #else
     (void)path;
@@ -245,7 +249,32 @@ NEEDLE_API int machmake_needle_init(
         snprintf(g_bridge_error, sizeof(g_bridge_error), "Needle model is not loaded");
         return -1;
     }
-    return needle_init(system_prompt, tools_json, nullptr);
+    const char* sys = system_prompt ? system_prompt : "";
+    const char* tools = tools_json ? tools_json : "[]";
+
+    // If the exact same system_prompt and tools_json are already initialized,
+    // simply call needle_reset() to rewind the KV cache to the static tool prefix.
+    if (g_is_initialized &&
+        g_last_system_prompt != nullptr &&
+        g_last_tools_json != nullptr &&
+        strcmp(g_last_system_prompt, sys) == 0 &&
+        strcmp(g_last_tools_json, tools) == 0) {
+        needle_reset();
+        return 0;
+    }
+
+    int rc = needle_init(sys, tools, nullptr);
+    if (rc < 0) {
+        g_is_initialized = 0;
+        return rc;
+    }
+
+    free(g_last_system_prompt);
+    free(g_last_tools_json);
+    g_last_system_prompt = strdup(sys);
+    g_last_tools_json = strdup(tools);
+    g_is_initialized = 1;
+    return rc;
 #else
     (void)system_prompt;
     (void)tools_json;

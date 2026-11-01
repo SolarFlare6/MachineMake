@@ -19,8 +19,7 @@ class HybridRoutingResult {
   final List<String> suggestions;
   final bool llmWasAvailable;
 
-  /// True when the prompt is a complicated/multi-step/conversational sentence
-  /// and the Local LLM is ready to plan it in [HybridNeedleRouter.routeAndPlan].
+  /// True when Cactus Needle 3 (Local LLM) is ready and will plan the command.
   final bool preferLocalLlm;
 
   const HybridRoutingResult({
@@ -33,12 +32,12 @@ class HybridRoutingResult {
   });
 }
 
-/// Orchestrates the 4-stage Hybrid Needle AI pipeline:
+/// Orchestrates the Hybrid Needle AI pipeline:
 /// - **Stage 0**: [TargetResolver] + [IntentNormalizer]
-/// - **Stage 1**: [RuleIntentMatcher] (0 MB, < 1 ms) for simple, direct commands
-/// - **Stage 2**: On-Device Local LLM (`SmolLM2-360M-Instruct` via [LlmModelManager])
-///   for complicated, conversational, or multi-step sentences
-/// - **Fallback**: Fast Rules fallback if Local LLM is not installed or fails
+/// - **Primary (when installed)**: Cactus Compute Needle 3 (`needle3.cact` via [LlmModelManager])
+///   using strictly device-specific tool schemas for the resolved target device.
+/// - **Fallback (when Needle 3 is not installed or fails)**: [RuleIntentMatcher]
+///   validated strictly against the target device's available tools.
 class HybridNeedleRouter {
   final LlmModelManager _llmManager;
 
@@ -55,13 +54,7 @@ class HybridNeedleRouter {
     caseSensitive: false,
   );
 
-  /// Determines whether a command is a simple, direct imperative command
-  /// (e.g., "press enter", "stand up", "turn on pin 4", "walk forward 2 meters")
-  /// that should be handled immediately by Fast Rules without waking the LLM.
-  ///
-  /// Complicated sentences (multi-step chains, conversational requests, indirect
-  /// phrasing, or sentences > 4 words) return `false` so the Local LLM handles
-  /// them when installed (with Fast Rules as a fallback if the LLM fails).
+  /// Helper to determine if a command is a short single-step imperative phrase.
   static bool isSimpleCommand({
     required String rawActionPrompt,
     required String normalizedPrompt,
@@ -71,7 +64,6 @@ class HybridNeedleRouter {
       return false;
     }
 
-    // Multi-step plans or prompts with multiple clauses are complicated
     if (rulePlan.steps.length > 1 ||
         IntentNormalizer.splitMultiStep(normalizedPrompt).length > 1) {
       return false;
@@ -93,17 +85,38 @@ class HybridNeedleRouter {
         .where((w) => w.isNotEmpty)
         .toList();
 
-    // Direct literal typing (e.g. "type hello world") is simple up to 5 words
     if (rulePlan.toolName == 'keyboard_type') {
       return words.length <= 5;
     }
 
-    // Standard simple commands have at most 4 words (e.g. "turn on pin 4",
-    // "walk forward 2 meters", "press enter", "volume up").
     return words.length <= 4;
   }
 
-  /// Synchronous preview planning (Stages 0 + 1 only) for instant UI badges.
+  /// Builds the strict device-specific tool catalog for [targetDevice].
+  static List<ToolDefinition> _resolveDeviceTools(
+    DeviceItem targetDevice,
+    List<ToolDefinition> reportedTools,
+  ) {
+    final profileStr = '${targetDevice.profile} ${targetDevice.deviceType} ${targetDevice.name}';
+    final profileDefaults = ToolRelevanceFilter.defaultToolsForProfile(profileStr);
+    if (reportedTools.isEmpty) {
+      return profileDefaults;
+    }
+
+    // Merge reported tools with profile defaults (keeping reported tool definitions first)
+    final byName = <String, ToolDefinition>{};
+    for (final t in reportedTools) {
+      if (t.name != 'needle_prompt' && t.name != 'ai_prompt') {
+        byName[t.name] = t;
+      }
+    }
+    for (final d in profileDefaults) {
+      byName.putIfAbsent(d.name, () => d);
+    }
+    return byName.values.toList();
+  }
+
+  /// Synchronous preview planning for instant UI badges in the Voice Command dialog.
   HybridRoutingResult planSync({
     required String prompt,
     required DeviceItem defaultDevice,
@@ -116,13 +129,10 @@ class HybridNeedleRouter {
       defaultDevice: defaultDevice,
     );
     final targetDevice = targetRes.targetDevice;
-    final normalized = IntentNormalizer.normalize(targetRes.cleanedActionPrompt);
-    final tools = toolsProvider(targetDevice.id);
-    final effectiveTools = tools.isNotEmpty
-        ? tools
-        : ToolRelevanceFilter.defaultToolsForProfile(
-            '${targetDevice.profile} ${targetDevice.deviceType}',
-          );
+    final normalized =
+        IntentNormalizer.normalize(targetRes.cleanedActionPrompt);
+    final rawReportedTools = toolsProvider(targetDevice.id);
+    final effectiveTools = _resolveDeviceTools(targetDevice, rawReportedTools);
 
     final rawRulePlan = RuleIntentMatcher.match(
       normalized,
@@ -130,12 +140,8 @@ class HybridNeedleRouter {
       targetDeviceId: targetDevice.id,
       targetDeviceName: targetDevice.name,
     );
-    final validatedPlan = PlanValidator.validateAndCoerce(rawRulePlan, tools);
-    final isSimple = isSimpleCommand(
-      rawActionPrompt: targetRes.cleanedActionPrompt,
-      normalizedPrompt: normalized,
-      rulePlan: validatedPlan,
-    );
+    final validatedPlan =
+        PlanValidator.validateAndCoerce(rawRulePlan, effectiveTools);
     final llmReady = _llmManager.isReadyForInference;
 
     return HybridRoutingResult(
@@ -147,14 +153,16 @@ class HybridNeedleRouter {
         deviceProfile: '${targetDevice.profile} ${targetDevice.deviceType}',
       ),
       llmWasAvailable: llmReady,
-      preferLocalLlm: llmReady && !isSimple,
+      // When Cactus Needle 3 is installed & enabled, always prefer it for voice commands
+      preferLocalLlm: llmReady && targetRes.cleanedActionPrompt.trim().isNotEmpty,
     );
   }
 
-  /// Full asynchronous hybrid planning:
-  /// - Simple commands -> Stage 1 Fast Rules (< 1 ms, do not use LLM)
-  /// - Complicated sentences -> Stage 2 Local LLM (`SmolLM2-360M-Instruct`) when installed
-  /// - Fallback -> Stage 1 Fast Rules if Local LLM is not installed or fails
+  /// Full asynchronous planning:
+  /// - When Cactus Needle 3 (`needle3.cact`) is installed and enabled, always uses
+  ///   Cactus Needle 3 first with the target device's specific tool schemas.
+  /// - Falls back to device-validated Fast Rules if Needle 3 is not installed or
+  ///   cannot produce a valid tool call.
   Future<HybridRoutingResult> routeAndPlan({
     required String prompt,
     required DeviceItem defaultDevice,
@@ -171,13 +179,12 @@ class HybridNeedleRouter {
     final rawActionPrompt = targetRes.cleanedActionPrompt.trim();
     final normalized = IntentNormalizer.normalize(rawActionPrompt);
 
-    final deviceTools = toolsProvider(targetDevice.id);
-    final profileStr = '${targetDevice.profile} ${targetDevice.deviceType}';
-    final effectiveTools = deviceTools.isNotEmpty
-        ? deviceTools
-        : ToolRelevanceFilter.defaultToolsForProfile(profileStr);
+    final rawReportedTools = toolsProvider(targetDevice.id);
+    final profileStr =
+        '${targetDevice.profile} ${targetDevice.deviceType} ${targetDevice.name}';
+    final effectiveTools = _resolveDeviceTools(targetDevice, rawReportedTools);
 
-    // ── Stage 1: Fast Deterministic & Fuzzy Rules (< 1 ms, 0 MB) ────────────
+    // Pre-compute Stage 1 Fast Rule plan (strictly validated against effectiveTools)
     final rulePlan = RuleIntentMatcher.match(
       normalized,
       effectiveTools,
@@ -185,65 +192,24 @@ class HybridNeedleRouter {
       targetDeviceName: targetDevice.name,
     );
     final validatedRulePlan =
-        PlanValidator.validateAndCoerce(rulePlan, deviceTools);
+        PlanValidator.validateAndCoerce(rulePlan, effectiveTools);
 
-    final isSimple = isSimpleCommand(
-      rawActionPrompt: rawActionPrompt,
-      normalizedPrompt: normalized,
-      rulePlan: validatedRulePlan,
-    );
-
-    // If it's a simple direct command, use Fast Rules immediately without LLM
-    if (isSimple) {
-      return HybridRoutingResult(
-        targetResolution: targetRes,
-        normalizedActionPrompt: normalized,
-        plan: validatedRulePlan,
-        llmWasAvailable: _llmManager.isReadyForInference,
-        preferLocalLlm: false,
-      );
-    }
-
-    // ── Stage 2: Local LLM (Cactus Needle 3) for Complicated Sentences
+    // ── Stage 2 (Primary when installed): Cactus Needle 3 Local LLM ─────────
     if (_llmManager.isReadyForInference) {
       final loaded = await _llmManager.ensureLoadedInRam();
       if (loaded) {
         try {
           final llmInputPrompt =
               rawActionPrompt.isNotEmpty ? rawActionPrompt : normalized;
-          final filteredTools = ToolRelevanceFilter.filter(
-            prompt: llmInputPrompt,
-            availableTools: effectiveTools,
-            deviceProfile: profileStr,
-            maxTools: 8,
-          );
-          final systemPrompt = ToolPromptBuilder.buildSystemPrompt(
-            deviceName: targetDevice.name,
-            deviceProfile: profileStr,
-            filteredTools: filteredTools,
-          );
-          final toolsJson =
-              ToolPromptBuilder.buildNeedleToolsJson(filteredTools);
-          final grammar = ToolGrammarBuilder.buildGrammar(filteredTools);
-
-          final rawJson = await _llmManager.runtime.generateStructured(
-            systemPrompt: systemPrompt,
-            userPrompt: llmInputPrompt,
-            gbnfGrammar: grammar,
-            toolsJson: toolsJson,
-            maxTokens: 140,
-            temperature: 0.05,
+          final validatedLlmPlan = await _planWithNeedleLlm(
+            llmInputPrompt: llmInputPrompt,
+            normalizedPrompt: normalized,
+            targetDevice: targetDevice,
+            profileStr: profileStr,
+            effectiveTools: effectiveTools,
           );
 
-          final parsedLlmPlan = LlmPlanParser.parse(
-            rawJson,
-            targetDeviceId: targetDevice.id,
-            targetDeviceName: targetDevice.name,
-          );
-          final validatedLlmPlan =
-              PlanValidator.validateAndCoerce(parsedLlmPlan, deviceTools);
-
-          if (validatedLlmPlan.toolName.isNotEmpty) {
+          if (validatedLlmPlan != null && validatedLlmPlan.toolName.isNotEmpty) {
             return HybridRoutingResult(
               targetResolution: targetRes,
               normalizedActionPrompt: normalized,
@@ -253,12 +219,12 @@ class HybridNeedleRouter {
             );
           }
         } catch (_) {
-          // Fall through gracefully to Fast Rules fallback if LLM inference fails
+          // Fall through gracefully to device-validated Fast Rules if native inference throws
         }
       }
     }
 
-    // ── Fallback: Use Fast Rules if LLM is not installed or if LLM failed ───
+    // ── Fallback: Device-Validated Fast Rules ───────────────────────────────
     final suggestions = PlanValidator.suggestExamples(
       effectiveTools,
       deviceProfile: profileStr,
@@ -272,5 +238,140 @@ class HybridNeedleRouter {
       llmWasAvailable: _llmManager.isReadyForInference,
       preferLocalLlm: false,
     );
+  }
+
+  Future<NeedlePlan?> _planWithNeedleLlm({
+    required String llmInputPrompt,
+    required String normalizedPrompt,
+    required DeviceItem targetDevice,
+    required String profileStr,
+    required List<ToolDefinition> effectiveTools,
+  }) async {
+    final filteredTools = ToolRelevanceFilter.filter(
+      prompt: llmInputPrompt,
+      availableTools: effectiveTools,
+      deviceProfile: profileStr,
+      maxTools: 12,
+    );
+    final systemPrompt = ToolPromptBuilder.buildSystemPrompt(
+      deviceName: targetDevice.name,
+      deviceProfile: profileStr,
+      filteredTools: filteredTools,
+    );
+    final toolsJson = ToolPromptBuilder.buildNeedleToolsJson(filteredTools);
+    final grammar = ToolGrammarBuilder.buildGrammar(filteredTools);
+
+    final rawJson = await _llmManager.runtime.generateStructured(
+      systemPrompt: systemPrompt,
+      userPrompt: llmInputPrompt,
+      gbnfGrammar: grammar,
+      toolsJson: toolsJson,
+      maxTokens: 256,
+      temperature: 0.0,
+    );
+
+    final parsedLlmPlan = LlmPlanParser.parse(
+      rawJson,
+      targetDeviceId: targetDevice.id,
+      targetDeviceName: targetDevice.name,
+    );
+    final validatedLlmPlan =
+        PlanValidator.validateAndCoerce(parsedLlmPlan, effectiveTools);
+
+    // If the prompt contains multiple clauses (e.g. "turn on the led strip and move the camera to the left")
+    // and a single pass only emitted 1 step, plan each clause with Needle 3 so all steps execute!
+    final subClauses = IntentNormalizer.splitMultiStep(normalizedPrompt);
+    if (subClauses.length > 1 && validatedLlmPlan.steps.length < subClauses.length) {
+      final clausePlans = <NeedlePlan>[];
+      int llmClauseMatches = 0;
+      for (final clause in subClauses) {
+        final clauseTools = ToolRelevanceFilter.filter(
+          prompt: clause,
+          availableTools: effectiveTools,
+          deviceProfile: profileStr,
+          maxTools: 10,
+        );
+        final clauseSysPrompt = ToolPromptBuilder.buildSystemPrompt(
+          deviceName: targetDevice.name,
+          deviceProfile: profileStr,
+          filteredTools: clauseTools,
+        );
+        final clauseToolsJson =
+            ToolPromptBuilder.buildNeedleToolsJson(clauseTools);
+        final clauseGrammar = ToolGrammarBuilder.buildGrammar(clauseTools);
+
+        final clauseRaw = await _llmManager.runtime.generateStructured(
+          systemPrompt: clauseSysPrompt,
+          userPrompt: clause,
+          gbnfGrammar: clauseGrammar,
+          toolsJson: clauseToolsJson,
+          maxTokens: 160,
+          temperature: 0.0,
+        );
+        final parsedClause = LlmPlanParser.parse(
+          clauseRaw,
+          targetDeviceId: targetDevice.id,
+          targetDeviceName: targetDevice.name,
+        );
+        var validatedClause =
+            PlanValidator.validateAndCoerce(parsedClause, effectiveTools);
+
+        if (validatedClause.toolName.isNotEmpty) {
+          llmClauseMatches++;
+        } else {
+          // If Needle 3 missed one sub-clause, check if a strict device-validated rule matches that sub-clause
+          final fallbackClause = RuleIntentMatcher.match(
+            clause,
+            effectiveTools,
+            targetDeviceId: targetDevice.id,
+            targetDeviceName: targetDevice.name,
+          );
+          validatedClause =
+              PlanValidator.validateAndCoerce(fallbackClause, effectiveTools);
+        }
+
+        if (validatedClause.toolName.isEmpty) {
+          clausePlans.clear();
+          break;
+        }
+        clausePlans.add(
+          NeedlePlan(
+            toolName: validatedClause.toolName,
+            parameters: validatedClause.parameters,
+            explanation: validatedClause.explanation,
+            confidence: validatedClause.confidence,
+            thoughts: validatedClause.thoughts,
+            source: NeedlePlanSource.localLlm,
+            requiresConfirmation: validatedClause.requiresConfirmation,
+            targetDeviceId: targetDevice.id,
+            targetDeviceName: targetDevice.name,
+          ),
+        );
+      }
+
+      if (clausePlans.length == subClauses.length && llmClauseMatches > 0) {
+        final first = clausePlans.first;
+        return NeedlePlan(
+          toolName: first.toolName,
+          parameters: first.parameters,
+          explanation: clausePlans.map((s) => s.explanation).join(' → '),
+          confidence: clausePlans
+              .map((s) => s.confidence)
+              .reduce((a, b) => a < b ? a : b),
+          thoughts: [
+            'Cactus Needle 3 generated ${clausePlans.length}-step device plan',
+            ...clausePlans.expand((s) => s.thoughts),
+          ],
+          source: NeedlePlanSource.localLlm,
+          requiresConfirmation:
+              clausePlans.any((s) => s.requiresConfirmation),
+          steps: clausePlans,
+          targetDeviceId: targetDevice.id,
+          targetDeviceName: targetDevice.name,
+        );
+      }
+    }
+
+    return validatedLlmPlan;
   }
 }

@@ -195,7 +195,7 @@ void main() {
       expect(rebootPlan.requiresConfirmation, isTrue);
     });
 
-    test('Matches multi-step fast rule chains', () {
+    test('Matches multi-step fast rule chains and robot LED strip + camera servo commands', () {
       final robotTools = ToolRelevanceFilter.defaultToolsForProfile('quadruped');
       final chainPlan = RuleIntentMatcher.match(
         'stand up and then walk forward two meters',
@@ -205,6 +205,30 @@ void main() {
       expect(chainPlan.steps[0].toolName, equals('stand'));
       expect(chainPlan.steps[1].toolName, equals('walk'));
       expect(chainPlan.steps[1].parameters['distance'], equals(2.0));
+
+      final stripAndCamPlan = RuleIntentMatcher.match(
+        'turn on the led strip and move the camera to the left',
+        robotTools,
+        targetDeviceId: 'robot-1',
+        targetDeviceName: 'Spot Quadruped',
+      );
+      expect(stripAndCamPlan.steps.length, equals(2));
+      expect(
+        stripAndCamPlan.steps[0].toolName,
+        equals('turn_on_strip_with_color'),
+      );
+      expect(stripAndCamPlan.steps[1].toolName, equals('pan_to_left'));
+      expect(stripAndCamPlan.steps[1].parameters['index'], equals(0));
+
+      // Verify the exact same robot command is rejected when given to a PC
+      final pcTools = ToolRelevanceFilter.defaultToolsForProfile('pc');
+      final rejectedOnPc = RuleIntentMatcher.match(
+        'turn on the led strip and move the camera to the left',
+        pcTools,
+        targetDeviceId: 'pc-1',
+        targetDeviceName: 'Desktop PC',
+      );
+      expect(rejectedOnPc.toolName, isEmpty);
     });
   });
 
@@ -244,10 +268,10 @@ void main() {
       expect(response.plan?.source, equals(NeedlePlanSource.rules));
     });
 
-    test('Uses Fast Rules for simple commands and Local LLM for complicated sentences (with Fast Rules fallback)', () async {
+    test('Always uses Cactus Needle 3 when installed, enforces device-specific tools, and falls back to Fast Rules on LLM failure', () async {
       final mockRuntime = _MockLlmRuntime(
         cannedJsonResponse:
-            '{"calls":[{"tool":"media_control","params":{"action":"vol_down"}}]}',
+            '{"type":"call","function_calls":[{"name":"media_control","arguments":{"action":"vol_down"}}],"confidence":0.94}',
       );
       mockRuntime._loaded = true;
       LlmModelManager.instance.setRuntimeForTesting(
@@ -257,18 +281,7 @@ void main() {
 
       final router = HybridNeedleRouter(llmManager: LlmModelManager.instance);
 
-      // 1. Simple command ("press enter") -> uses Fast Rules even when LLM is loaded
-      final simpleRouting = await router.routeAndPlan(
-        prompt: 'On the PC press enter',
-        defaultDevice: robotDevice,
-        connectedDevices: allDevices,
-        toolsProvider: (_) => ToolRelevanceFilter.defaultToolsForProfile('pc'),
-      );
-      expect(simpleRouting.targetResolution.targetDevice.id, equals('pc-1'));
-      expect(simpleRouting.plan.source, equals(NeedlePlanSource.rules));
-      expect(simpleRouting.plan.toolName, equals('keyboard_press'));
-
-      // 2. Complicated sentence ("On the PC it is way too loud in here") -> uses Local LLM
+      // 1. When Cactus Needle 3 is installed, voice commands use Local LLM (NeedlePlanSource.localLlm)
       final complexRouting = await router.routeAndPlan(
         prompt: 'On the PC it is way too loud in here',
         defaultDevice: robotDevice,
@@ -280,7 +293,42 @@ void main() {
       expect(complexRouting.plan.toolName, equals('media_control'));
       expect(complexRouting.plan.parameters['action'], equals('vol_down'));
 
-      // 3. Complicated sentence when LLM fails -> falls back to Fast Rules
+      // 2. Robot-only tools ("turn_on_strip_with_color", "pan_to_left") work on Robot but are rejected on PC
+      final robotMockRuntime = _MockLlmRuntime(
+        cannedJsonResponse:
+            '{"type":"call","function_calls":[{"name":"turn_on_strip_with_color","arguments":{"r":0,"g":230,"b":118}},{"name":"pan_to_left","arguments":{"index":0}}],"confidence":0.95}',
+      );
+      robotMockRuntime._loaded = true;
+      LlmModelManager.instance.setRuntimeForTesting(
+        robotMockRuntime,
+        state: LlmModelState.readyInRam,
+      );
+
+      final robotRouting = await router.routeAndPlan(
+        prompt: 'turn on the led strip and move the camera to the left',
+        defaultDevice: robotDevice,
+        connectedDevices: allDevices,
+        toolsProvider: (_) =>
+            ToolRelevanceFilter.defaultToolsForProfile('quadruped'),
+      );
+      expect(robotRouting.plan.source, equals(NeedlePlanSource.localLlm));
+      expect(robotRouting.plan.steps.length, equals(2));
+      expect(
+        robotRouting.plan.steps[0].toolName,
+        equals('turn_on_strip_with_color'),
+      );
+      expect(robotRouting.plan.steps[1].toolName, equals('pan_to_left'));
+      expect(robotRouting.plan.steps[1].parameters['index'], equals(0));
+
+      final rejectedPcRouting = await router.routeAndPlan(
+        prompt: 'turn on the led strip and move the camera to the left',
+        defaultDevice: pcDevice,
+        connectedDevices: [pcDevice],
+        toolsProvider: (_) => ToolRelevanceFilter.defaultToolsForProfile('pc'),
+      );
+      expect(rejectedPcRouting.plan.toolName, isEmpty);
+
+      // 3. When LLM fails -> falls back to device-validated Fast Rules
       final failingRuntime = _MockLlmRuntime(cannedJsonResponse: 'invalid json');
       failingRuntime._loaded = true;
       LlmModelManager.instance.setRuntimeForTesting(

@@ -128,6 +128,11 @@ class LlmModelManager extends ChangeNotifier {
     _preloadOnVoiceDialog = prefs.getBool(_prefPreload) ?? true;
 
     await refreshDiskState();
+    if (_isEnabled &&
+        _state == LlmModelState.installed &&
+        !_runtime.isLoaded) {
+      unawaited(ensureLoadedInRam());
+    }
   }
 
   Future<void> setEnabled(bool value) async {
@@ -376,6 +381,9 @@ class LlmModelManager extends ChangeNotifier {
       _state = LlmModelState.installed;
       _errorMessage = null;
       notifyListeners();
+      if (_isEnabled) {
+        unawaited(ensureLoadedInRam());
+      }
       return true;
     } catch (e) {
       if (_cancelRequested) {
