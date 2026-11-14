@@ -119,6 +119,10 @@ class PlanValidator {
         'animate_running_process': ['animate_with_color'],
         'set_servo_angle': ['driver_set_servo_angle_with_index'],
         'driver_set_servo_angle_with_index': ['set_servo_angle'],
+        'track_object': ['select_object'],
+        'select_object': ['track_object'],
+        'stop_tracking': ['cancel_tracking'],
+        'cancel_tracking': ['stop_tracking'],
       };
       final candidates = aliasMap[plan.toolName] ?? const [];
       for (final alt in candidates) {
@@ -259,6 +263,18 @@ class PlanValidator {
         toolName == 'snap_servo_right') {
       result['index'] =
           (result['index'] is num) ? (result['index'] as num).toInt().clamp(0, 15) : 0;
+    } else if (toolName == 'track_object' || toolName == 'select_object') {
+      if (result['label'] == null && result['target'] != null) {
+        result['label'] = result['target'].toString();
+      }
+      final hasCoords = (result['u'] != null && result['v'] != null) ||
+          (result['x'] != null && result['y'] != null);
+      if (hasCoords) {
+        result.removeWhere((k, v) => v == null);
+      } else {
+        final lbl = (result['label'] ?? '').toString().trim();
+        result['label'] = lbl.isEmpty ? 'person' : lbl;
+      }
     }
     return result;
   }

@@ -147,198 +147,303 @@ class _ControlsScreenState extends State<ControlsScreen> {
                 listenable: EventManager(),
                 builder: (context, _) {
                   final frameBytes = EventManager().latestCameraFrame(_targetId);
-                  return GestureDetector(
-                    onTap: !_isCameraStreaming ? _toggleCamera : null,
-                    child: Container(
-                      height: 210,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF131418),
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(
-                          color: (_isCameraStreaming || frameBytes != null)
-                              ? AppTheme.primaryOrange.withAlpha(180)
-                              : AppTheme.darkBorder,
-                          width: 1.5,
-                        ),
+                  final isTracking = EventManager().isTrackingActive(_targetId);
+                  return Container(
+                    height: 210,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF131418),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(
+                        color: isTracking
+                            ? const Color(0xFF00E5FF)
+                            : ((_isCameraStreaming || frameBytes != null)
+                                ? AppTheme.primaryOrange.withAlpha(180)
+                                : AppTheme.darkBorder),
+                        width: 1.5,
                       ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(17),
-                        child: Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            if (frameBytes != null && _isCameraStreaming)
-                              Image.memory(
-                                frameBytes,
-                                fit: BoxFit.cover,
-                                gaplessPlayback: true,
-                              )
-                            else if (frameBytes != null && !_isCameraStreaming)
-                              Stack(
-                                fit: StackFit.expand,
-                                children: [
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(17),
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final viewSize = Size(
+                            constraints.maxWidth,
+                            constraints.maxHeight,
+                          );
+                          return GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTapUp: (details) {
+                              if (!_isCameraStreaming && frameBytes == null) {
+                                _toggleCamera();
+                                return;
+                              }
+                              if (viewSize.width <= 0 || viewSize.height <= 0) {
+                                return;
+                              }
+                              final u = (details.localPosition.dx /
+                                      viewSize.width)
+                                  .clamp(0.0, 1.0);
+                              final v = (details.localPosition.dy /
+                                      viewSize.height)
+                                  .clamp(0.0, 1.0);
+                              EventManager().setTrackingState(
+                                _targetId,
+                                active: true,
+                                label: 'tap_target',
+                              );
+                              if (_targetId.isNotEmpty) {
+                                () async {
+                                  try {
+                                    await DeviceManager().executeTool(
+                                      _targetId,
+                                      'track_object',
+                                      {
+                                        'u': double.parse(u.toStringAsFixed(4)),
+                                        'v': double.parse(v.toStringAsFixed(4)),
+                                      },
+                                    );
+                                  } catch (_) {}
+                                }();
+                              }
+                            },
+                            child: Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                if (frameBytes != null && _isCameraStreaming)
                                   Image.memory(
                                     frameBytes,
                                     fit: BoxFit.cover,
                                     gaplessPlayback: true,
-                                  ),
-                                  Container(
-                                    color: Colors.black.withAlpha(130),
-                                    alignment: Alignment.center,
+                                  )
+                                else if (frameBytes != null &&
+                                    !_isCameraStreaming)
+                                  Stack(
+                                    fit: StackFit.expand,
+                                    children: [
+                                      Image.memory(
+                                        frameBytes,
+                                        fit: BoxFit.cover,
+                                        gaplessPlayback: true,
+                                      ),
+                                      Container(
+                                        color: Colors.black.withAlpha(130),
+                                        alignment: Alignment.center,
+                                        child: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(Icons.play_circle_fill,
+                                                size: 46,
+                                                color: AppTheme.primaryOrange),
+                                            const SizedBox(height: 6),
+                                            Text(
+                                              'Stream Paused · Tap to Track or Start',
+                                              style: GoogleFonts.exo2(
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 13,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  )
+                                else
+                                  Center(
                                     child: Column(
-                                      mainAxisSize: MainAxisSize.min,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
                                       children: [
-                                        Icon(Icons.play_circle_fill,
-                                            size: 46, color: AppTheme.primaryOrange),
-                                        const SizedBox(height: 6),
+                                        Icon(
+                                          _isCameraStreaming
+                                              ? Icons.videocam
+                                              : Icons.videocam_off_outlined,
+                                          size: 42,
+                                          color: _isCameraStreaming
+                                              ? AppTheme.primaryOrange
+                                              : AppTheme.textMuted,
+                                        ),
+                                        const SizedBox(height: 8),
                                         Text(
-                                          'Stream Paused · Tap to Resume',
+                                          _isCameraStreaming
+                                              ? 'Connecting to Robot Camera Stream...'
+                                              : 'Camera Feed Paused (Tap to Start)',
                                           style: GoogleFonts.exo2(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 13,
+                                            color: _isCameraStreaming
+                                                ? Colors.white
+                                                : AppTheme.textMuted,
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          'State: $_currentAction',
+                                          style: GoogleFonts.exo2(
+                                            color: AppTheme.textMuted,
+                                            fontSize: 12,
                                           ),
                                         ),
                                       ],
                                     ),
                                   ),
-                                ],
-                              )
-                            else
-                              Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      _isCameraStreaming
-                                          ? Icons.videocam
-                                          : Icons.videocam_off_outlined,
-                                      size: 42,
+                                // Live badge
+                                Positioned(
+                                  top: 10,
+                                  left: 10,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
                                       color: _isCameraStreaming
-                                          ? AppTheme.primaryOrange
-                                          : AppTheme.textMuted,
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      _isCameraStreaming
-                                          ? 'Connecting to Robot Camera Stream...'
-                                          : 'Camera Feed Paused (Tap to Start)',
-                                      style: GoogleFonts.exo2(
+                                          ? const Color(0xFF00E676).withAlpha(40)
+                                          : Colors.black54,
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(
                                         color: _isCameraStreaming
-                                            ? Colors.white
-                                            : AppTheme.textMuted,
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 14,
+                                            ? const Color(0xFF00E676)
+                                            : AppTheme.darkBorder,
                                       ),
                                     ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      'State: $_currentAction',
-                                      style: GoogleFonts.exo2(
-                                        color: AppTheme.textMuted,
-                                        fontSize: 12,
-                                      ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Container(
+                                          width: 8,
+                                          height: 8,
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            color: _isCameraStreaming
+                                                ? const Color(0xFF00E676)
+                                                : Colors.grey,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          _isCameraStreaming ? 'LIVE' : 'PAUSED',
+                                          style: GoogleFonts.exo2(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                            color: _isCameraStreaming
+                                                ? const Color(0xFF00E676)
+                                                : Colors.grey,
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                  ],
-                                ),
-                              ),
-                            // Live badge
-                            Positioned(
-                              top: 10,
-                              left: 10,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: _isCameraStreaming
-                                      ? const Color(0xFF00E676).withAlpha(40)
-                                      : Colors.black54,
-                                  borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(
-                                    color: _isCameraStreaming
-                                        ? const Color(0xFF00E676)
-                                        : AppTheme.darkBorder,
                                   ),
                                 ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Container(
-                                      width: 8,
-                                      height: 8,
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        color: _isCameraStreaming
-                                            ? const Color(0xFF00E676)
-                                            : Colors.grey,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      _isCameraStreaming ? 'LIVE' : 'PAUSED',
-                                      style: GoogleFonts.exo2(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.bold,
-                                        color: _isCameraStreaming
-                                            ? const Color(0xFF00E676)
-                                            : Colors.grey,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            // On-card Start/Stop + Snapshot mini controls in bottom-right
-                            Positioned(
-                              bottom: 10,
-                              right: 10,
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                   InkWell(
-                                    onTap: _toggleCamera,
-                                    borderRadius: BorderRadius.circular(8),
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 10, vertical: 6),
-                                      decoration: BoxDecoration(
-                                        color: Colors.black.withAlpha(170),
+                                // On-card Start/Stop + Stop Tracking mini controls in bottom-right
+                                Positioned(
+                                  bottom: 10,
+                                  right: 10,
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      InkWell(
+                                        onTap: () async {
+                                          EventManager().setTrackingState(
+                                            _targetId,
+                                            active: false,
+                                          );
+                                          if (_targetId.isNotEmpty) {
+                                            try {
+                                              await DeviceManager().executeTool(
+                                                _targetId,
+                                                'stop_tracking',
+                                                {},
+                                              );
+                                            } catch (_) {}
+                                          }
+                                        },
                                         borderRadius: BorderRadius.circular(8),
-                                        border: Border.all(
-                                          color: _isCameraStreaming
-                                              ? Colors.redAccent
-                                              : AppTheme.primaryOrange,
-                                        ),
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(
-                                            _isCameraStreaming
-                                                ? Icons.stop
-                                                : Icons.play_arrow,
-                                            size: 14,
-                                            color: _isCameraStreaming
-                                                ? Colors.redAccent
-                                                : AppTheme.primaryOrange,
-                                          ),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            _isCameraStreaming ? 'Stop' : 'Start',
-                                            style: GoogleFonts.exo2(
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.bold,
-                                              color: Colors.white,
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 10, vertical: 6),
+                                          decoration: BoxDecoration(
+                                            color: Colors.black.withAlpha(170),
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                            border: Border.all(
+                                              color: isTracking
+                                                  ? const Color(0xFF00E5FF)
+                                                  : AppTheme.darkBorder,
                                             ),
                                           ),
-                                        ],
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(
+                                                Icons.gps_off,
+                                                size: 13,
+                                                color: isTracking
+                                                    ? const Color(0xFF00E5FF)
+                                                    : Colors.white70,
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                'Untrack',
+                                                style: GoogleFonts.exo2(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.white,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
                                       ),
-                                    ),
+                                      const SizedBox(width: 6),
+                                      InkWell(
+                                        onTap: _toggleCamera,
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 10, vertical: 6),
+                                          decoration: BoxDecoration(
+                                            color: Colors.black.withAlpha(170),
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                            border: Border.all(
+                                              color: _isCameraStreaming
+                                                  ? Colors.redAccent
+                                                  : AppTheme.primaryOrange,
+                                            ),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(
+                                                _isCameraStreaming
+                                                    ? Icons.stop
+                                                    : Icons.play_arrow,
+                                                size: 14,
+                                                color: _isCameraStreaming
+                                                    ? Colors.redAccent
+                                                    : AppTheme.primaryOrange,
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                _isCameraStreaming
+                                                    ? 'Stop'
+                                                    : 'Start',
+                                                style: GoogleFonts.exo2(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.white,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                ],
-                              ),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
+                          );
+                        },
                       ),
                     ),
                   );

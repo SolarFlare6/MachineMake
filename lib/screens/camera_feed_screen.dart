@@ -52,6 +52,30 @@ class _CameraFeedScreenState extends State<CameraFeedScreen> {
     );
   }
 
+  Future<void> _handleTapTrack(TapUpDetails details, Size viewSize) async {
+    if (viewSize.width <= 0 || viewSize.height <= 0) return;
+    final u = (details.localPosition.dx / viewSize.width).clamp(0.0, 1.0);
+    final v = (details.localPosition.dy / viewSize.height).clamp(0.0, 1.0);
+    EventManager().setTrackingState(_targetId, active: true, label: 'tap_target');
+    if (_targetId.isNotEmpty) {
+      try {
+        await DeviceManager().executeTool(_targetId, 'track_object', {
+          'u': double.parse(u.toStringAsFixed(4)),
+          'v': double.parse(v.toStringAsFixed(4)),
+        });
+      } catch (_) {}
+    }
+  }
+
+  Future<void> _stopTracking() async {
+    EventManager().setTrackingState(_targetId, active: false);
+    if (_targetId.isNotEmpty) {
+      try {
+        await DeviceManager().executeTool(_targetId, 'stop_tracking', {});
+      } catch (_) {}
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -71,6 +95,7 @@ class _CameraFeedScreenState extends State<CameraFeedScreen> {
           listenable: EventManager(),
           builder: (context, _) {
             final frameBytes = EventManager().latestCameraFrame(_targetId);
+            final isTracking = EventManager().isTrackingActive(_targetId);
             return Column(
               children: [
                 Expanded(
@@ -79,108 +104,134 @@ class _CameraFeedScreenState extends State<CameraFeedScreen> {
                     decoration: BoxDecoration(
                       color: Colors.black,
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: AppTheme.primaryOrange, width: 2),
+                      border: Border.all(
+                        color: isTracking
+                            ? const Color(0xFF00E5FF)
+                            : AppTheme.primaryOrange,
+                        width: 2,
+                      ),
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(18),
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          if (_isStreaming && frameBytes != null)
-                            Image.memory(
-                              frameBytes,
-                              fit: BoxFit.contain,
-                              gaplessPlayback: true,
-                            )
-                          else if (frameBytes != null)
-                            Stack(
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final viewSize = Size(
+                            constraints.maxWidth,
+                            constraints.maxHeight,
+                          );
+                          return GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTapUp: (details) =>
+                                _handleTapTrack(details, viewSize),
+                            child: Stack(
                               fit: StackFit.expand,
                               children: [
-                                Image.memory(
-                                  frameBytes,
-                                  fit: BoxFit.contain,
-                                  gaplessPlayback: true,
-                                ),
-                                Container(
-                                  color: Colors.black.withAlpha(120),
-                                  alignment: Alignment.center,
-                                  child: Text(
-                                    'Stream Paused',
-                                    style: GoogleFonts.exo2(
-                                      color: Colors.white,
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
+                                if (_isStreaming && frameBytes != null)
+                                  Image.memory(
+                                    frameBytes,
+                                    fit: BoxFit.contain,
+                                    gaplessPlayback: true,
+                                  )
+                                else if (frameBytes != null)
+                                  Stack(
+                                    fit: StackFit.expand,
+                                    children: [
+                                      Image.memory(
+                                        frameBytes,
+                                        fit: BoxFit.contain,
+                                        gaplessPlayback: true,
+                                      ),
+                                      Container(
+                                        color: Colors.black.withAlpha(120),
+                                        alignment: Alignment.center,
+                                        child: Text(
+                                          'Stream Paused',
+                                          style: GoogleFonts.exo2(
+                                            color: Colors.white,
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  )
+                                else
+                                  Center(
+                                    child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          _isStreaming
+                                              ? Icons.videocam
+                                              : Icons.videocam_off,
+                                          size: 64,
+                                          color: AppTheme.primaryOrange
+                                              .withAlpha(200),
+                                        ),
+                                        const SizedBox(height: 12),
+                                        Text(
+                                          _isStreaming
+                                              ? 'CONNECTING TO LIVE DCP STREAM...'
+                                              : 'CAMERA STREAM PAUSED',
+                                          style: GoogleFonts.exo2(
+                                            color: Colors.white,
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                            letterSpacing: 1.1,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          '640x480 • MJPEG over DCP WebSocket',
+                                          style: GoogleFonts.exo2(
+                                            color: AppTheme.textMuted,
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+
+                                // HUD Overlay
+                                Positioned(
+                                  top: 16,
+                                  left: 16,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: _isStreaming
+                                          ? Colors.red
+                                          : Colors.grey[800],
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const CircleAvatar(
+                                          radius: 4,
+                                          backgroundColor: Colors.white,
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          _isStreaming ? 'LIVE' : 'PAUSED',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ),
                               ],
-                            )
-                          else
-                            Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    _isStreaming ? Icons.videocam : Icons.videocam_off,
-                                    size: 64,
-                                    color: AppTheme.primaryOrange.withAlpha(200),
-                                  ),
-                                  const SizedBox(height: 12),
-                                  Text(
-                                    _isStreaming
-                                        ? 'CONNECTING TO LIVE DCP STREAM...'
-                                        : 'CAMERA STREAM PAUSED',
-                                    style: GoogleFonts.exo2(
-                                      color: Colors.white,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      letterSpacing: 1.1,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    '640x480 • MJPEG over DCP WebSocket',
-                                    style: GoogleFonts.exo2(
-                                      color: AppTheme.textMuted,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ],
-                              ),
                             ),
-
-                          // HUD Overlay
-                          Positioned(
-                            top: 16,
-                            left: 16,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: _isStreaming ? Colors.red : Colors.grey[800],
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const CircleAvatar(
-                                      radius: 4, backgroundColor: Colors.white),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    _isStreaming ? 'LIVE' : 'PAUSED',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
+                          );
+                        },
                       ),
                     ),
                   ),
@@ -202,6 +253,17 @@ class _CameraFeedScreenState extends State<CameraFeedScreen> {
                         ),
                         tooltip: _isStreaming ? 'Pause Stream' : 'Start Stream',
                         onPressed: _toggleStream,
+                      ),
+                      IconButton(
+                        icon: Icon(
+                          Icons.gps_off,
+                          color: isTracking
+                              ? const Color(0xFF00E5FF)
+                              : Colors.white70,
+                          size: 30,
+                        ),
+                        tooltip: 'Stop Object Tracking',
+                        onPressed: _stopTracking,
                       ),
                       IconButton(
                         icon: const Icon(Icons.camera_alt,

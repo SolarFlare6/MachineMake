@@ -137,6 +137,7 @@ class _QuadrupedDashboardScreenState extends State<QuadrupedDashboardScreen> {
       // 2. Camera Tab
       RobotCameraTab(
         deviceId: widget.device.id,
+        conn: widget.conn,
         isStreaming: _isStreaming,
         onToggleStream: _toggleCameraStream,
         onSnapshot: _takeSnapshot,

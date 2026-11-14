@@ -77,6 +77,28 @@ class ToolRelevanceFilter {
         }
       }
 
+      if (lowerPrompt.contains('track') ||
+          lowerPrompt.contains('follow') ||
+          lowerPrompt.contains('lock') ||
+          lowerPrompt.contains('target') ||
+          lowerPrompt.contains('watch') ||
+          lowerPrompt.contains('untrack') ||
+          lowerPrompt.contains('person') ||
+          lowerPrompt.contains('people') ||
+          lowerPrompt.contains('human') ||
+          lowerPrompt.contains('face') ||
+          lowerPrompt.contains('ball') ||
+          lowerPrompt.contains('cup') ||
+          lowerPrompt.contains('bottle')) {
+        if (nameLower == 'track_object' ||
+            nameLower == 'select_object' ||
+            nameLower == 'stop_tracking' ||
+            nameLower == 'cancel_tracking' ||
+            nameLower == 'get_tracked_objects') {
+          score += 14;
+        }
+      }
+
       if (_isCoreTool(nameLower, deviceProfile)) {
         score += 3;
       }
@@ -105,6 +127,8 @@ class ToolRelevanceFilter {
       'turn_off_strip',
       'pan_to_left',
       'pan_to_right',
+      'track_object',
+      'stop_tracking',
       'speak',
       'gpio_write',
       'pwm_set',
@@ -525,6 +549,44 @@ class ToolRelevanceFilter {
       ToolDefinition(
         name: 'camera_snapshot',
         description: 'Take a photo snapshot with the onboard robot camera',
+        parameters: [],
+      ),
+      ToolDefinition(
+        name: 'track_object',
+        description:
+            'Track a person ("person") or an object currently visible in the robot camera view by label ("person", "center", or a visible object label) or normalized tap coordinates (u, v)',
+        parameters: [
+          ToolParameter(
+            name: 'label',
+            type: 'string',
+            description:
+                'Target to track in camera view ("person" for person tracking, "center" for center object, or a label currently visible in camera view)',
+            required: false,
+            defaultValue: 'person',
+          ),
+          ToolParameter(
+            name: 'u',
+            type: 'float',
+            description: 'Normalized horizontal tap coordinate (0.0 to 1.0)',
+            required: false,
+          ),
+          ToolParameter(
+            name: 'v',
+            type: 'float',
+            description: 'Normalized vertical tap coordinate (0.0 to 1.0)',
+            required: false,
+          ),
+        ],
+      ),
+      ToolDefinition(
+        name: 'stop_tracking',
+        description: 'Cancel and stop active camera object tracking on the robot',
+        parameters: [],
+      ),
+      ToolDefinition(
+        name: 'get_tracked_objects',
+        description:
+            'Return current camera tracking lock status and YOLO26 object detections in view',
         parameters: [],
       ),
       ToolDefinition(

@@ -13,6 +13,7 @@ import 'package:machmake2/core/needle/needle_models.dart';
 import 'package:machmake2/core/needle/rule_intent_matcher.dart';
 import 'package:machmake2/core/needle/target_resolver.dart';
 import 'package:machmake2/models/dcp_models.dart';
+import 'package:machmake2/screens/robot/robot_camera_tab.dart';
 import 'package:machmake2/services/llm_model_manager.dart';
 import 'package:machmake2/theme/app_theme.dart';
 import 'package:machmake2/widgets/needle_model_settings_card.dart';
@@ -229,6 +230,60 @@ void main() {
         targetDeviceName: 'Desktop PC',
       );
       expect(rejectedOnPc.toolName, isEmpty);
+
+      // Verify object tracking voice rules ("track the person", "follow the ball", "stop tracking")
+      final trackPersonPlan = RuleIntentMatcher.match(
+        'track the person',
+        robotTools,
+        targetDeviceId: 'robot-1',
+        targetDeviceName: 'Spot Quadruped',
+      );
+      expect(trackPersonPlan.toolName, equals('track_object'));
+      expect(trackPersonPlan.parameters['label'], equals('person'));
+
+      final followMePlan = RuleIntentMatcher.match(
+        'follow me',
+        robotTools,
+        targetDeviceId: 'robot-1',
+        targetDeviceName: 'Spot Quadruped',
+      );
+      expect(followMePlan.toolName, equals('track_object'));
+      expect(followMePlan.parameters['label'], equals('person'));
+
+      final trackCenterPlan = RuleIntentMatcher.match(
+        'track center',
+        robotTools,
+        targetDeviceId: 'robot-1',
+        targetDeviceName: 'Spot Quadruped',
+      );
+      expect(trackCenterPlan.toolName, equals('track_object'));
+      expect(trackCenterPlan.parameters['label'], equals('center'));
+
+      final followBallPlan = RuleIntentMatcher.match(
+        'follow the ball',
+        robotTools,
+        targetDeviceId: 'robot-1',
+        targetDeviceName: 'Spot Quadruped',
+      );
+      expect(followBallPlan.toolName, equals('track_object'));
+      expect(followBallPlan.parameters['label'], equals('sports ball'));
+
+      final stopTrackPlan = RuleIntentMatcher.match(
+        'stop tracking',
+        robotTools,
+        targetDeviceId: 'robot-1',
+        targetDeviceName: 'Spot Quadruped',
+      );
+      expect(stopTrackPlan.toolName, equals('stop_tracking'));
+
+      // Verify "track the person" is rejected on PC
+      final trackOnPc = RuleIntentMatcher.match(
+        'track the person',
+        pcTools,
+        targetDeviceId: 'pc-1',
+        targetDeviceName: 'Desktop PC',
+      );
+      expect(trackOnPc.toolName, isEmpty);
     });
   });
 
@@ -416,6 +471,44 @@ void main() {
       expect(tester.takeException(), isNull);
       expect(find.text('Test Voice AI'), findsOneWidget);
       expect(find.text('Delete Model'), findsOneWidget);
+    });
+
+    testWidgets('RobotCameraTab tap-to-track and chip selection render without RenderFlex overflow on phone width', (tester) async {
+      tester.view.physicalSize = const Size(380, 800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.darkTheme,
+          home: Scaffold(
+            body: RobotCameraTab(
+              deviceId: 'robot-1',
+              isStreaming: true,
+              onToggleStream: () {},
+              onSnapshot: () {},
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+
+      // Tap "person" chip to trigger tracking
+      await tester.tap(find.text('person'));
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+
+      // Tap on the camera viewport to trigger tap-to-track with long coordinates label
+      await tester.tapAt(const Offset(190, 140));
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+
+      // Tap Stop Track
+      await tester.tap(find.text('Stop Track'));
+      await tester.pump();
+      expect(tester.takeException(), isNull);
     });
   });
 }

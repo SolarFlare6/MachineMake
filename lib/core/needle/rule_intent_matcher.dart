@@ -717,6 +717,69 @@ class RuleIntentMatcher {
       );
     }
 
+    // ── 8b. Visual Object Tracking (stop_tracking & track_object) ───────────
+    if (RegExp(
+      r'\b(stop\s+tracking|cancel\s+tracking|stop\s+following|cancel\s+track|untrack|unlock\s+target|clear\s+tracking|release\s+target)\b',
+    ).hasMatch(lower)) {
+      thoughts.add('Matched stop_tracking intent');
+      return NeedlePlan(
+        toolName: 'stop_tracking',
+        parameters: const {},
+        explanation: 'Stopping active camera object tracking',
+        confidence: 0.98,
+        thoughts: thoughts,
+        source: NeedlePlanSource.rules,
+        targetDeviceId: targetDeviceId,
+        targetDeviceName: targetDeviceName,
+      );
+    }
+
+    final trackMatch = RegExp(
+      r'\b(?:track|follow|lock\s+on(?:to)?|watch|look\s+at|focus\s+on|select)\s+(?:the\s+|a\s+|an\s+|onto\s+)?([a-z0-9\s]+)$',
+    ).firstMatch(lower);
+    if (trackMatch != null &&
+        !lower.contains('next track') &&
+        !lower.contains('previous track') &&
+        !lower.contains('prev track') &&
+        !lower.contains('skip track')) {
+      var rawTarget = trackMatch.group(1)?.trim() ?? '';
+      rawTarget = rawTarget
+          .replaceAll(
+            RegExp(r'\s+(?:with|on|using)\s+(?:the\s+)?camera.*$'),
+            '',
+          )
+          .trim();
+      if (rawTarget == 'me' ||
+          rawTarget == 'myself' ||
+          rawTarget == 'person' ||
+          rawTarget == 'people' ||
+          rawTarget == 'human' ||
+          rawTarget == 'face' ||
+          rawTarget == 'user') {
+        rawTarget = 'person';
+      } else if (rawTarget == 'ball') {
+        rawTarget = 'sports ball';
+      } else if (rawTarget.isEmpty ||
+          rawTarget == 'object' ||
+          rawTarget == 'target' ||
+          rawTarget == 'center' ||
+          rawTarget == 'middle' ||
+          rawTarget == 'front') {
+        rawTarget = 'center';
+      }
+      thoughts.add('Matched track_object intent: label="$rawTarget"');
+      return NeedlePlan(
+        toolName: 'track_object',
+        parameters: {'label': rawTarget},
+        explanation: 'Tracking "$rawTarget" with the robot camera',
+        confidence: 0.97,
+        thoughts: thoughts,
+        source: NeedlePlanSource.rules,
+        targetDeviceId: targetDeviceId,
+        targetDeviceName: targetDeviceName,
+      );
+    }
+
     // ── 9. Locomotion Poses (stand, sit, crouch, stop) ──────────────────────
     if (RegExp(r'\b(stand|stand up|get up|rise|pose stand)\b').hasMatch(lower)) {
       thoughts.add('Detected pose intent: stand up');

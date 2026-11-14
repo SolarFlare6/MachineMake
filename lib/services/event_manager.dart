@@ -22,6 +22,14 @@ class EventManager extends ChangeNotifier {
   final Map<String, Map<String, dynamic>> _latestImuData = {};
   Map<String, dynamic>? _lastGlobalImuData;
 
+  /// Cache of the most recent camera tracking state per deviceId.
+  final Map<String, Map<String, dynamic>> _latestTrackingInfo = {};
+  Map<String, dynamic>? _lastGlobalTrackingInfo;
+
+  /// Cache of the most recent YOLOv8 object detections per deviceId.
+  final Map<String, List<Map<String, dynamic>>> _latestDetections = {};
+  List<Map<String, dynamic>> _lastGlobalDetections = const [];
+
   /// Global stream of all events from all devices.
   Stream<DeviceEvent> get events => _bus.stream;
 
@@ -63,6 +71,55 @@ class EventManager extends ChangeNotifier {
     return _lastGlobalImuData;
   }
 
+  /// Returns the latest camera tracking metadata (`active`, `bbox`, `target_label`) for [deviceId].
+  Map<String, dynamic>? latestTrackingInfo([String? deviceId]) {
+    if (deviceId != null && _latestTrackingInfo.containsKey(deviceId)) {
+      return _latestTrackingInfo[deviceId];
+    }
+    return _lastGlobalTrackingInfo;
+  }
+
+  /// Returns whether visual object tracking is currently locked on [deviceId].
+  bool isTrackingActive([String? deviceId]) {
+    final info = latestTrackingInfo(deviceId);
+    return info != null && info['active'] == true;
+  }
+
+  /// Returns the active tracked object label (if any) for [deviceId].
+  String? trackingTargetLabel([String? deviceId]) {
+    final info = latestTrackingInfo(deviceId);
+    final lbl = info?['target_label'] ?? info?['label'];
+    if (lbl is String && lbl.trim().isNotEmpty) {
+      return lbl.trim();
+    }
+    return null;
+  }
+
+  /// Returns the latest YOLOv8 detections reported in `camera_frame` for [deviceId].
+  List<Map<String, dynamic>> latestDetections([String? deviceId]) {
+    if (deviceId != null && _latestDetections.containsKey(deviceId)) {
+      return _latestDetections[deviceId]!;
+    }
+    return _lastGlobalDetections;
+  }
+
+  /// Optimistically updates the local tracking state for [deviceId] when the user starts/stops tracking.
+  void setTrackingState(
+    String? deviceId, {
+    required bool active,
+    String? label,
+  }) {
+    final map = <String, dynamic>{
+      'active': active,
+      if (label != null) 'target_label': label,
+    };
+    if (deviceId != null && deviceId.isNotEmpty) {
+      _latestTrackingInfo[deviceId] = map;
+    }
+    _lastGlobalTrackingInfo = map;
+    notifyListeners();
+  }
+
   /// Stores a decoded JPEG camera frame directly (e.g. from a `camera_snapshot` tool response).
   void updateCameraFrame(String deviceId, Uint8List bytes) {
     if (bytes.isEmpty) return;
@@ -89,6 +146,27 @@ class EventManager extends ChangeNotifier {
             _lastGlobalCameraFrame = bytes;
           }
         } catch (_) {}
+      }
+
+      final rawTracking = event.data['tracking'];
+      if (rawTracking is Map) {
+        final trkMap = Map<String, dynamic>.from(rawTracking);
+        if (event.deviceId.isNotEmpty) {
+          _latestTrackingInfo[event.deviceId] = trkMap;
+        }
+        _lastGlobalTrackingInfo = trkMap;
+      }
+
+      final rawDetections = event.data['detections'];
+      if (rawDetections is List) {
+        final detList = rawDetections
+            .whereType<Map>()
+            .map((m) => Map<String, dynamic>.from(m))
+            .toList();
+        if (event.deviceId.isNotEmpty) {
+          _latestDetections[event.deviceId] = detList;
+        }
+        _lastGlobalDetections = detList;
       }
     } else if (event.eventType == 'telemetry') {
       final rawImu = event.data['imu'];
