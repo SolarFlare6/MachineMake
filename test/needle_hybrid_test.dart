@@ -532,6 +532,10 @@ void main() {
       expect(find.text('Camera Pan / Tilt'), findsOneWidget);
       expect(find.text('STOP'), findsOneWidget);
       expect(find.byIcon(Icons.center_focus_strong), findsOneWidget);
+
+      await tester.tap(find.byIcon(Icons.center_focus_strong));
+      await tester.pump();
+      expect(tester.takeException(), isNull);
     });
   });
 }

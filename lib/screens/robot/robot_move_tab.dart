@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/connection/device_connection.dart';
+import '../../services/device_manager.dart';
 import '../../services/event_manager.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/robot/robot_body_sim.dart';
@@ -14,6 +15,7 @@ import '../../widgets/robot/robot_body_sim.dart';
 ///   2. Servo control (quick PCA9685 index, angle slider, snap & pan actions)
 ///   3. RGB led plate (WS281x 8-LED strip colors, animations & buzzer tone)
 class RobotMoveTab extends StatefulWidget {
+  final String? deviceId;
   final DeviceConnection? conn;
   final Function(String direction)? onMove;
   final Function(double speed)? onSpeedChanged;
@@ -22,6 +24,7 @@ class RobotMoveTab extends StatefulWidget {
 
   const RobotMoveTab({
     super.key,
+    this.deviceId,
     this.conn,
     this.onMove,
     this.onSpeedChanged,
@@ -46,44 +49,57 @@ class _RobotMoveTabState extends State<RobotMoveTab> {
   int _selectedServo = 3;
   double _servoAngle = 70.0;
 
-  // Camera Pan / Tilt State (Index 0 = Pan, Index 1 = Tilt)
-  double _camPan = 90.0;
-  double _camTilt = 90.0;
+  // Camera angles (matching controls_screen.dart)
+  double? _camPan = 90.0;
+  double? _camTilt = 90.0;
 
   // RGB LED strip state
   Color _currentLedColor = const Color(0xFF00E676);
   Color _lastActiveLedColor = const Color(0xFF00E676);
 
-  void _sendMove(String direction) {
-    widget.onMove?.call(direction);
-    widget.conn?.session?.executeTool('walk', {
-      'direction': direction,
-      'distance': (_speed * 1.5).clamp(0.2, 5.0),
-    });
-  }
+  String get _targetId => widget.deviceId ?? widget.conn?.deviceId ?? '';
 
-  void _stopMove() {
-    widget.conn?.session?.executeTool('stand', {});
+  Future<void> _sendTool(
+    String tool,
+    Map<String, dynamic> params, [
+    String? actionLabel,
+  ]) async {
+    try {
+      final targetId = _targetId;
+      if (targetId.isNotEmpty) {
+        await DeviceManager().executeTool(targetId, tool, params);
+        return;
+      }
+      await widget.conn?.session?.executeTool(tool, params);
+    } catch (_) {
+      try {
+        await widget.conn?.session?.executeTool(tool, params);
+      } catch (_) {}
+    }
   }
 
   void _panCam(double delta) {
+    final nextPan = ((_camPan ?? 90.0) + delta).clamp(0.0, 180.0);
     setState(() {
-      _camPan = (_camPan + delta).clamp(0.0, 180.0);
+      _camPan = nextPan;
     });
-    widget.conn?.session?.executeTool('driver_set_servo_angle_with_index', {
-      'index': 0,
-      'angle': _camPan.round(),
-    });
+    _sendTool(
+      'driver_set_servo_angle_with_index',
+      {'index': 0, 'angle': nextPan.round()},
+      'Camera Pan: ${nextPan.round()}°',
+    );
   }
 
   void _tiltCam(double delta) {
+    final nextTilt = ((_camTilt ?? 90.0) + delta).clamp(20.0, 160.0);
     setState(() {
-      _camTilt = (_camTilt + delta).clamp(20.0, 160.0);
+      _camTilt = nextTilt;
     });
-    widget.conn?.session?.executeTool('driver_set_servo_angle_with_index', {
-      'index': 1,
-      'angle': _camTilt.round(),
-    });
+    _sendTool(
+      'driver_set_servo_angle_with_index',
+      {'index': 1, 'angle': nextTilt.round()},
+      'Camera Tilt: ${nextTilt.round()}°',
+    );
   }
 
   void _centerCamera() {
@@ -91,14 +107,8 @@ class _RobotMoveTabState extends State<RobotMoveTab> {
       _camPan = 90.0;
       _camTilt = 90.0;
     });
-    widget.conn?.session?.executeTool('driver_set_servo_angle_with_index', {
-      'index': 0,
-      'angle': 90,
-    });
-    widget.conn?.session?.executeTool('driver_set_servo_angle_with_index', {
-      'index': 1,
-      'angle': 90,
-    });
+    _sendTool('driver_set_servo_angle_with_index', {'index': 0, 'angle': 90}, 'Camera Centered');
+    _sendTool('driver_set_servo_angle_with_index', {'index': 1, 'angle': 90}, 'Camera Centered');
   }
 
   void _sendServoAngle(int index, double angle) {
@@ -592,164 +602,166 @@ class _RobotMoveTabState extends State<RobotMoveTab> {
     );
   }
 
+  // ── Locomotion Pad Widget ─────────────────────────────────────────
   Widget _buildLocomotionPad() {
-    return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 160, maxHeight: 160),
-      child: AspectRatio(
-        aspectRatio: 1.0,
-        child: Container(
-          decoration: BoxDecoration(
-            color: AppTheme.darkSurface,
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: AppTheme.primaryOrange.withAlpha(80),
-              width: 1.5,
+    return Container(
+      width: 160,
+      height: 160,
+      decoration: BoxDecoration(
+        color: AppTheme.darkSurface,
+        shape: BoxShape.circle,
+        border: Border.all(color: AppTheme.primaryOrange.withAlpha(80), width: 1.5),
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Forward
+          Positioned(
+            top: 6,
+            child: _buildMiniBtn(
+              icon: Icons.keyboard_arrow_up,
+              onTap: () => _sendTool(
+                'walk',
+                {'direction': 'forward', 'distance': (_speed * 2.0).clamp(0.2, 5.0)},
+                'Walking Forward',
+              ),
             ),
           ),
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Positioned(
-                top: 6,
-                child: _buildPadBtn(
-                  icon: Icons.keyboard_arrow_up,
-                  onTap: () => _sendMove('forward'),
-                ),
+          // Backward
+          Positioned(
+            bottom: 6,
+            child: _buildMiniBtn(
+              icon: Icons.keyboard_arrow_down,
+              onTap: () => _sendTool(
+                'walk',
+                {'direction': 'backward', 'distance': (_speed * 2.0).clamp(0.2, 5.0)},
+                'Walking Backward',
               ),
-              Positioned(
-                bottom: 6,
-                child: _buildPadBtn(
-                  icon: Icons.keyboard_arrow_down,
-                  onTap: () => _sendMove('backward'),
-                ),
-              ),
-              Positioned(
-                left: 6,
-                child: _buildPadBtn(
-                  icon: Icons.keyboard_arrow_left,
-                  onTap: () => _sendMove('left'),
-                ),
-              ),
-              Positioned(
-                right: 6,
-                child: _buildPadBtn(
-                  icon: Icons.keyboard_arrow_right,
-                  onTap: () => _sendMove('right'),
-                ),
-              ),
-              // Center Stop
-              GestureDetector(
-                onTap: _stopMove,
-                child: Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: AppTheme.primaryOrange,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppTheme.primaryOrange.withAlpha(60),
-                        blurRadius: 10,
-                      ),
-                    ],
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    'STOP',
-                    style: GoogleFonts.exo2(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
-        ),
+          // Left
+          Positioned(
+            left: 6,
+            child: _buildMiniBtn(
+              icon: Icons.keyboard_arrow_left,
+              onTap: () => _sendTool(
+                'turn',
+                {'direction': 'left', 'angle': 45.0},
+                'Turning Left',
+              ),
+            ),
+          ),
+          // Right
+          Positioned(
+            right: 6,
+            child: _buildMiniBtn(
+              icon: Icons.keyboard_arrow_right,
+              onTap: () => _sendTool(
+                'turn',
+                {'direction': 'right', 'angle': 45.0},
+                'Turning Right',
+              ),
+            ),
+          ),
+          // Center Stop
+          GestureDetector(
+            onTap: () => _sendTool('stand', {}, 'Stopped'),
+            child: Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: AppTheme.primaryOrange,
+                shape: BoxShape.circle,
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                'STOP',
+                style: GoogleFonts.exo2(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 10,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
+  // ── Camera Pan/Tilt Pad Widget ────────────────────────────────────
   Widget _buildCameraPad() {
-    return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 160, maxHeight: 160),
-      child: AspectRatio(
-        aspectRatio: 1.0,
-        child: Container(
-          decoration: BoxDecoration(
-            color: AppTheme.darkSurface,
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: const Color(0xFF4FC3F7).withAlpha(80),
-              width: 1.5,
+    return Container(
+      width: 160,
+      height: 160,
+      decoration: BoxDecoration(
+        color: AppTheme.darkSurface,
+        shape: BoxShape.circle,
+        border: Border.all(color: const Color(0xFF4FC3F7).withAlpha(80), width: 1.5),
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Tilt Up
+          Positioned(
+            top: 6,
+            child: _buildMiniBtn(
+              icon: Icons.keyboard_arrow_up,
+              color: const Color(0xFF4FC3F7),
+              onTap: () => _tiltCam(-15.0),
             ),
           ),
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              // Tilt Up
-              Positioned(
-                top: 6,
-                child: _buildPadBtn(
-                  icon: Icons.keyboard_arrow_up,
-                  color: const Color(0xFF4FC3F7),
-                  onTap: () => _tiltCam(-15.0),
-                ),
-              ),
-              // Tilt Down
-              Positioned(
-                bottom: 6,
-                child: _buildPadBtn(
-                  icon: Icons.keyboard_arrow_down,
-                  color: const Color(0xFF4FC3F7),
-                  onTap: () => _tiltCam(15.0),
-                ),
-              ),
-              // Pan Left
-              Positioned(
-                left: 6,
-                child: _buildPadBtn(
-                  icon: Icons.keyboard_arrow_left,
-                  color: const Color(0xFF4FC3F7),
-                  onTap: () => _panCam(15.0),
-                ),
-              ),
-              // Pan Right
-              Positioned(
-                right: 6,
-                child: _buildPadBtn(
-                  icon: Icons.keyboard_arrow_right,
-                  color: const Color(0xFF4FC3F7),
-                  onTap: () => _panCam(-15.0),
-                ),
-              ),
-              // Center Cam
-              GestureDetector(
-                onTap: _centerCamera,
-                child: Container(
-                  width: 44,
-                  height: 44,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF1E2832),
-                    shape: BoxShape.circle,
-                  ),
-                  alignment: Alignment.center,
-                  child: const Icon(
-                    Icons.center_focus_strong,
-                    color: Color(0xFF4FC3F7),
-                    size: 22,
-                  ),
-                ),
-              ),
-            ],
+          // Tilt Down
+          Positioned(
+            bottom: 6,
+            child: _buildMiniBtn(
+              icon: Icons.keyboard_arrow_down,
+              color: const Color(0xFF4FC3F7),
+              onTap: () => _tiltCam(15.0),
+            ),
           ),
-        ),
+          // Pan Left
+          Positioned(
+            left: 6,
+            child: _buildMiniBtn(
+              icon: Icons.keyboard_arrow_left,
+              color: const Color(0xFF4FC3F7),
+              onTap: () => _panCam(15.0),
+            ),
+          ),
+          // Pan Right
+          Positioned(
+            right: 6,
+            child: _buildMiniBtn(
+              icon: Icons.keyboard_arrow_right,
+              color: const Color(0xFF4FC3F7),
+              onTap: () => _panCam(-15.0),
+            ),
+          ),
+          // Center Cam
+          GestureDetector(
+            onTap: _centerCamera,
+            child: Container(
+              width: 44,
+              height: 44,
+              decoration: const BoxDecoration(
+                color: Color(0xFF1E2832),
+                shape: BoxShape.circle,
+              ),
+              alignment: Alignment.center,
+              child: const Icon(
+                Icons.center_focus_strong,
+                color: Color(0xFF4FC3F7),
+                size: 22,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildPadBtn({
+  Widget _buildMiniBtn({
     required IconData icon,
     required VoidCallback onTap,
     Color color = Colors.white,

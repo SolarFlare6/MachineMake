@@ -124,6 +124,7 @@ class _QuadrupedDashboardScreenState extends State<QuadrupedDashboardScreen> {
     final tabs = [
       // 0. Move Tab
       RobotMoveTab(
+        deviceId: widget.device.id,
         conn: widget.conn,
         onMove: _handleMove,
         onSpeedChanged: _handleSpeedChanged,
