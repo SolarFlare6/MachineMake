@@ -14,6 +14,7 @@ import 'package:machmake2/core/needle/rule_intent_matcher.dart';
 import 'package:machmake2/core/needle/target_resolver.dart';
 import 'package:machmake2/models/dcp_models.dart';
 import 'package:machmake2/screens/robot/robot_camera_tab.dart';
+import 'package:machmake2/screens/robot/robot_move_tab.dart';
 import 'package:machmake2/services/llm_model_manager.dart';
 import 'package:machmake2/theme/app_theme.dart';
 import 'package:machmake2/widgets/needle_model_settings_card.dart';
@@ -509,6 +510,28 @@ void main() {
       await tester.tap(find.text('Stop Track'));
       await tester.pump();
       expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('RobotMoveTab renders Locomotion and Camera Pan / Tilt pads without overflow on phone width', (tester) async {
+      tester.view.physicalSize = const Size(380, 800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.darkTheme,
+          home: const Scaffold(
+            body: RobotMoveTab(),
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+      expect(find.text('Locomotion'), findsOneWidget);
+      expect(find.text('Camera Pan / Tilt'), findsOneWidget);
+      expect(find.text('STOP'), findsOneWidget);
+      expect(find.byIcon(Icons.center_focus_strong), findsOneWidget);
     });
   });
 }

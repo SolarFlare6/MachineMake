@@ -46,6 +46,10 @@ class _RobotMoveTabState extends State<RobotMoveTab> {
   int _selectedServo = 3;
   double _servoAngle = 70.0;
 
+  // Camera Pan / Tilt State (Index 0 = Pan, Index 1 = Tilt)
+  double _camPan = 90.0;
+  double _camTilt = 90.0;
+
   // RGB LED strip state
   Color _currentLedColor = const Color(0xFF00E676);
   Color _lastActiveLedColor = const Color(0xFF00E676);
@@ -60,6 +64,41 @@ class _RobotMoveTabState extends State<RobotMoveTab> {
 
   void _stopMove() {
     widget.conn?.session?.executeTool('stand', {});
+  }
+
+  void _panCam(double delta) {
+    setState(() {
+      _camPan = (_camPan + delta).clamp(0.0, 180.0);
+    });
+    widget.conn?.session?.executeTool('driver_set_servo_angle_with_index', {
+      'index': 0,
+      'angle': _camPan.round(),
+    });
+  }
+
+  void _tiltCam(double delta) {
+    setState(() {
+      _camTilt = (_camTilt + delta).clamp(20.0, 160.0);
+    });
+    widget.conn?.session?.executeTool('driver_set_servo_angle_with_index', {
+      'index': 1,
+      'angle': _camTilt.round(),
+    });
+  }
+
+  void _centerCamera() {
+    setState(() {
+      _camPan = 90.0;
+      _camTilt = 90.0;
+    });
+    widget.conn?.session?.executeTool('driver_set_servo_angle_with_index', {
+      'index': 0,
+      'angle': 90,
+    });
+    widget.conn?.session?.executeTool('driver_set_servo_angle_with_index', {
+      'index': 1,
+      'angle': 90,
+    });
   }
 
   void _sendServoAngle(int index, double angle) {
@@ -468,72 +507,52 @@ class _RobotMoveTabState extends State<RobotMoveTab> {
     );
   }
 
-  // ── Movement Content (D-Pad + Speed Slider) ───────────────────────
+  // ── Movement Content (Locomotion + Camera Pan/Tilt + Speed Slider) ──
   Widget _buildMovementContent() {
     return Column(
       children: [
-        // Directional Navigation Pad
-        Center(
-          child: Container(
-            width: 200,
-            height: 200,
-            decoration: BoxDecoration(
-              color: AppTheme.darkSurface,
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: AppTheme.primaryOrange.withAlpha(70),
-                width: 1.5,
-              ),
-            ),
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                Positioned(
-                  top: 10,
-                  child: _buildDirectionBtn(Icons.keyboard_arrow_up, 'forward'),
-                ),
-                Positioned(
-                  bottom: 10,
-                  child: _buildDirectionBtn(Icons.keyboard_arrow_down, 'backward'),
-                ),
-                Positioned(
-                  left: 10,
-                  child: _buildDirectionBtn(Icons.keyboard_arrow_left, 'left'),
-                ),
-                Positioned(
-                  right: 10,
-                  child: _buildDirectionBtn(Icons.keyboard_arrow_right, 'right'),
-                ),
-                // Center Stop
-                GestureDetector(
-                  onTap: _stopMove,
-                  child: Container(
-                    width: 50,
-                    height: 50,
-                    decoration: BoxDecoration(
-                      color: AppTheme.primaryOrange,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppTheme.primaryOrange.withAlpha(60),
-                          blurRadius: 10,
-                        ),
-                      ],
-                    ),
-                    alignment: Alignment.center,
-                    child: Text(
-                      'STOP',
-                      style: GoogleFonts.exo2(
-                        color: Colors.white,
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                      ),
+        // Dual Controller Pads (Locomotion + Camera Pan / Tilt)
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Left: Robot Locomotion Pad
+            Expanded(
+              child: Column(
+                children: [
+                  Text(
+                    'Locomotion',
+                    style: GoogleFonts.exo2(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 10),
+                  _buildLocomotionPad(),
+                ],
+              ),
             ),
-          ),
+
+            const SizedBox(width: 12),
+
+            // Right: Camera Pan / Tilt Pad
+            Expanded(
+              child: Column(
+                children: [
+                  Text(
+                    'Camera Pan / Tilt',
+                    style: GoogleFonts.exo2(
+                      color: const Color(0xFF4FC3F7),
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  _buildCameraPad(),
+                ],
+              ),
+            ),
+          ],
         ),
 
         const SizedBox(height: 18),
@@ -573,21 +592,182 @@ class _RobotMoveTabState extends State<RobotMoveTab> {
     );
   }
 
-  Widget _buildDirectionBtn(IconData icon, String direction) {
+  Widget _buildLocomotionPad() {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 160, maxHeight: 160),
+      child: AspectRatio(
+        aspectRatio: 1.0,
+        child: Container(
+          decoration: BoxDecoration(
+            color: AppTheme.darkSurface,
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: AppTheme.primaryOrange.withAlpha(80),
+              width: 1.5,
+            ),
+          ),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Positioned(
+                top: 6,
+                child: _buildPadBtn(
+                  icon: Icons.keyboard_arrow_up,
+                  onTap: () => _sendMove('forward'),
+                ),
+              ),
+              Positioned(
+                bottom: 6,
+                child: _buildPadBtn(
+                  icon: Icons.keyboard_arrow_down,
+                  onTap: () => _sendMove('backward'),
+                ),
+              ),
+              Positioned(
+                left: 6,
+                child: _buildPadBtn(
+                  icon: Icons.keyboard_arrow_left,
+                  onTap: () => _sendMove('left'),
+                ),
+              ),
+              Positioned(
+                right: 6,
+                child: _buildPadBtn(
+                  icon: Icons.keyboard_arrow_right,
+                  onTap: () => _sendMove('right'),
+                ),
+              ),
+              // Center Stop
+              GestureDetector(
+                onTap: _stopMove,
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryOrange,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppTheme.primaryOrange.withAlpha(60),
+                        blurRadius: 10,
+                      ),
+                    ],
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    'STOP',
+                    style: GoogleFonts.exo2(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCameraPad() {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 160, maxHeight: 160),
+      child: AspectRatio(
+        aspectRatio: 1.0,
+        child: Container(
+          decoration: BoxDecoration(
+            color: AppTheme.darkSurface,
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: const Color(0xFF4FC3F7).withAlpha(80),
+              width: 1.5,
+            ),
+          ),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              // Tilt Up
+              Positioned(
+                top: 6,
+                child: _buildPadBtn(
+                  icon: Icons.keyboard_arrow_up,
+                  color: const Color(0xFF4FC3F7),
+                  onTap: () => _tiltCam(-15.0),
+                ),
+              ),
+              // Tilt Down
+              Positioned(
+                bottom: 6,
+                child: _buildPadBtn(
+                  icon: Icons.keyboard_arrow_down,
+                  color: const Color(0xFF4FC3F7),
+                  onTap: () => _tiltCam(15.0),
+                ),
+              ),
+              // Pan Left
+              Positioned(
+                left: 6,
+                child: _buildPadBtn(
+                  icon: Icons.keyboard_arrow_left,
+                  color: const Color(0xFF4FC3F7),
+                  onTap: () => _panCam(15.0),
+                ),
+              ),
+              // Pan Right
+              Positioned(
+                right: 6,
+                child: _buildPadBtn(
+                  icon: Icons.keyboard_arrow_right,
+                  color: const Color(0xFF4FC3F7),
+                  onTap: () => _panCam(-15.0),
+                ),
+              ),
+              // Center Cam
+              GestureDetector(
+                onTap: _centerCamera,
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF1E2832),
+                    shape: BoxShape.circle,
+                  ),
+                  alignment: Alignment.center,
+                  child: const Icon(
+                    Icons.center_focus_strong,
+                    color: Color(0xFF4FC3F7),
+                    size: 22,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPadBtn({
+    required IconData icon,
+    required VoidCallback onTap,
+    Color color = Colors.white,
+  }) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () => _sendMove(direction),
-        borderRadius: BorderRadius.circular(20),
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
         child: Container(
-          width: 46,
-          height: 46,
+          width: 38,
+          height: 38,
           decoration: BoxDecoration(
             color: AppTheme.darkCard,
             shape: BoxShape.circle,
             border: Border.all(color: AppTheme.darkBorder),
           ),
-          child: Icon(icon, color: Colors.white, size: 28),
+          child: Icon(icon, color: color, size: 24),
         ),
       ),
     );
