@@ -604,160 +604,182 @@ class _RobotMoveTabState extends State<RobotMoveTab> {
 
   // ── Locomotion Pad Widget ─────────────────────────────────────────
   Widget _buildLocomotionPad() {
-    return Container(
-      width: 160,
-      height: 160,
-      decoration: BoxDecoration(
-        color: AppTheme.darkSurface,
-        shape: BoxShape.circle,
-        border: Border.all(color: AppTheme.primaryOrange.withAlpha(80), width: 1.5),
-      ),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          // Forward
-          Positioned(
-            top: 6,
-            child: _buildMiniBtn(
-              icon: Icons.keyboard_arrow_up,
-              onTap: () => _sendTool(
-                'walk',
-                {'direction': 'forward', 'distance': (_speed * 2.0).clamp(0.2, 5.0)},
-                'Walking Forward',
-              ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final padSize = math.min(constraints.maxWidth, 160.0);
+        return Container(
+          width: padSize,
+          height: padSize,
+          decoration: BoxDecoration(
+            color: AppTheme.darkSurface,
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: AppTheme.primaryOrange.withAlpha(80),
+              width: 1.5,
             ),
           ),
-          // Backward
-          Positioned(
-            bottom: 6,
-            child: _buildMiniBtn(
-              icon: Icons.keyboard_arrow_down,
-              onTap: () => _sendTool(
-                'walk',
-                {'direction': 'backward', 'distance': (_speed * 2.0).clamp(0.2, 5.0)},
-                'Walking Backward',
-              ),
-            ),
-          ),
-          // Left
-          Positioned(
-            left: 6,
-            child: _buildMiniBtn(
-              icon: Icons.keyboard_arrow_left,
-              onTap: () => _sendTool(
-                'turn',
-                {'direction': 'left', 'angle': 45.0},
-                'Turning Left',
-              ),
-            ),
-          ),
-          // Right
-          Positioned(
-            right: 6,
-            child: _buildMiniBtn(
-              icon: Icons.keyboard_arrow_right,
-              onTap: () => _sendTool(
-                'turn',
-                {'direction': 'right', 'angle': 45.0},
-                'Turning Right',
-              ),
-            ),
-          ),
-          // Center Stop
-          GestureDetector(
-            onTap: () => _sendTool('stand', {}, 'Stopped'),
-            child: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: AppTheme.primaryOrange,
-                shape: BoxShape.circle,
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                'STOP',
-                style: GoogleFonts.exo2(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 10,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              // Forward
+              Positioned(
+                top: 6,
+                child: _buildMiniBtn(
+                  icon: Icons.keyboard_arrow_up,
+                  onTap: () => _sendTool(
+                    'walk',
+                    {
+                      'direction': 'forward',
+                      'distance': (_speed * 2.0).clamp(0.2, 5.0),
+                    },
+                    'Walking Forward',
+                  ),
                 ),
               ),
-            ),
+              // Backward
+              Positioned(
+                bottom: 6,
+                child: _buildMiniBtn(
+                  icon: Icons.keyboard_arrow_down,
+                  onTap: () => _sendTool(
+                    'walk',
+                    {
+                      'direction': 'backward',
+                      'distance': (_speed * 2.0).clamp(0.2, 5.0),
+                    },
+                    'Walking Backward',
+                  ),
+                ),
+              ),
+              // Left
+              Positioned(
+                left: 6,
+                child: _buildMiniBtn(
+                  icon: Icons.keyboard_arrow_left,
+                  onTap: () => _sendTool(
+                    'turn',
+                    {'direction': 'left', 'angle': 45.0},
+                    'Turning Left',
+                  ),
+                ),
+              ),
+              // Right
+              Positioned(
+                right: 6,
+                child: _buildMiniBtn(
+                  icon: Icons.keyboard_arrow_right,
+                  onTap: () => _sendTool(
+                    'turn',
+                    {'direction': 'right', 'angle': 45.0},
+                    'Turning Right',
+                  ),
+                ),
+              ),
+              // Center Stop
+              GestureDetector(
+                onTap: () => _sendTool('stand', {}, 'Stopped'),
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryOrange,
+                    shape: BoxShape.circle,
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    'STOP',
+                    style: GoogleFonts.exo2(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 10,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
   // ── Camera Pan/Tilt Pad Widget ────────────────────────────────────
   Widget _buildCameraPad() {
-    return Container(
-      width: 160,
-      height: 160,
-      decoration: BoxDecoration(
-        color: AppTheme.darkSurface,
-        shape: BoxShape.circle,
-        border: Border.all(color: const Color(0xFF4FC3F7).withAlpha(80), width: 1.5),
-      ),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          // Tilt Up
-          Positioned(
-            top: 6,
-            child: _buildMiniBtn(
-              icon: Icons.keyboard_arrow_up,
-              color: const Color(0xFF4FC3F7),
-              onTap: () => _tiltCam(-15.0),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final padSize = math.min(constraints.maxWidth, 160.0);
+        return Container(
+          width: padSize,
+          height: padSize,
+          decoration: BoxDecoration(
+            color: AppTheme.darkSurface,
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: const Color(0xFF4FC3F7).withAlpha(80),
+              width: 1.5,
             ),
           ),
-          // Tilt Down
-          Positioned(
-            bottom: 6,
-            child: _buildMiniBtn(
-              icon: Icons.keyboard_arrow_down,
-              color: const Color(0xFF4FC3F7),
-              onTap: () => _tiltCam(15.0),
-            ),
-          ),
-          // Pan Left
-          Positioned(
-            left: 6,
-            child: _buildMiniBtn(
-              icon: Icons.keyboard_arrow_left,
-              color: const Color(0xFF4FC3F7),
-              onTap: () => _panCam(15.0),
-            ),
-          ),
-          // Pan Right
-          Positioned(
-            right: 6,
-            child: _buildMiniBtn(
-              icon: Icons.keyboard_arrow_right,
-              color: const Color(0xFF4FC3F7),
-              onTap: () => _panCam(-15.0),
-            ),
-          ),
-          // Center Cam
-          GestureDetector(
-            onTap: _centerCamera,
-            child: Container(
-              width: 44,
-              height: 44,
-              decoration: const BoxDecoration(
-                color: Color(0xFF1E2832),
-                shape: BoxShape.circle,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              // Tilt Up
+              Positioned(
+                top: 6,
+                child: _buildMiniBtn(
+                  icon: Icons.keyboard_arrow_up,
+                  color: const Color(0xFF4FC3F7),
+                  onTap: () => _tiltCam(-15.0),
+                ),
               ),
-              alignment: Alignment.center,
-              child: const Icon(
-                Icons.center_focus_strong,
-                color: Color(0xFF4FC3F7),
-                size: 22,
+              // Tilt Down
+              Positioned(
+                bottom: 6,
+                child: _buildMiniBtn(
+                  icon: Icons.keyboard_arrow_down,
+                  color: const Color(0xFF4FC3F7),
+                  onTap: () => _tiltCam(15.0),
+                ),
               ),
-            ),
+              // Pan Left
+              Positioned(
+                left: 6,
+                child: _buildMiniBtn(
+                  icon: Icons.keyboard_arrow_left,
+                  color: const Color(0xFF4FC3F7),
+                  onTap: () => _panCam(15.0),
+                ),
+              ),
+              // Pan Right
+              Positioned(
+                right: 6,
+                child: _buildMiniBtn(
+                  icon: Icons.keyboard_arrow_right,
+                  color: const Color(0xFF4FC3F7),
+                  onTap: () => _panCam(-15.0),
+                ),
+              ),
+              // Center Cam
+              GestureDetector(
+                onTap: _centerCamera,
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF1E2832),
+                    shape: BoxShape.circle,
+                  ),
+                  alignment: Alignment.center,
+                  child: const Icon(
+                    Icons.center_focus_strong,
+                    color: Color(0xFF4FC3F7),
+                    size: 22,
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 

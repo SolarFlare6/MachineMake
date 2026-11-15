@@ -475,7 +475,7 @@ void main() {
     });
 
     testWidgets('RobotCameraTab tap-to-track and chip selection render without RenderFlex overflow on phone width', (tester) async {
-      tester.view.physicalSize = const Size(380, 800);
+      tester.view.physicalSize = const Size(360, 780);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
@@ -496,13 +496,23 @@ void main() {
       await tester.pump();
       expect(tester.takeException(), isNull);
 
+      // Verify Stop Stream and Stop Track buttons stay single-line (height == 48) on 360dp S23 width
+      final stopStreamSize = tester.getSize(
+        find.ancestor(of: find.text('Stop Stream'), matching: find.bySubtype<ButtonStyleButton>()),
+      );
+      final stopTrackSize = tester.getSize(
+        find.ancestor(of: find.text('Stop Track'), matching: find.bySubtype<ButtonStyleButton>()),
+      );
+      expect(stopStreamSize.height, closeTo(48.0, 2.0));
+      expect(stopTrackSize.height, closeTo(48.0, 2.0));
+
       // Tap "person" chip to trigger tracking
       await tester.tap(find.text('person'));
       await tester.pump();
       expect(tester.takeException(), isNull);
 
       // Tap on the camera viewport to trigger tap-to-track with long coordinates label
-      await tester.tapAt(const Offset(190, 140));
+      await tester.tapAt(const Offset(180, 140));
       await tester.pump();
       expect(tester.takeException(), isNull);
 
@@ -513,7 +523,7 @@ void main() {
     });
 
     testWidgets('RobotMoveTab renders Locomotion and Camera Pan / Tilt pads without overflow on phone width', (tester) async {
-      tester.view.physicalSize = const Size(380, 800);
+      tester.view.physicalSize = const Size(360, 780);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);

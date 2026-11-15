@@ -497,24 +497,35 @@ class _RobotCameraTabState extends State<RobotCameraTab> {
                         foregroundColor: widget.isStreaming
                             ? Colors.white
                             : AppTheme.textDarkButton,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 14,
+                        ),
+                        minimumSize: const Size(0, 48),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),
                         ),
                       ),
                       icon: Icon(
                         widget.isStreaming ? Icons.stop : Icons.play_arrow,
+                        size: 18,
                       ),
-                      label: Text(
-                        widget.isStreaming ? 'Stop Stream' : 'Start Camera',
-                        style: GoogleFonts.exo2(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
+                      label: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          widget.isStreaming ? 'Stop Stream' : 'Start Camera',
+                          maxLines: 1,
+                          softWrap: false,
+                          style: GoogleFonts.exo2(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
                         ),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: ElevatedButton.icon(
                       onPressed: _stopTracking,
@@ -524,7 +535,12 @@ class _RobotCameraTabState extends State<RobotCameraTab> {
                             : AppTheme.darkCard,
                         foregroundColor:
                             isTracking ? Colors.black : Colors.white70,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 14,
+                        ),
+                        minimumSize: const Size(0, 48),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),
                           side: BorderSide(
@@ -534,24 +550,31 @@ class _RobotCameraTabState extends State<RobotCameraTab> {
                           ),
                         ),
                       ),
-                      icon: const Icon(Icons.gps_off, size: 18),
-                      label: Text(
-                        'Stop Track',
-                        style: GoogleFonts.exo2(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
+                      icon: const Icon(Icons.gps_off, size: 17),
+                      label: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          'Stop Track',
+                          maxLines: 1,
+                          softWrap: false,
+                          style: GoogleFonts.exo2(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
                         ),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 8),
                   IconButton.filled(
                     onPressed: widget.onSnapshot,
-                    icon: const Icon(Icons.camera_alt),
+                    icon: const Icon(Icons.camera_alt, size: 20),
                     style: IconButton.styleFrom(
                       backgroundColor: AppTheme.darkCard,
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.all(14),
+                      minimumSize: const Size(48, 48),
+                      padding: const EdgeInsets.all(13),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
                         side: const BorderSide(color: AppTheme.darkBorder),
@@ -563,13 +586,16 @@ class _RobotCameraTabState extends State<RobotCameraTab> {
                     onPressed: () => setState(() => _hudEnabled = !_hudEnabled),
                     icon: Icon(
                       _hudEnabled ? Icons.visibility : Icons.visibility_off,
+                      size: 20,
                       color: _hudEnabled
                           ? AppTheme.primaryOrange
                           : AppTheme.textMuted,
                     ),
                     style: IconButton.styleFrom(
                       backgroundColor: AppTheme.darkCard,
-                      padding: const EdgeInsets.all(14),
+                      minimumSize: const Size(48, 48),
+                      padding: const EdgeInsets.all(13),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
                         side: const BorderSide(color: AppTheme.darkBorder),
