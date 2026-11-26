@@ -893,6 +893,17 @@ class DeviceManager extends ChangeNotifier {
     final requiresConfirm = needleResponse.error == 'CONFIRMATION_REQUIRED' ||
         ((needleResponse.plan?.requiresConfirmation ?? false) && !allowDestructive);
 
+    // Trigger robot voice command acknowledgment ("Alright executing request" + pleasant buzzer tone + blink_oke)
+    final executedTool = needleResponse.plan?.toolName ?? '';
+    if (needleResponse.success && !requiresConfirm && executedTool != 'needle_prompt') {
+      final targetConn = _connections[needleResponse.plan?.targetDeviceId ?? effectiveId] ?? conn;
+      final isSpeakTool = executedTool == 'speak' || executedTool == 'stop_audio' || executedTool == 'stop_tone';
+      targetConn.session?.executeTool('acknowledge_voice_command', {
+        'tool': executedTool,
+        'speak_ack': !isSpeakTool,
+      }).catchError((_) => <String, dynamic>{});
+    }
+
     return VoiceExecutionResult(
       success: needleResponse.success,
       toolName: needleResponse.plan?.toolName,

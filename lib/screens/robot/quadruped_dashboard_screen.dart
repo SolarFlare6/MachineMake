@@ -114,6 +114,8 @@ class _QuadrupedDashboardScreenState extends State<QuadrupedDashboardScreen> {
       widget.conn?.session?.executeTool('set_autonomy', {'enabled': val == true});
     } else if (param == 'active_stabilizer' || param == 'stabilizer_enabled') {
       widget.conn?.session?.executeTool('set_stabilizer', {'enabled': val == true});
+    } else if (param == 'reduced_walking' || param == 'reduced_walking_enabled') {
+      widget.conn?.session?.executeTool('set_reduced_walking', {'enabled': val == true});
     } else {
       widget.conn?.session?.executeTool('set_config', {'param': param, 'value': val});
     }

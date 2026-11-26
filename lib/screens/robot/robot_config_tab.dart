@@ -22,6 +22,7 @@ class RobotConfigTab extends StatefulWidget {
 class _RobotConfigTabState extends State<RobotConfigTab> {
   bool _stabilizerEnabled = true;
   bool _autonomyEnabled = false;
+  bool _reducedWalkingEnabled = true;
 
   @override
   Widget build(BuildContext context) {
@@ -93,6 +94,35 @@ class _RobotConfigTabState extends State<RobotConfigTab> {
                   SnackBar(
                     content: Text(
                       val ? 'Autonomous mode enabled' : 'Autonomous mode disabled',
+                      style: GoogleFonts.exo2(),
+                    ),
+                    backgroundColor: val ? AppTheme.primaryOrange : Colors.white24,
+                    duration: const Duration(milliseconds: 900),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+            },
+          ),
+
+          const SizedBox(height: 12),
+
+          // reduced walking mode option
+          _buildSwitchCard(
+            title: 'Reduced Walking Mode',
+            subtitle: 'When ON, uses folded-leg CPG gait (reduced_walking.py). When OFF, uses Full Standing Mode.',
+            icon: Icons.directions_walk,
+            value: _reducedWalkingEnabled,
+            onChanged: (val) {
+              setState(() => _reducedWalkingEnabled = val);
+              widget.onParamChanged('reduced_walking', val);
+              ScaffoldMessenger.of(context)
+                ..hideCurrentSnackBar()
+                ..showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      val
+                          ? 'Reduced Walking Mode ON (folded-leg CPG gait)'
+                          : 'Reduced Walking Mode OFF (Full Standing Mode)',
                       style: GoogleFonts.exo2(),
                     ),
                     backgroundColor: val ? AppTheme.primaryOrange : Colors.white24,

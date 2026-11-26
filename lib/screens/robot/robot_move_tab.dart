@@ -51,7 +51,7 @@ class _RobotMoveTabState extends State<RobotMoveTab> {
 
   // Camera angles (matching controls_screen.dart)
   double? _camPan = 90.0;
-  double? _camTilt = 90.0;
+  double? _camTilt = 52.0;
 
   // RGB LED strip state
   Color _currentLedColor = const Color(0xFF00E676);
@@ -91,7 +91,7 @@ class _RobotMoveTabState extends State<RobotMoveTab> {
   }
 
   void _tiltCam(double delta) {
-    final nextTilt = ((_camTilt ?? 90.0) + delta).clamp(20.0, 160.0);
+    final nextTilt = ((_camTilt ?? 52.0) + delta).clamp(0.0, 180.0);
     setState(() {
       _camTilt = nextTilt;
     });
@@ -105,10 +105,10 @@ class _RobotMoveTabState extends State<RobotMoveTab> {
   void _centerCamera() {
     setState(() {
       _camPan = 90.0;
-      _camTilt = 90.0;
+      _camTilt = 52.0;
     });
     _sendTool('driver_set_servo_angle_with_index', {'index': 0, 'angle': 90}, 'Camera Centered');
-    _sendTool('driver_set_servo_angle_with_index', {'index': 1, 'angle': 90}, 'Camera Centered');
+    _sendTool('driver_set_servo_angle_with_index', {'index': 1, 'angle': 52}, 'Camera Centered');
   }
 
   void _sendServoAngle(int index, double angle) {
@@ -565,7 +565,48 @@ class _RobotMoveTabState extends State<RobotMoveTab> {
           ],
         ),
 
-        const SizedBox(height: 18),
+        const SizedBox(height: 14),
+
+        // Quick Posture Row: Stand Up vs Sit / Rest Down
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(color: AppTheme.primaryOrange.withAlpha(180)),
+                  foregroundColor: AppTheme.primaryOrange,
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                onPressed: () => _sendTool('stand', {}, 'Standing Up'),
+                icon: const Icon(Icons.accessibility_new, size: 17),
+                label: Text(
+                  'Stand Up',
+                  style: GoogleFonts.exo2(fontWeight: FontWeight.bold, fontSize: 12),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Colors.white24),
+                  foregroundColor: Colors.white70,
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                onPressed: () => _sendTool('sit', {}, 'Resting Down'),
+                icon: const Icon(Icons.airline_seat_recline_normal, size: 17),
+                label: Text(
+                  'Rest / Sit',
+                  style: GoogleFonts.exo2(fontWeight: FontWeight.bold, fontSize: 12),
+                ),
+              ),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 14),
 
         // Speed Slider
         Row(
